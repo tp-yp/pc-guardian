@@ -17,11 +17,10 @@ public sealed record ControlResponse(bool Ok, string Message);
 /// The pipe is reachable by local interactive users only; the password is the real gate.
 /// </summary>
 public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedConfigStore store, IHostApplicationLifetime life,
-    Guardian.Service.Enforcers.LockoutExemptions exemptions, Guardian.Service.Enforcers.NetworkEnforcer network)
+    Guardian.Service.Enforcers.LockoutExemptions exemptions, Guardian.Service.Enforcers.NetworkEnforcer network, AdminGate gate)
     : BackgroundService
 {
     public const string PipeName = "GuardianControl";
-    private readonly AdminGate _gate = new();
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -53,7 +52,7 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
     private ControlResponse Handle(ControlRequest req)
     {
         var cfg = store.Load();
-        var auth = _gate.Authenticate(cfg, req.Password);
+        var auth = gate.Authenticate(cfg, req.Password);
         log.LogInformation("Control '{Cmd}': {Auth}", req.Command, auth);
         if (auth == AuthResult.LockedOut) return new(false, "Too many wrong passwords. Try again later.");
         if (auth == AuthResult.Denied) return new(false, "Access denied.");
@@ -84,6 +83,7 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
             case "uninstall":
                 Guardian.Service.Enforcers.LockoutEnforcer.RestoreAll(cfg);
                 network.Restore();
+                Guardian.Service.Enforcers.ProxyHost.RemoveCa();
                 // Running as SYSTEM: restore the normal DACL and remove restart actions,
                 // then remove config and let the CLI stop/delete the service.
                 ServiceHardening.Unharden(cfg.ServiceName);

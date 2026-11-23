@@ -12,6 +12,7 @@ using Guardian.Service.Enforcers;
 // guardian export FILE.json            -> write current policy (no secrets) to a file
 // guardian import FILE.json            -> replace policy from a file
 // guardian set-password admin|recovery
+// guardian ui                          -> open the management page (http://127.0.0.1:8898)
 // guardian hash FILE.exe               -> print SHA-256 for an app rule
 // guardian unlock USER MINUTES         -> temporarily lift the schedule lock for a user
 
@@ -24,6 +25,8 @@ switch (cmd)
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddWindowsService();
         builder.Services.AddSingleton(store);
+        builder.Services.AddSingleton<AdminGate>();
+        builder.Services.AddHostedService<Guardian.Service.Ui.ManagementUi>();
         builder.Services.AddSingleton<LockoutExemptions>();
         builder.Services.AddSingleton<LockoutEnforcer>();
         builder.Services.AddSingleton<AppBlocker>();
@@ -31,6 +34,8 @@ switch (cmd)
         builder.Services.AddSingleton<NetworkEnforcer>();
         builder.Services.AddSingleton<DnsFilterServer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DnsFilterServer>());
+        builder.Services.AddSingleton<ProxyHost>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<ProxyHost>());
         builder.Services.AddHostedService<EnforcementWorker>();
         builder.Services.AddHostedService<ControlPipeServer>();
         builder.Build().Run();
@@ -106,6 +111,10 @@ switch (cmd)
         return resp.Ok ? 0 : 2;
     }
 
+    case "ui":
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("http://127.0.0.1:8898/") { UseShellExecute = true });
+        return 0;
+
     case "hash":
     {
         var f = args.ElementAtOrDefault(1);
@@ -120,7 +129,7 @@ switch (cmd)
         return 0;
 
     default:
-        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery | unlock USER MINUTES | hash FILE");
+        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery | unlock USER MINUTES | hash FILE | ui");
         return cmd == "help" ? 0 : 1;
 }
 

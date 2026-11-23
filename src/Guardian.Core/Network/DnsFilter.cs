@@ -27,6 +27,6 @@ public static class DnsFilter
         if (!policy.Enabled) return true;
         if (AlwaysBlocked.Any(d => UrlPolicy.HostMatches(host, d))) return false;
         if (policy.Mode == UrlMode.Allowlist && AlwaysAllowed.Any(d => UrlPolicy.HostMatches(host, d))) return true;
-        return UrlPolicy.IsAllowed(policy, host);
+        return UrlPolicy.IsHostAllowed(policy, host);
     }
 }

@@ -13,7 +13,9 @@ namespace Guardian.Service.Enforcers;
 ///  * per-app outbound block rules (network.blockedAppPaths);
 ///  * block outbound DNS (53) and DNS-over-TLS (853) to anything but loopback, so apps can't bypass the filter;
 ///  * browser policies that turn off built-in DNS-over-HTTPS;
-///  * Windows Firewall kept on for all profiles.
+///  * Windows Firewall kept on for all profiles;
+///  * with URL filtering: system proxy -> local proxy, and outbound "block by default" so only the
+///    proxy, Windows services (svchost/System) and allowDirectApps can connect out directly.
 /// Everything is re-checked every 30 seconds, so manual changes are reverted.
 /// </summary>
 public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
@@ -29,8 +31,10 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         _nextCheck = DateTime.UtcNow.AddSeconds(30);
         if (!cfg.Network.Enabled) { Restore(); _rulesSig = ""; return; }
 
-        EnsureFirewallOn();
+        EnsureFirewallOn(cfg.Network.UrlFiltering);
         EnsureRules(cfg.Network);
+        if (cfg.Network.UrlFiltering) { if (!SystemProxySettings.IsApplied()) SystemProxySettings.Apply(); }
+        else if (SystemProxySettings.IsApplied()) SystemProxySettings.Remove();
         EnsureLocalDns();
         EnsureBrowserDohOff();
     }
@@ -44,11 +48,19 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         };
         foreach (var path in p.BlockedAppPaths.Where(x => !string.IsNullOrWhiteSpace(x)))
             wanted.Add(($"Guardian app {ShortHash(path)}", r => { r.ApplicationName = path; }));
+        if (p.UrlFiltering)
+        {
+            // Allow rules for "block outbound by default". Block rules above still win over these.
+            var allow = new List<string> { Environment.ProcessPath!, Path.Combine(Environment.SystemDirectory, "svchost.exe"), "System" };
+            allow.AddRange(p.AllowDirectApps.Where(x => !string.IsNullOrWhiteSpace(x)));
+            foreach (var app in allow.Distinct(StringComparer.OrdinalIgnoreCase))
+                wanted.Add(($"Guardian allow {ShortHash(app)}", r => { r.ApplicationName = app; r.Action = 1; }));
+        }
 
         var fw = Fw();
         var existing = new HashSet<string>();
         foreach (dynamic r in fw.Rules) if (r.Grouping == RuleGroup) existing.Add((string)r.Name);
-        var sig = string.Join("|", wanted.Select(w => w.Name)) + "|" + string.Join(",", p.BlockedAppPaths);
+        var sig = string.Join("|", wanted.Select(w => w.Name));
         if (sig == _rulesSig && wanted.All(w => existing.Contains(w.Name))) return;
 
         foreach (var name in existing) fw.Rules.Remove(name);
@@ -61,18 +73,22 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
             rule.Action = 0;     // block
             rule.Profiles = 0x7FFFFFFF;
             rule.Enabled = true;
-            setup(rule);
+            setup(rule); // may override Action to allow
             fw.Rules.Add(rule);
         }
         _rulesSig = sig;
         log.LogInformation("Firewall rules applied ({N})", wanted.Count);
     }
 
-    private static void EnsureFirewallOn()
+    private static void EnsureFirewallOn(bool blockOutboundByDefault)
     {
         var fw = Fw();
+        var wantedAction = blockOutboundByDefault ? 0 : 1; // NET_FW_ACTION_BLOCK / ALLOW
         foreach (var profile in new[] { 1, 2, 4 }) // domain, private, public
+        {
             if (!fw.FirewallEnabled[profile]) fw.FirewallEnabled[profile] = true;
+            if ((int)fw.DefaultOutboundAction[profile] != wantedAction) fw.DefaultOutboundAction[profile] = wantedAction;
+        }
     }
 
     private void EnsureLocalDns()
@@ -110,9 +126,11 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
     /// <summary>Undo everything (policy disabled or uninstall).</summary>
     public void Restore()
     {
+        try { SystemProxySettings.Remove(); } catch (Exception ex) { log.LogWarning(ex, "Proxy settings cleanup failed"); }
         try
         {
             var fw = Fw();
+            foreach (var profile in new[] { 1, 2, 4 }) fw.DefaultOutboundAction[profile] = 1;
             var mine = new List<string>();
             foreach (dynamic r in fw.Rules) if (r.Grouping == RuleGroup) mine.Add((string)r.Name);
             foreach (var n in mine) fw.Rules.Remove(n);

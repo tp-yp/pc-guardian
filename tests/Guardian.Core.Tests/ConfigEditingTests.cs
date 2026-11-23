@@ -46,6 +46,19 @@ public class ConfigEditingTests
     }
 
     [Fact]
+    public void Network_list_editing()
+    {
+        var cfg = Cfg();
+        Assert.True(ConfigEditing.TryEditNetworkList(cfg, "domains", "add", " youtube.com/shorts ", out _));
+        Assert.True(ConfigEditing.TryEditNetworkList(cfg, "domains", "add", "YOUTUBE.com/shorts", out _)); // no duplicate
+        Assert.Equal(["a.com", "youtube.com/shorts"], cfg.Network.Domains);
+        Assert.True(ConfigEditing.TryEditNetworkList(cfg, "domains", "remove", "a.com", out _));
+        Assert.False(ConfigEditing.TryEditNetworkList(cfg, "domains", "add", "bad host", out _));
+        Assert.False(ConfigEditing.TryEditNetworkList(cfg, "nope", "add", "x.com", out _));
+        Assert.True(ConfigEditing.TryEditNetworkList(cfg, "blockedApps", "add", @"C:\Games\game.exe", out _));
+    }
+
+    [Fact]
     public void Admin_cannot_change_recovery_password()
     {
         var cfg = Cfg();

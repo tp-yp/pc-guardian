@@ -8,7 +8,7 @@ namespace Guardian.Service;
 /// One failing enforcer never stops the others.
 /// </summary>
 public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
-    NetworkEnforcer network, DnsFilterServer dns) : BackgroundService
+    NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -18,6 +18,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
             cfg.ServiceName, cfg.UserLockouts.Count, cfg.Apps.Rules.Count, cfg.Network.Domains.Count);
 
         dns.Update(cfg);
+        proxy.Update(cfg);
         Run("network", () => network.Tick(cfg, force: true));
         while (!ct.IsCancellationRequested)
         {
@@ -28,6 +29,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
                 stamp = store.LastWriteUtc;
                 cfg = store.Load();
                 dns.Update(cfg);
+                proxy.Update(cfg);
                 Run("network", () => network.Tick(cfg, force: true));
                 log.LogInformation("Policy reloaded.");
             }
