@@ -50,6 +50,59 @@ public static class ConfigEditing
         }
     }
 
+    public static readonly string[] Toggles =
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering"];
+
+    /// <summary>Turns one feature on or off.</summary>
+    public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
+    {
+        error = "";
+        switch (key)
+        {
+            case "apps.enabled": cfg.Apps.Enabled = value; return true;
+            case "apps.defaultDeny": cfg.Apps.DefaultDeny = value; return true;
+            case "apps.trustProgramFiles": cfg.Apps.TrustProgramFiles = value; return true;
+            case "network.enabled":
+                cfg.Network.Enabled = value;
+                if (!value) cfg.Network.UrlFiltering = false;
+                return true;
+            case "network.urlFiltering":
+                cfg.Network.UrlFiltering = value;
+                if (value) cfg.Network.Enabled = true; // the proxy relies on the network layer
+                return true;
+            default: error = "Unknown setting."; return false;
+        }
+    }
+
+    /// <summary>Allow/Block app rules by path or file name ("allowApps" / "blockApps").</summary>
+    public static bool TryEditAppList(GuardianConfig cfg, string list, string action, string value, out string error)
+    {
+        error = "";
+        value = value.Trim().Trim('"');
+        var kind = list switch { "allowApps" => RuleAction.Allow, "blockApps" => RuleAction.Block, _ => (RuleAction?)null };
+        if (kind is null) { error = "Unknown list."; return false; }
+        if (value.Length is 0 or > 500 || value.Any(char.IsControl)) { error = "Invalid value."; return false; }
+        var isPath = value.Contains('\\') || value.Contains('/');
+        bool Same(AppRule r) => r.Action == kind && r.When.Windows.Count == 0 &&
+            string.Equals(isPath ? r.PathPrefix : r.FileName, value, StringComparison.OrdinalIgnoreCase);
+        var existing = cfg.Apps.Rules.FindIndex(Same);
+        switch (action)
+        {
+            case "add" when existing < 0:
+                cfg.Apps.Rules.Add(isPath ? new AppRule { Action = kind.Value, PathPrefix = value } : new AppRule { Action = kind.Value, FileName = value });
+                return true;
+            case "add": return true;
+            case "remove" when existing >= 0: cfg.Apps.Rules.RemoveAt(existing); return true;
+            case "remove": error = "Not in list."; return false;
+            default: error = "Unknown action."; return false;
+        }
+    }
+
+    /// <summary>Simple (unscheduled) app rules shown in the UI lists.</summary>
+    public static List<string> SimpleAppList(GuardianConfig cfg, RuleAction kind) =>
+        cfg.Apps.Rules.Where(r => r.Action == kind && r.When.Windows.Count == 0 && r.Sha256 is null)
+            .Select(r => r.PathPrefix ?? r.FileName ?? "").Where(v => v.Length > 0).ToList();
+
     /// <summary>Adds/removes one entry of a network list ("domains", "noDecrypt", "blockedApps", "directApps").</summary>
     public static bool TryEditNetworkList(GuardianConfig cfg, string list, string action, string value, out string error)
     {

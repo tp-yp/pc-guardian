@@ -82,17 +82,9 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
                 return new(true, $"{req.Arg} unlocked until {DateTime.Now.AddMinutes(mins):HH:mm}.");
             case "uninstall":
             {
-                // Running as SYSTEM: lift every protection, undo system changes, remove config,
-                // then let the CLI stop and delete both services.
-                var services = new[] { cfg.ServiceName, cfg.WatchdogServiceName }.Where(n => n.Length > 0).ToArray();
-                foreach (var svc in services) { ServiceHardening.Unharden(svc); ServiceHardening.DisableRecovery(svc); }
-                Guardian.Service.Enforcers.LockoutEnforcer.RestoreAll(cfg);
-                network.Restore();
-                Guardian.Service.Enforcers.ProxyHost.RemoveCa();
-                DataDirSecurity.Unlock(Paths.InstallDir);
-                File.Delete(Path.Combine(Paths.DataDir, "config.bin"));
-                File.Delete(Path.Combine(Paths.DataDir, "key.bin"));
-                DataDirSecurity.Unlock(Paths.DataDir);
+                // Running as SYSTEM: lift every protection and undo system changes;
+                // the caller then stops and deletes both services.
+                var services = Uninstaller.LiftProtections(cfg, network);
                 _ = Task.Delay(500).ContinueWith(_ => life.StopApplication());
                 return new(true, string.Join(",", services));
             }
@@ -105,6 +97,7 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
     {
         using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
         pipe.Connect(timeoutMs);
+        pipe.ReadTimeout = 60_000;
         var writer = new StreamWriter(pipe) { AutoFlush = true };
         writer.WriteLine(JsonSerializer.Serialize(req));
         var line = new StreamReader(pipe).ReadLine();

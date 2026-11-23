@@ -46,6 +46,41 @@ public class ConfigEditingTests
     }
 
     [Fact]
+    public void Fresh_install_has_every_blocking_feature_off()
+    {
+        var c = GuardianConfig.CreateInitial("A1", "B2", "h1", "h2");
+        Assert.False(c.Apps.Enabled);
+        Assert.False(c.Network.Enabled);
+        Assert.False(c.Network.UrlFiltering);
+        Assert.Empty(c.UserLockouts);
+        Assert.True(c.Apps.DefaultDeny); // ready for when the owner turns app blocking on
+    }
+
+    [Fact]
+    public void Toggles_keep_network_and_proxy_consistent()
+    {
+        var c = GuardianConfig.CreateInitial("A1", "B2", "h1", "h2");
+        Assert.True(ConfigEditing.TrySetToggle(c, "network.urlFiltering", true, out _));
+        Assert.True(c.Network.Enabled);
+        Assert.True(ConfigEditing.TrySetToggle(c, "network.enabled", false, out _));
+        Assert.False(c.Network.UrlFiltering);
+        Assert.False(ConfigEditing.TrySetToggle(c, "nope", true, out _));
+    }
+
+    [Fact]
+    public void App_list_editing()
+    {
+        var c = Cfg();
+        Assert.True(ConfigEditing.TryEditAppList(c, "allowApps", "add", @"C:\Users\me\AppData\Local\Discord\", out _));
+        Assert.True(ConfigEditing.TryEditAppList(c, "blockApps", "add", "steam.exe", out _));
+        Assert.Equal([@"C:\Users\me\AppData\Local\Discord\"], ConfigEditing.SimpleAppList(c, RuleAction.Allow));
+        Assert.Equal(["steam.exe"], ConfigEditing.SimpleAppList(c, RuleAction.Block));
+        Assert.Equal("steam.exe", c.Apps.Rules[1].FileName);
+        Assert.True(ConfigEditing.TryEditAppList(c, "blockApps", "remove", "STEAM.exe", out _));
+        Assert.Empty(ConfigEditing.SimpleAppList(c, RuleAction.Block));
+    }
+
+    [Fact]
     public void Network_list_editing()
     {
         var cfg = Cfg();

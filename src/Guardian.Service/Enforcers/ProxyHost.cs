@@ -22,6 +22,9 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog) : Bac
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        // Nothing (no CA, no trusted root) until the owner turns URL filtering on.
+        while (!(_policy.Enabled && _policy.UrlFiltering)) await Task.Delay(TimeSpan.FromSeconds(3), ct);
+
         LocalCertificateAuthority ca;
         try { ca = new LocalCertificateAuthority(LoadOrCreateRoot()); }
         catch (Exception ex) { log.LogError(ex, "Proxy CA unavailable; URL filtering disabled"); return; }

@@ -24,9 +24,13 @@ public sealed class AppBlocker : IDisposable
     private volatile GuardianConfig? _cfg;
     private List<string> _trusted = [];
 
-    public AppBlocker(ILogger<AppBlocker> log)
+    private readonly AccessLog _access;
+    private readonly Lazy<string?> _selfHash = new(() => HashFile(Environment.ProcessPath!));
+
+    public AppBlocker(ILogger<AppBlocker> log, AccessLog access)
     {
         _log = log;
+        _access = access;
         try
         {
             _watcher = new ManagementEventWatcher(new WqlEventQuery("SELECT ProcessID FROM Win32_ProcessStartTrace"));
@@ -74,6 +78,11 @@ public sealed class AppBlocker : IDisposable
         var path = ProcessPath.Get(pid);
         if (string.IsNullOrEmpty(path)) return;
 
+        // Never block Guardian itself (e.g. the temporary copy that runs the uninstaller):
+        // identified by identical file contents, not by name.
+        if (Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) &&
+            _selfHash.Value is { } self && Hash(path) == self) return;
+
         var hashNeeded = cfg.Apps.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
         var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null);
         var decision = AppPolicyEvaluator.Evaluate(cfg.Apps, info, DateTime.Now, _trusted);
@@ -83,6 +92,7 @@ public sealed class AppBlocker : IDisposable
         {
             proc.Kill(entireProcessTree: true);
             _log.LogInformation("Blocked {Path} (pid {Pid}): {Reason}", path, pid, decision.Reason);
+            _access.Add("app", path, allowed: false);
             NotifyOnce(proc.SessionId, path);
         }
         catch (Exception ex) { _log.LogWarning(ex, "Could not terminate {Path}", path); }
@@ -109,6 +119,12 @@ public sealed class AppBlocker : IDisposable
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+    }
+
+    private static string? HashFile(string path)
+    {
+        try { using var fs = File.OpenRead(path); return Convert.ToHexString(SHA256.HashData(fs)); }
+        catch (Exception) { return null; }
     }
 
     private static Process? TryGet(int pid)
