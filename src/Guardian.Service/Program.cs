@@ -3,14 +3,19 @@ using Guardian.Core.Naming;
 using Guardian.Core.Security;
 using Guardian.Core.Storage;
 using Guardian.Service;
+using Guardian.Service.Enforcers;
 
 // guardian run                         -> service entry point (started by the SCM)
+// guardian watchdog                    -> companion service entry point
 // guardian install [--name X]          -> first-time setup: set passwords, install hardened service
 // guardian uninstall                   -> requires admin or recovery password
 // guardian status
 // guardian export FILE.json            -> write current policy (no secrets) to a file
 // guardian import FILE.json            -> replace policy from a file
 // guardian set-password admin|recovery
+// guardian ui                          -> open the management page (http://127.0.0.1:8898)
+// guardian hash FILE.exe               -> print SHA-256 for an app rule
+// guardian unlock USER MINUTES         -> temporarily lift the schedule lock for a user
 
 var cmd = args.FirstOrDefault() ?? "help";
 var store = new EncryptedConfigStore(Paths.DataDir, new DpapiKeyProtector());
@@ -21,10 +26,31 @@ switch (cmd)
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddWindowsService();
         builder.Services.AddSingleton(store);
+        builder.Services.AddSingleton<AdminGate>();
+        builder.Services.AddHostedService<Guardian.Service.Ui.ManagementUi>();
+        builder.Services.AddSingleton<LockoutExemptions>();
+        builder.Services.AddSingleton<LockoutEnforcer>();
+        builder.Services.AddSingleton<AppBlocker>();
+        builder.Services.AddSingleton<AccessLog>();
+        builder.Services.AddSingleton<NetworkEnforcer>();
+        builder.Services.AddSingleton<DnsFilterServer>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<DnsFilterServer>());
+        builder.Services.AddSingleton<ProxyHost>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<ProxyHost>());
         builder.Services.AddHostedService<EnforcementWorker>();
         builder.Services.AddHostedService<ControlPipeServer>();
         builder.Build().Run();
         return 0;
+
+    case "watchdog":
+    {
+        var wb = Host.CreateApplicationBuilder(args);
+        wb.Services.AddWindowsService();
+        wb.Services.AddSingleton(store);
+        wb.Services.AddHostedService<WatchdogWorker>();
+        wb.Build().Run();
+        return 0;
+    }
 
     case "install":
     {
@@ -39,15 +65,21 @@ switch (cmd)
         var exe = Path.Combine(Paths.InstallDir, name + ".exe");
         File.Copy(Environment.ProcessPath!, exe, overwrite: true);
 
+        var watchdogName = ServiceNameGenerator.Generate();
+        while (watchdogName == name) watchdogName = ServiceNameGenerator.Generate();
         store.Save(new GuardianConfig
         {
             ServiceName = name,
+            WatchdogServiceName = watchdogName,
             AdminPasswordHash = PasswordHasher.Hash(admin),
             RecoveryPasswordHash = PasswordHasher.Hash(recovery),
         });
         DataDirSecurity.Lock(Paths.DataDir);
+        DataDirSecurity.Lock(Paths.InstallDir);
         ServiceHardening.Install(name, exe);
-        Console.WriteLine($"Installed and started service '{name}'.");
+        ServiceHardening.Install(watchdogName, exe, "watchdog");
+        Console.WriteLine($"Installed and started services '{name}' and '{watchdogName}' (watchdog).");
+        Console.WriteLine("Management page: guardian ui  (http://127.0.0.1:8898)");
         return 0;
     }
 
@@ -57,8 +89,11 @@ switch (cmd)
         var resp = ControlPipeServer.Send(new ControlRequest("uninstall", Cli.ReadPassword("Password")));
         if (!resp.Ok) { Console.Error.WriteLine(resp.Message); return 2; }
         Thread.Sleep(1500);
-        ServiceHardening.StopAndDelete(resp.Message);
-        try { File.Delete(Path.Combine(Paths.InstallDir, resp.Message + ".exe")); } catch (IOException) { /* removed on reboot */ }
+        foreach (var svc in resp.Message.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            ServiceHardening.StopAndDelete(svc);
+        Thread.Sleep(1500);
+        try { Directory.Delete(Paths.InstallDir, recursive: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Console.WriteLine($"Remove {Paths.InstallDir} manually after reboot."); }
         Console.WriteLine("Uninstalled.");
         return 0;
     }
@@ -86,12 +121,37 @@ switch (cmd)
         return resp.Ok ? 0 : 2;
     }
 
+    case "unlock":
+    {
+        var user = args.ElementAtOrDefault(1);
+        if (user is null || !int.TryParse(args.ElementAtOrDefault(2), out var minutes) || minutes is < 1 or > 1440)
+        { Console.Error.WriteLine("usage: guardian unlock USER MINUTES (1-1440)"); return 1; }
+        var resp = ControlPipeServer.Send(new ControlRequest("unlock", Cli.ReadPassword("Password"), minutes.ToString(), user));
+        Console.WriteLine(resp.Message);
+        return resp.Ok ? 0 : 2;
+    }
+
+    case "ui":
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("http://127.0.0.1:8898/") { UseShellExecute = true });
+        return 0;
+
+    case "hash":
+    {
+        var f = args.ElementAtOrDefault(1);
+        if (f is null || !File.Exists(f)) { Console.Error.WriteLine("usage: guardian hash FILE.exe"); return 1; }
+        using var fs = File.OpenRead(f);
+        Console.WriteLine(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fs)));
+        return 0;
+    }
+
     case "status":
-        Console.WriteLine(store.Exists ? $"Installed as '{store.Load().ServiceName}'." : "Not installed.");
+        if (!store.Exists) { Console.WriteLine("Not installed."); return 0; }
+        var st = store.Load();
+        Console.WriteLine($"Installed. Service: {st.ServiceName}, watchdog: {st.WatchdogServiceName}.");
         return 0;
 
     default:
-        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery");
+        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery | unlock USER MINUTES | hash FILE | ui");
         return cmd == "help" ? 0 : 1;
 }
 

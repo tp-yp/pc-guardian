@@ -21,21 +21,61 @@ public static class ServiceHardening
     public const string DefaultSddl =
         "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
 
-    public static void Install(string name, string exePath)
+    public static void Install(string name, string exePath, string mode = "run")
     {
-        Sc($"create {name} binPath= \"\\\"{exePath}\\\" run\" start= auto obj= LocalSystem DisplayName= \"{name}\"");
+        Sc($"create {name} binPath= \"\\\"{exePath}\\\" {mode}\" start= auto obj= LocalSystem DisplayName= \"{name}\"");
         Sc($"description {name} \"Local policy host\"");
         // Restart after 5s on every failure; reset the failure counter daily.
         Sc($"failure {name} reset= 86400 actions= restart/5000/restart/5000/restart/5000");
         Sc($"failureflag {name} 1");
         Sc($"sdset {name} {HardenedSddl}");
+        EnableInSafeMode(name);
         Sc($"start {name}");
+    }
+
+    /// <summary>Lets the service start in Safe Mode too (Minimal and Network), so booting into
+    /// Safe Mode is not an instant way around the policy.</summary>
+    public static void EnableInSafeMode(string name)
+    {
+        foreach (var mode in new[] { "Minimal", "Network" })
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.CreateSubKey($@"SYSTEM\CurrentControlSet\Control\SafeBoot\{mode}\{name}");
+            k.SetValue("", "Service");
+        }
+    }
+
+    public static void DisableInSafeMode(string name)
+    {
+        foreach (var mode in new[] { "Minimal", "Network" })
+            Microsoft.Win32.Registry.LocalMachine.DeleteSubKeyTree($@"SYSTEM\CurrentControlSet\Control\SafeBoot\{mode}\{name}", false);
+    }
+
+    /// <summary>Starts a service if it is stopped. Returns true if a start was issued.</summary>
+    public static bool EnsureRunning(string name)
+    {
+        using var sc = new System.ServiceProcess.ServiceController(name);
+        try
+        {
+            if (sc.Status is System.ServiceProcess.ServiceControllerStatus.Stopped or System.ServiceProcess.ServiceControllerStatus.Paused)
+            {
+                if (sc.Status == System.ServiceProcess.ServiceControllerStatus.Paused) sc.Continue(); else sc.Start();
+                return true;
+            }
+        }
+        catch (InvalidOperationException) { /* service missing or start refused */ }
+        return false;
     }
 
     /// <summary>Must run as SYSTEM (i.e. inside the service) to be able to restore the DACL.</summary>
     public static void Unharden(string name) => Sc($"sdset {name} {DefaultSddl}");
 
-    public static void DisableRecovery(string name) => Sc($"failure {name} reset= 0 actions= \"\"");
+    public static void DisableRecovery(string name)
+    {
+        DisableInSafeMode(name);
+        DisableRecoveryActions(name);
+    }
+
+    private static void DisableRecoveryActions(string name) => Sc($"failure {name} reset= 0 actions= \"\"");
 
     /// <summary>Called by the CLI after the service has unhardened itself.</summary>
     public static void StopAndDelete(string name)

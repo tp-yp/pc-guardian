@@ -7,6 +7,8 @@ public sealed class GuardianConfig
     public int Version { get; set; } = 1;
     /// <summary>Configurable (random by default) Windows service name.</summary>
     public string ServiceName { get; set; } = "";
+    /// <summary>Companion service that restarts the main one (and vice versa).</summary>
+    public string WatchdogServiceName { get; set; } = "";
     public string AdminPasswordHash { get; set; } = "";
     /// <summary>Recovery ("rescue") password. Unlocks everything, including uninstall.</summary>
     public string RecoveryPasswordHash { get; set; } = "";
@@ -43,6 +45,9 @@ public sealed class AppPolicy
     public bool Enabled { get; set; } = true;
     /// <summary>Unknown executables are blocked unless an Allow rule matches.</summary>
     public bool DefaultDeny { get; set; } = true;
+    /// <summary>Treat everything under Program Files as known (only admins can install there).
+    /// Portable apps in Downloads, Desktop, USB drives etc. stay blocked by default.</summary>
+    public bool TrustProgramFiles { get; set; } = true;
     public List<AppRule> Rules { get; set; } = new();
 }
 
@@ -52,8 +57,18 @@ public sealed class NetworkPolicy
 {
     public bool Enabled { get; set; } = true;
     public UrlMode Mode { get; set; } = UrlMode.Blocklist;
-    /// <summary>Domains; "example.com" also covers subdomains.</summary>
+    /// <summary>Domains ("example.com", covers subdomains) or URL prefixes ("youtube.com/shorts").</summary>
     public List<string> Domains { get; set; } = new();
     /// <summary>Executables denied any network access (outbound firewall rules).</summary>
     public List<string> BlockedAppPaths { get; set; } = new();
+    /// <summary>
+    /// Route web traffic through the local HTTPS-inspecting proxy so full URLs can be filtered.
+    /// Also switches Windows Firewall to "block outbound by default": only the proxy, Windows
+    /// services and <see cref="AllowDirectApps"/> may connect out directly.
+    /// </summary>
+    public bool UrlFiltering { get; set; } = true;
+    /// <summary>Hosts tunnelled without decryption (banks, apps with certificate pinning). Filtered by domain only.</summary>
+    public List<string> NoDecryptDomains { get; set; } = new();
+    /// <summary>Executables allowed to reach the internet directly, bypassing the proxy (e.g. games, Steam).</summary>
+    public List<string> AllowDirectApps { get; set; } = new();
 }

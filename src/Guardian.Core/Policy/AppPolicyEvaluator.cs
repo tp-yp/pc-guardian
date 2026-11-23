@@ -36,6 +36,16 @@ public static class AppPolicyEvaluator
                                   : new(RuleAction.Allow, "default allow");
     }
 
+    /// <summary>Extra trusted folders for this machine (Program Files if enabled, plus Guardian itself).</summary>
+    public static List<string> TrustedPrefixes(AppPolicy policy, IEnumerable<string> programFilesDirs, string selfDir)
+    {
+        var list = new List<string> { WithSlash(selfDir) };
+        if (policy.TrustProgramFiles) list.AddRange(programFilesDirs.Where(d => !string.IsNullOrEmpty(d)).Select(WithSlash));
+        return list;
+    }
+
+    private static string WithSlash(string d) => Normalize(d).TrimEnd('\\') + "\\";
+
     public static bool Matches(AppRule r, ProcessInfo p)
     {
         if (r.Sha256 is { Length: > 0 } h && p.Sha256 is { } ph && string.Equals(h, ph, StringComparison.OrdinalIgnoreCase)) return true;

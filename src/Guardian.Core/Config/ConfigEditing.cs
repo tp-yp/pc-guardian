@@ -50,6 +50,33 @@ public static class ConfigEditing
         }
     }
 
+    /// <summary>Adds/removes one entry of a network list ("domains", "noDecrypt", "blockedApps", "directApps").</summary>
+    public static bool TryEditNetworkList(GuardianConfig cfg, string list, string action, string value, out string error)
+    {
+        error = "";
+        value = value.Trim();
+        var target = list switch
+        {
+            "domains" => cfg.Network.Domains,
+            "noDecrypt" => cfg.Network.NoDecryptDomains,
+            "blockedApps" => cfg.Network.BlockedAppPaths,
+            "directApps" => cfg.Network.AllowDirectApps,
+            _ => null,
+        };
+        if (target is null) { error = "Unknown list."; return false; }
+        if (value.Length is 0 or > 500 || value.Any(char.IsControl) || (list is "domains" or "noDecrypt" && value.Contains(' ')))
+        { error = "Invalid value."; return false; }
+        var existing = target.FindIndex(v => v.Equals(value, StringComparison.OrdinalIgnoreCase));
+        switch (action)
+        {
+            case "add" when existing < 0: target.Add(value); return true;
+            case "add": return true;
+            case "remove" when existing >= 0: target.RemoveAt(existing); return true;
+            case "remove": error = "Not in list."; return false;
+            default: error = "Unknown action."; return false;
+        }
+    }
+
     public static void Validate(GuardianConfig c)
     {
         foreach (var u in c.UserLockouts)

@@ -16,11 +16,11 @@ public sealed record ControlResponse(bool Ok, string Message);
 /// goes through the service, which runs as SYSTEM and checks the admin/recovery password.
 /// The pipe is reachable by local interactive users only; the password is the real gate.
 /// </summary>
-public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedConfigStore store, IHostApplicationLifetime life)
+public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedConfigStore store, IHostApplicationLifetime life,
+    Guardian.Service.Enforcers.LockoutExemptions exemptions, Guardian.Service.Enforcers.NetworkEnforcer network, AdminGate gate)
     : BackgroundService
 {
     public const string PipeName = "GuardianControl";
-    private readonly AdminGate _gate = new();
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -52,7 +52,7 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
     private ControlResponse Handle(ControlRequest req)
     {
         var cfg = store.Load();
-        var auth = _gate.Authenticate(cfg, req.Password);
+        var auth = gate.Authenticate(cfg, req.Password);
         log.LogInformation("Control '{Cmd}': {Auth}", req.Command, auth);
         if (auth == AuthResult.LockedOut) return new(false, "Too many wrong passwords. Try again later.");
         if (auth == AuthResult.Denied) return new(false, "Access denied.");
@@ -64,23 +64,38 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
             case "export":
                 return new(true, ConfigEditing.Export(cfg));
             case "import":
+                var oldUsers = cfg.UserLockouts.Select(u => u.UserName).ToList();
                 try { ConfigEditing.Import(cfg, req.Payload ?? ""); }
                 catch (Exception ex) when (ex is InvalidDataException or JsonException) { return new(false, "Invalid config: " + ex.Message); }
                 store.Save(cfg);
+                foreach (var gone in oldUsers.Where(o => !cfg.UserLockouts.Any(u => u.UserName.Equals(o, StringComparison.OrdinalIgnoreCase))))
+                    Guardian.Service.Native.NetUser.SetLogonHours(gone, Guardian.Service.Native.NetUser.AllHours);
                 return new(true, "Policy updated.");
             case "set-password":
                 if (!ConfigEditing.TrySetPassword(cfg, auth, req.Arg ?? "", req.Payload ?? "", out var err)) return new(false, err);
                 store.Save(cfg);
                 return new(true, "Password changed.");
+            case "unlock":
+                if (string.IsNullOrWhiteSpace(req.Arg) || !int.TryParse(req.Payload, out var mins) || mins is < 1 or > 1440)
+                    return new(false, "usage: unlock USER MINUTES");
+                exemptions.Until[req.Arg] = DateTime.Now.AddMinutes(mins);
+                return new(true, $"{req.Arg} unlocked until {DateTime.Now.AddMinutes(mins):HH:mm}.");
             case "uninstall":
-                // Running as SYSTEM: restore the normal DACL and remove restart actions,
-                // then remove config and let the CLI stop/delete the service.
-                ServiceHardening.Unharden(cfg.ServiceName);
-                ServiceHardening.DisableRecovery(cfg.ServiceName);
+            {
+                // Running as SYSTEM: lift every protection, undo system changes, remove config,
+                // then let the CLI stop and delete both services.
+                var services = new[] { cfg.ServiceName, cfg.WatchdogServiceName }.Where(n => n.Length > 0).ToArray();
+                foreach (var svc in services) { ServiceHardening.Unharden(svc); ServiceHardening.DisableRecovery(svc); }
+                Guardian.Service.Enforcers.LockoutEnforcer.RestoreAll(cfg);
+                network.Restore();
+                Guardian.Service.Enforcers.ProxyHost.RemoveCa();
+                DataDirSecurity.Unlock(Paths.InstallDir);
                 File.Delete(Path.Combine(Paths.DataDir, "config.bin"));
                 File.Delete(Path.Combine(Paths.DataDir, "key.bin"));
+                DataDirSecurity.Unlock(Paths.DataDir);
                 _ = Task.Delay(500).ContinueWith(_ => life.StopApplication());
-                return new(true, cfg.ServiceName);
+                return new(true, string.Join(",", services));
+            }
             default:
                 return new(false, "Unknown command.");
         }
