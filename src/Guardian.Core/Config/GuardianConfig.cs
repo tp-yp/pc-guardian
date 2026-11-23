@@ -15,6 +15,20 @@ public sealed class GuardianConfig
     public List<UserLockoutRule> UserLockouts { get; set; } = new();
     public AppPolicy Apps { get; set; } = new();
     public NetworkPolicy Network { get; set; } = new();
+
+    /// <summary>
+    /// Config for a fresh install: protected and running, but every blocking feature OFF,
+    /// so nothing changes on the computer until the owner turns features on one by one.
+    /// </summary>
+    public static GuardianConfig CreateInitial(string serviceName, string watchdogName, string adminHash, string recoveryHash) => new()
+    {
+        ServiceName = serviceName,
+        WatchdogServiceName = watchdogName,
+        AdminPasswordHash = adminHash,
+        RecoveryPasswordHash = recoveryHash,
+        Apps = new AppPolicy { Enabled = false },
+        Network = new NetworkPolicy { Enabled = false, UrlFiltering = false },
+    };
 }
 
 /// <summary>While the schedule is active the user is signed out and cannot sign in.</summary>

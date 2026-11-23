@@ -1,10 +1,9 @@
-using Guardian.Core.Config;
-using Guardian.Core.Naming;
 using Guardian.Core.Security;
 using Guardian.Core.Storage;
 using Guardian.Service;
 using Guardian.Service.Enforcers;
 
+// (no arguments, double-click)         -> install wizard, or open the management page if installed
 // guardian run                         -> service entry point (started by the SCM)
 // guardian watchdog                    -> companion service entry point
 // guardian install [--name X]          -> first-time setup: set passwords, install hardened service
@@ -17,11 +16,32 @@ using Guardian.Service.Enforcers;
 // guardian hash FILE.exe               -> print SHA-256 for an app rule
 // guardian unlock USER MINUTES         -> temporarily lift the schedule lock for a user
 
-var cmd = args.FirstOrDefault() ?? "help";
+var cmd = args.FirstOrDefault() ?? "gui";
 var store = new EncryptedConfigStore(Paths.DataDir, new DpapiKeyProtector());
 
 switch (cmd)
 {
+    case "gui":
+    case "uninstall-gui":
+    {
+        Setup.HideOwnConsole();
+        if (!Setup.IsElevated()) { Setup.RelaunchElevated(cmd == "gui" ? [] : [cmd]); return 0; }
+        if (cmd == "uninstall-gui" && Path.GetDirectoryName(Environment.ProcessPath!)!.StartsWith(Paths.InstallDir, StringComparison.OrdinalIgnoreCase))
+        {
+            // Run from a temporary copy so the install folder can be deleted.
+            var tmp = Path.Combine(Path.GetTempPath(), "guardian-uninstall.exe");
+            File.Copy(Environment.ProcessPath!, tmp, true);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(tmp, "uninstall-gui") { UseShellExecute = true });
+            return 0;
+        }
+        if (cmd == "gui" && store.Exists) { Setup.OpenUi(); return 0; }
+        Guardian.Service.Ui.SetupWeb.Run(store, uninstall: cmd == "uninstall-gui");
+        return 0;
+    }
+
+    case "uninstall-system":
+        return Uninstaller.SystemTaskMain(args.ElementAtOrDefault(1) ?? "", store);
+
     case "run":
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddWindowsService();
@@ -55,47 +75,22 @@ switch (cmd)
     case "install":
     {
         if (store.Exists) { Console.Error.WriteLine("Already installed. Uninstall first."); return 1; }
-        var name = Arg("--name") ?? ServiceNameGenerator.Generate();
-        if (!ServiceNameGenerator.IsValid(name)) { Console.Error.WriteLine("Invalid service name (letters/digits only)."); return 1; }
-        var admin = Cli.ReadNewPassword("Admin password");
-        var recovery = Cli.ReadNewPassword("Recovery (rescue) password - store it somewhere safe");
-        if (admin == recovery) { Console.Error.WriteLine("Recovery password must differ from admin password."); return 1; }
-
-        Directory.CreateDirectory(Paths.InstallDir);
-        var exe = Path.Combine(Paths.InstallDir, name + ".exe");
-        File.Copy(Environment.ProcessPath!, exe, overwrite: true);
-
-        var watchdogName = ServiceNameGenerator.Generate();
-        while (watchdogName == name) watchdogName = ServiceNameGenerator.Generate();
-        store.Save(new GuardianConfig
+        try
         {
-            ServiceName = name,
-            WatchdogServiceName = watchdogName,
-            AdminPasswordHash = PasswordHasher.Hash(admin),
-            RecoveryPasswordHash = PasswordHasher.Hash(recovery),
-        });
-        DataDirSecurity.Lock(Paths.DataDir);
-        DataDirSecurity.Lock(Paths.InstallDir);
-        ServiceHardening.Install(name, exe);
-        ServiceHardening.Install(watchdogName, exe, "watchdog");
-        Console.WriteLine($"Installed and started services '{name}' and '{watchdogName}' (watchdog).");
-        Console.WriteLine("Management page: guardian ui  (http://127.0.0.1:8898)");
-        return 0;
+            var admin = Cli.ReadNewPassword("Admin password");
+            var recovery = Cli.ReadNewPassword("Recovery (rescue) password - store it somewhere safe");
+            var name = Setup.Install(store, admin, recovery, Arg("--name"));
+            Console.WriteLine($"Installed as '{name}'. All blocking features are OFF; turn them on in the management page: guardian ui");
+            return 0;
+        }
+        catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return 1; }
     }
 
     case "uninstall":
     {
-        // The service (running as SYSTEM) checks the password and lifts its own protection.
-        var resp = ControlPipeServer.Send(new ControlRequest("uninstall", Cli.ReadPassword("Password")));
-        if (!resp.Ok) { Console.Error.WriteLine(resp.Message); return 2; }
-        Thread.Sleep(1500);
-        foreach (var svc in resp.Message.Split(',', StringSplitOptions.RemoveEmptyEntries))
-            ServiceHardening.StopAndDelete(svc);
-        Thread.Sleep(1500);
-        try { Directory.Delete(Paths.InstallDir, recursive: true); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Console.WriteLine($"Remove {Paths.InstallDir} manually after reboot."); }
-        Console.WriteLine("Uninstalled.");
-        return 0;
+        var (ok, message) = Setup.Uninstall(store, Cli.ReadPassword("Password"));
+        (ok ? Console.Out : Console.Error).WriteLine(message);
+        return ok ? 0 : 2;
     }
 
     case "export":
@@ -132,7 +127,7 @@ switch (cmd)
     }
 
     case "ui":
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("http://127.0.0.1:8898/") { UseShellExecute = true });
+        Setup.OpenUi();
         return 0;
 
     case "hash":
@@ -152,7 +147,7 @@ switch (cmd)
 
     default:
         Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery | unlock USER MINUTES | hash FILE | ui");
-        return cmd == "help" ? 0 : 1;
+        return cmd is "help" or "--help" or "/?" ? 0 : 1;
 }
 
 string? Arg(string flag)

@@ -86,6 +86,29 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 case ("/api/network", "GET"):
                     await SendJson(res, 200, store.Load().Network);
                     break;
+                case ("/api/state", "GET"):
+                    await SendJson(res, 200, State(store.Load()));
+                    break;
+                case ("/api/settings", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (!ConfigEditing.TrySetToggle(cfg, body.GetValueOrDefault("key") ?? "", body.GetValueOrDefault("value") == "true", out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    log.LogInformation("UI: {Key} = {Value}", body["key"], body["value"]);
+                    await SendJson(res, 200, State(cfg));
+                    break;
+                }
+                case ("/api/apps/list", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (!ConfigEditing.TryEditAppList(cfg, body.GetValueOrDefault("list") ?? "", body.GetValueOrDefault("action") ?? "",
+                            body.GetValueOrDefault("value") ?? "", out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    await SendJson(res, 200, State(cfg));
+                    break;
+                }
                 case ("/api/network/list", "POST"):
                 {
                     var cfg = store.Load();
@@ -94,7 +117,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     { await SendJson(res, 400, new { error = err }); break; }
                     store.Save(cfg);
                     log.LogInformation("UI: {Action} {Value} in {List}", body["action"], body["value"], body["list"]);
-                    await SendJson(res, 200, cfg.Network);
+                    await SendJson(res, 200, State(cfg));
                     break;
                 }
                 case ("/api/network/mode", "POST"):
@@ -103,7 +126,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var cfg = store.Load();
                     cfg.Network.Mode = mode;
                     store.Save(cfg);
-                    await SendJson(res, 200, cfg.Network);
+                    await SendJson(res, 200, State(cfg));
                     break;
                 }
                 default:
@@ -117,6 +140,29 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             try { await SendJson(res, 500, new { error = "Internal error." }); } catch { /* client gone */ }
         }
     }
+
+    private static object State(GuardianConfig c) => new
+    {
+        settings = new Dictionary<string, bool>
+        {
+            ["apps.enabled"] = c.Apps.Enabled,
+            ["apps.defaultDeny"] = c.Apps.DefaultDeny,
+            ["apps.trustProgramFiles"] = c.Apps.TrustProgramFiles,
+            ["network.enabled"] = c.Network.Enabled,
+            ["network.urlFiltering"] = c.Network.UrlFiltering,
+        },
+        mode = c.Network.Mode.ToString(),
+        lists = new Dictionary<string, List<string>>
+        {
+            ["domains"] = c.Network.Domains,
+            ["noDecrypt"] = c.Network.NoDecryptDomains,
+            ["blockedApps"] = c.Network.BlockedAppPaths,
+            ["directApps"] = c.Network.AllowDirectApps,
+            ["allowApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Allow),
+            ["blockApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Block),
+        },
+        lockouts = c.UserLockouts.Count,
+    };
 
     private bool Authorized(HttpListenerRequest req)
     {

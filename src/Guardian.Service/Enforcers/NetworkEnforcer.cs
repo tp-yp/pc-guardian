@@ -24,12 +24,18 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
     private const string NonLoopbackV4 = "0.0.0.0-126.255.255.255,128.0.0.0-255.255.255.255";
     private DateTime _nextCheck = DateTime.MinValue;
     private string _rulesSig = "";
+    private bool? _active; // null = unknown (first tick after start)
 
     public void Tick(GuardianConfig cfg, bool force = false)
     {
         if (!force && DateTime.UtcNow < _nextCheck) return;
         _nextCheck = DateTime.UtcNow.AddSeconds(30);
-        if (!cfg.Network.Enabled) { Restore(); _rulesSig = ""; return; }
+        if (!cfg.Network.Enabled)
+        {
+            if (_active != false) { Restore(); _rulesSig = ""; _active = false; }
+            return;
+        }
+        _active = true;
 
         EnsureFirewallOn(cfg.Network.UrlFiltering);
         EnsureRules(cfg.Network);
