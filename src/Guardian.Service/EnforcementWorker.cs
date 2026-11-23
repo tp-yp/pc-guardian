@@ -7,7 +7,8 @@ namespace Guardian.Service;
 /// Main loop: reloads the policy when it changes and runs each enforcer every few seconds.
 /// One failing enforcer never stops the others.
 /// </summary>
-public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps) : BackgroundService
+public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
+    NetworkEnforcer network, DnsFilterServer dns) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -16,17 +17,23 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
         log.LogInformation("Policy host started as {Name}. Lockout rules: {L}, app rules: {A}, domains: {D}",
             cfg.ServiceName, cfg.UserLockouts.Count, cfg.Apps.Rules.Count, cfg.Network.Domains.Count);
 
+        dns.Update(cfg);
+        Run("network", () => network.Tick(cfg, force: true));
         while (!ct.IsCancellationRequested)
         {
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            if (!store.Exists) break; // uninstalled: stop enforcing, the host is shutting down
             if (store.LastWriteUtc != stamp)
             {
                 stamp = store.LastWriteUtc;
                 cfg = store.Load();
+                dns.Update(cfg);
+                Run("network", () => network.Tick(cfg, force: true));
                 log.LogInformation("Policy reloaded.");
             }
             Run("lockout", () => lockout.Tick(cfg));
             Run("apps", () => apps.Tick(cfg));
+            Run("network", () => network.Tick(cfg));
         }
     }
 

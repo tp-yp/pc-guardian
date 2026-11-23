@@ -27,6 +27,10 @@ switch (cmd)
         builder.Services.AddSingleton<LockoutExemptions>();
         builder.Services.AddSingleton<LockoutEnforcer>();
         builder.Services.AddSingleton<AppBlocker>();
+        builder.Services.AddSingleton<AccessLog>();
+        builder.Services.AddSingleton<NetworkEnforcer>();
+        builder.Services.AddSingleton<DnsFilterServer>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<DnsFilterServer>());
         builder.Services.AddHostedService<EnforcementWorker>();
         builder.Services.AddHostedService<ControlPipeServer>();
         builder.Build().Run();
