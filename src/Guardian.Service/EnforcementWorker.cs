@@ -1,12 +1,13 @@
 using Guardian.Core.Storage;
+using Guardian.Service.Enforcers;
 
 namespace Guardian.Service;
 
 /// <summary>
-/// Main loop. Phase 1 only loads the config and heartbeats; the enforcers
-/// (user lockout, app blocking, firewall/DNS) are added in later phases.
+/// Main loop: reloads the policy when it changes and runs each enforcer every few seconds.
+/// One failing enforcer never stops the others.
 /// </summary>
-public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store) : BackgroundService
+public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -24,7 +25,13 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
                 cfg = store.Load();
                 log.LogInformation("Policy reloaded.");
             }
-            // TODO phase 3+: run enforcers with cfg.
+            Run("lockout", () => lockout.Tick(cfg));
         }
+    }
+
+    private void Run(string name, Action a)
+    {
+        try { a(); }
+        catch (Exception ex) { log.LogError(ex, "Enforcer {Name} failed", name); }
     }
 }
