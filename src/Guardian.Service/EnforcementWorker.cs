@@ -11,13 +11,20 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         var cfg = store.Load();
+        var stamp = store.LastWriteUtc;
         log.LogInformation("Policy host started as {Name}. Lockout rules: {L}, app rules: {A}, domains: {D}",
             cfg.ServiceName, cfg.UserLockouts.Count, cfg.Apps.Rules.Count, cfg.Network.Domains.Count);
 
         while (!ct.IsCancellationRequested)
         {
-            // TODO phase 2+: reload config on change, run enforcers.
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            if (store.LastWriteUtc != stamp)
+            {
+                stamp = store.LastWriteUtc;
+                cfg = store.Load();
+                log.LogInformation("Policy reloaded.");
+            }
+            // TODO phase 3+: run enforcers with cfg.
         }
     }
 }

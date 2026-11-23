@@ -8,6 +8,9 @@ using Guardian.Service;
 // guardian install [--name X]          -> first-time setup: set passwords, install hardened service
 // guardian uninstall                   -> requires admin or recovery password
 // guardian status
+// guardian export FILE.json            -> write current policy (no secrets) to a file
+// guardian import FILE.json            -> replace policy from a file
+// guardian set-password admin|recovery
 
 var cmd = args.FirstOrDefault() ?? "help";
 var store = new EncryptedConfigStore(Paths.DataDir, new DpapiKeyProtector());
@@ -42,6 +45,7 @@ switch (cmd)
             AdminPasswordHash = PasswordHasher.Hash(admin),
             RecoveryPasswordHash = PasswordHasher.Hash(recovery),
         });
+        DataDirSecurity.Lock(Paths.DataDir);
         ServiceHardening.Install(name, exe);
         Console.WriteLine($"Installed and started service '{name}'.");
         return 0;
@@ -59,12 +63,35 @@ switch (cmd)
         return 0;
     }
 
+    case "export":
+    case "import":
+    {
+        var file = args.ElementAtOrDefault(1);
+        if (file is null) { Console.Error.WriteLine($"usage: guardian {cmd} FILE.json"); return 1; }
+        var payload = cmd == "import" ? File.ReadAllText(file) : null;
+        var resp = ControlPipeServer.Send(new ControlRequest(cmd, Cli.ReadPassword("Password"), payload));
+        if (!resp.Ok) { Console.Error.WriteLine(resp.Message); return 2; }
+        if (cmd == "export") { File.WriteAllText(file, resp.Message); Console.WriteLine($"Policy written to {file}."); }
+        else Console.WriteLine(resp.Message);
+        return 0;
+    }
+
+    case "set-password":
+    {
+        var which = args.ElementAtOrDefault(1);
+        if (which is not ("admin" or "recovery")) { Console.Error.WriteLine("usage: guardian set-password admin|recovery"); return 1; }
+        var current = Cli.ReadPassword(which == "recovery" ? "Current recovery password" : "Current admin or recovery password");
+        var resp = ControlPipeServer.Send(new ControlRequest("set-password", current, Cli.ReadNewPassword("New password"), which));
+        Console.WriteLine(resp.Message);
+        return resp.Ok ? 0 : 2;
+    }
+
     case "status":
         Console.WriteLine(store.Exists ? $"Installed as '{store.Load().ServiceName}'." : "Not installed.");
         return 0;
 
     default:
-        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status");
+        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery");
         return cmd == "help" ? 0 : 1;
 }
 

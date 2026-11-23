@@ -2,12 +2,13 @@ using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.Json;
+using Guardian.Core.Config;
 using Guardian.Core.Security;
 using Guardian.Core.Storage;
 
 namespace Guardian.Service;
 
-public sealed record ControlRequest(string Command, string Password);
+public sealed record ControlRequest(string Command, string Password, string? Payload = null, string? Arg = null);
 public sealed record ControlResponse(bool Ok, string Message);
 
 /// <summary>
@@ -60,6 +61,17 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
         {
             case "verify":
                 return new(true, auth.ToString());
+            case "export":
+                return new(true, ConfigEditing.Export(cfg));
+            case "import":
+                try { ConfigEditing.Import(cfg, req.Payload ?? ""); }
+                catch (Exception ex) when (ex is InvalidDataException or JsonException) { return new(false, "Invalid config: " + ex.Message); }
+                store.Save(cfg);
+                return new(true, "Policy updated.");
+            case "set-password":
+                if (!ConfigEditing.TrySetPassword(cfg, auth, req.Arg ?? "", req.Payload ?? "", out var err)) return new(false, err);
+                store.Save(cfg);
+                return new(true, "Password changed.");
             case "uninstall":
                 // Running as SYSTEM: restore the normal DACL and remove restart actions,
                 // then remove config and let the CLI stop/delete the service.

@@ -31,6 +31,8 @@ public sealed class EncryptedConfigStore
 
     public bool Exists => File.Exists(_configPath);
 
+    public DateTime LastWriteUtc => File.GetLastWriteTimeUtc(_configPath);
+
     public GuardianConfig Load()
     {
         var plain = ConfigCipher.Decrypt(LoadOrCreateKey(), File.ReadAllBytes(_configPath));

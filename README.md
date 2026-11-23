@@ -50,19 +50,21 @@
 | שלב | תוכן | מצב |
 |---|---|---|
 | 1 | שירות, סיסמת ניהול + מצילה, קונפיג מוצפן, הגנת DACL + restart, הסרה בסיסמה | ✅ |
-| 2 | עריכת הגדרות דרך ה-CLI (ייבוא/ייצוא JSON בסיסמה) + טעינה חיה בשירות | ⏳ |
+| 2 | עריכת הגדרות דרך ה-CLI (ייבוא/ייצוא JSON בסיסמה) + טעינה חיה בשירות, החלפת סיסמאות | ✅ |
 | 3 | נעילת משתמשים לפי לו"ז: התנתקות מאולצת (WTSLogoffSession) + אזהרה מראש, וחסימת כניסה | ⏳ |
 | 4 | חסימת אפליקציות: ניטור יצירת תהליכים (ETW/WMI), hash, default-deny ל-exe לא מוכר, לו"ז | ⏳ |
 | 5 | חומת אש לפי אפליקציה (Windows Firewall API) + סינון דומיינים (DNS מקומי + חסימת DoH) | ⏳ |
-| 6 | Proxy/VPN מקומי עם לוג גישה וממשק ניהול (tray / web מקומי) | ⏳ |
+| 6 | Proxy מקומי עם פענוח HTTPS (תעודת שורש מקומית) לסינון לפי כתובת מלאה, לוג גישה וממשק ניהול | ⏳ |
 | 7 | watchdog משני + מתקין | ⏳ |
 
 הערה לשלב 4: חסימה ע"י הריגת תהליך מיד אחרי שעלה היא הדרך הסבירה בלי driver; היא מהירה (מילישניות) אך לא
 מונעת הרצה של קוד שלב-אפס. אפשרות חזקה יותר היא **AppLocker / WDAC** (מובנה בווינדוס Pro/Enterprise) –
 אפשר לשלב: השירות ייצר מדיניות AppLocker מההגדרות.
 
-הערה לשלב 5: סינון URL מלא (נתיב, לא רק דומיין) ב-HTTPS דורש פענוח TLS עם תעודה מקומית. ההמלצה: סינון
-ברמת דומיין (DNS + חסימת DNS-over-HTTPS בדפדפנים דרך policy), שעובד לכל האפליקציות בלי לשבור אבטחה.
+הערה לשלב 6 (נבחר: סינון לפי כתובת מלאה): proxy מקומי שמפענח HTTPS בעזרת תעודת שורש ייחודית למחשב
+(נוצרת בהתקנה, המפתח הפרטי נגיש רק ל-SYSTEM, ומותקנת ב-Trusted Root של המחשב). כדי שאי אפשר יהיה לעקוף,
+חומת האש חוסמת יציאה ישירה ל-80/443 ו-QUIC (UDP 443) לכל תוכנה חוץ מה-proxy. Firefox מקבל את התעודה דרך policy.
+אתרים רגישים (בנקים) ואפליקציות עם certificate pinning עוברים ללא פענוח ומסוננים לפי דומיין בלבד.
 
 ## בנייה ושימוש
 
@@ -74,4 +76,31 @@ publish\guardian.exe install            # שם שירות רנדומלי
 publish\guardian.exe install --name MySvc
 guardian.exe status
 guardian.exe uninstall                  # דורש סיסמת ניהול או מצילה
+guardian.exe export policy.json         # ייצוא ההגדרות (בלי סיסמאות) לעריכה
+guardian.exe import policy.json         # טעינת הגדרות; השירות מתעדכן תוך 5 שניות
+guardian.exe set-password admin         # סיסמת ניהול או מצילה
+guardian.exe set-password recovery      # רק הסיסמה המצילה
+```
+
+תיקיית ההגדרות נעולה: SYSTEM בלבד יכול לכתוב, ולכן כל שינוי עובר דרך השירות שבודק סיסמה.
+
+### דוגמת policy.json
+
+```json
+{
+  "userLockouts": [
+    { "userName": "Kids", "lockedDuring": { "windows": [
+      { "days": ["Sunday","Monday","Tuesday","Wednesday","Thursday"], "start": "22:00", "end": "07:00" } ] },
+      "warningMinutes": 5 }
+  ],
+  "apps": {
+    "enabled": true, "defaultDeny": true,
+    "rules": [
+      { "action": "Allow", "pathPrefix": "C:\\Program Files\\Mozilla Firefox\\" },
+      { "action": "Block", "fileName": "steam.exe",
+        "when": { "windows": [ { "days": ["Monday"], "start": "08:00", "end": "16:00" } ] } }
+    ]
+  },
+  "network": { "enabled": true, "mode": "Blocklist", "domains": ["example.com"], "blockedAppPaths": [] }
+}
 ```
