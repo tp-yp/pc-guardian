@@ -15,7 +15,9 @@ public sealed class EncryptedConfigStore
     public static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() },
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter(), new HhMmTimeOnlyConverter() },
     };
 
     private readonly string _configPath, _keyPath;

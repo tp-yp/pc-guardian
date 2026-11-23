@@ -56,4 +56,34 @@ public class ConfigEditingTests
         Assert.False(ConfigEditing.TrySetPassword(cfg, AuthResult.Admin, "admin", "newrescue1", out _)); // same as recovery
         Assert.False(ConfigEditing.TrySetPassword(cfg, AuthResult.Admin, "admin", "short", out _));
     }
+
+    private const string ReadmeExample = """
+{
+  "userLockouts": [
+    { "userName": "Kids", "lockedDuring": { "windows": [
+      { "days": ["Sunday","Monday","Tuesday","Wednesday","Thursday"], "start": "22:00", "end": "07:00" } ] },
+      "warningMinutes": 5 }
+  ],
+  "apps": {
+    "enabled": true, "defaultDeny": true,
+    "rules": [
+      { "action": "Allow", "pathPrefix": "C:\\Program Files\\Mozilla Firefox\\" },
+      { "action": "Block", "fileName": "steam.exe",
+        "when": { "windows": [ { "days": ["Monday"], "start": "08:00", "end": "16:00" } ] } }
+    ]
+  },
+  "network": { "enabled": true, "mode": "Blocklist", "domains": ["example.com"], "blockedAppPaths": [] }
+}
+""";
+
+    [Fact]
+    public void Readme_example_imports()
+    {
+        var cfg = Cfg();
+        ConfigEditing.Import(cfg, ReadmeExample);
+        Assert.Equal("Kids", cfg.UserLockouts[0].UserName);
+        Assert.True(cfg.UserLockouts[0].LockedDuring.IsActive(new DateTime(2026, 11, 24, 6, 0, 0))); // Tue 06:00
+        Assert.Equal(@"C:\Program Files\Mozilla Firefox\", cfg.Apps.Rules[0].PathPrefix);
+        Assert.Equal(RuleAction.Block, cfg.Apps.Rules[1].Action);
+    }
 }
