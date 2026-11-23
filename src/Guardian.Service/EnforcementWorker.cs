@@ -7,7 +7,7 @@ namespace Guardian.Service;
 /// Main loop: reloads the policy when it changes and runs each enforcer every few seconds.
 /// One failing enforcer never stops the others.
 /// </summary>
-public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout) : BackgroundService
+public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -26,6 +26,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
                 log.LogInformation("Policy reloaded.");
             }
             Run("lockout", () => lockout.Tick(cfg));
+            Run("apps", () => apps.Tick(cfg));
         }
     }
 

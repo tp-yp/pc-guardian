@@ -146,6 +146,23 @@ public class AppPolicyTests
     }
 
     [Fact]
+    public void Program_files_trusted_only_when_enabled_and_never_over_block()
+    {
+        var p = new AppPolicy { Rules = { new AppRule { Action = RuleAction.Block, FileName = "steam.exe" } } };
+        var trusted = AppPolicyEvaluator.TrustedPrefixes(p, [@"C:\Program Files", @"C:\Program Files (x86)\"], @"C:\Program Files\GuardianHost");
+        Assert.Equal(RuleAction.Allow, AppPolicyEvaluator.Evaluate(p, new(@"C:\Program Files (x86)\App\app.exe", null), Now, trusted).Action);
+        Assert.Equal(RuleAction.Block, AppPolicyEvaluator.Evaluate(p, new(@"C:\Program Files (x86)\Steam\steam.exe", null), Now, trusted).Action);
+        Assert.Equal(RuleAction.Block, AppPolicyEvaluator.Evaluate(p, new(@"C:\Users\kid\Downloads\x.exe", null), Now, trusted).Action);
+        // Prefix must match a whole folder name.
+        Assert.Equal(RuleAction.Block, AppPolicyEvaluator.Evaluate(p, new(@"C:\Program Files Evil\x.exe", null), Now, trusted).Action);
+
+        p.TrustProgramFiles = false;
+        trusted = AppPolicyEvaluator.TrustedPrefixes(p, [@"C:\Program Files"], @"C:\G");
+        Assert.Equal(RuleAction.Block, AppPolicyEvaluator.Evaluate(p, new(@"C:\Program Files\App\app.exe", null), Now, trusted).Action);
+        Assert.Equal(RuleAction.Allow, AppPolicyEvaluator.Evaluate(p, new(@"C:\G\g.exe", null), Now, trusted).Action);
+    }
+
+    [Fact]
     public void Hash_rule_survives_rename()
     {
         var p = new AppPolicy { Rules = { new AppRule { Action = RuleAction.Allow, Sha256 = "ABCD" } } };
