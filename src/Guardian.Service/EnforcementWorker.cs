@@ -36,6 +36,11 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
             Run("lockout", () => lockout.Tick(cfg));
             Run("apps", () => apps.Tick(cfg));
             Run("network", () => network.Tick(cfg));
+            Run("watchdog", () =>
+            {
+                if (cfg.WatchdogServiceName.Length > 0 && ServiceHardening.EnsureRunning(cfg.WatchdogServiceName))
+                    log.LogWarning("Watchdog {Name} was stopped; restarted", cfg.WatchdogServiceName);
+            });
         }
     }
 

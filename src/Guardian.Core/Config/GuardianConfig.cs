@@ -7,6 +7,8 @@ public sealed class GuardianConfig
     public int Version { get; set; } = 1;
     /// <summary>Configurable (random by default) Windows service name.</summary>
     public string ServiceName { get; set; } = "";
+    /// <summary>Companion service that restarts the main one (and vice versa).</summary>
+    public string WatchdogServiceName { get; set; } = "";
     public string AdminPasswordHash { get; set; } = "";
     /// <summary>Recovery ("rescue") password. Unlocks everything, including uninstall.</summary>
     public string RecoveryPasswordHash { get; set; } = "";

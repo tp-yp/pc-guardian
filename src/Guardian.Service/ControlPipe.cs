@@ -81,17 +81,21 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
                 exemptions.Until[req.Arg] = DateTime.Now.AddMinutes(mins);
                 return new(true, $"{req.Arg} unlocked until {DateTime.Now.AddMinutes(mins):HH:mm}.");
             case "uninstall":
+            {
+                // Running as SYSTEM: lift every protection, undo system changes, remove config,
+                // then let the CLI stop and delete both services.
+                var services = new[] { cfg.ServiceName, cfg.WatchdogServiceName }.Where(n => n.Length > 0).ToArray();
+                foreach (var svc in services) { ServiceHardening.Unharden(svc); ServiceHardening.DisableRecovery(svc); }
                 Guardian.Service.Enforcers.LockoutEnforcer.RestoreAll(cfg);
                 network.Restore();
                 Guardian.Service.Enforcers.ProxyHost.RemoveCa();
-                // Running as SYSTEM: restore the normal DACL and remove restart actions,
-                // then remove config and let the CLI stop/delete the service.
-                ServiceHardening.Unharden(cfg.ServiceName);
-                ServiceHardening.DisableRecovery(cfg.ServiceName);
+                DataDirSecurity.Unlock(Paths.InstallDir);
                 File.Delete(Path.Combine(Paths.DataDir, "config.bin"));
                 File.Delete(Path.Combine(Paths.DataDir, "key.bin"));
+                DataDirSecurity.Unlock(Paths.DataDir);
                 _ = Task.Delay(500).ContinueWith(_ => life.StopApplication());
-                return new(true, cfg.ServiceName);
+                return new(true, string.Join(",", services));
+            }
             default:
                 return new(false, "Unknown command.");
         }

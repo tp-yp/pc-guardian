@@ -18,4 +18,15 @@ public static class DataDirSecurity
             FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
         new DirectoryInfo(dir).SetAccessControl(sec);
     }
+
+    /// <summary>Back to normal inherited permissions so an administrator can delete the folder.</summary>
+    public static void Unlock(string dir)
+    {
+        if (!Directory.Exists(dir)) return;
+        var sec = new DirectorySecurity();
+        sec.SetAccessRuleProtection(isProtected: false, preserveInheritance: true);
+        sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+            FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+        new DirectoryInfo(dir).SetAccessControl(sec);
+    }
 }
