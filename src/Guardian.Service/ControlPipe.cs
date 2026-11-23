@@ -17,7 +17,7 @@ public sealed record ControlResponse(bool Ok, string Message);
 /// The pipe is reachable by local interactive users only; the password is the real gate.
 /// </summary>
 public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedConfigStore store, IHostApplicationLifetime life,
-    Guardian.Service.Enforcers.LockoutExemptions exemptions)
+    Guardian.Service.Enforcers.LockoutExemptions exemptions, Guardian.Service.Enforcers.NetworkEnforcer network)
     : BackgroundService
 {
     public const string PipeName = "GuardianControl";
@@ -83,6 +83,7 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
                 return new(true, $"{req.Arg} unlocked until {DateTime.Now.AddMinutes(mins):HH:mm}.");
             case "uninstall":
                 Guardian.Service.Enforcers.LockoutEnforcer.RestoreAll(cfg);
+                network.Restore();
                 // Running as SYSTEM: restore the normal DACL and remove restart actions,
                 // then remove config and let the CLI stop/delete the service.
                 ServiceHardening.Unharden(cfg.ServiceName);
