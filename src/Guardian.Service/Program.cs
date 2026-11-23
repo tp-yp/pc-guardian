@@ -3,6 +3,7 @@ using Guardian.Core.Naming;
 using Guardian.Core.Security;
 using Guardian.Core.Storage;
 using Guardian.Service;
+using Guardian.Service.Enforcers;
 
 // guardian run                         -> service entry point (started by the SCM)
 // guardian install [--name X]          -> first-time setup: set passwords, install hardened service
@@ -11,6 +12,7 @@ using Guardian.Service;
 // guardian export FILE.json            -> write current policy (no secrets) to a file
 // guardian import FILE.json            -> replace policy from a file
 // guardian set-password admin|recovery
+// guardian unlock USER MINUTES         -> temporarily lift the schedule lock for a user
 
 var cmd = args.FirstOrDefault() ?? "help";
 var store = new EncryptedConfigStore(Paths.DataDir, new DpapiKeyProtector());
@@ -21,6 +23,8 @@ switch (cmd)
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddWindowsService();
         builder.Services.AddSingleton(store);
+        builder.Services.AddSingleton<LockoutExemptions>();
+        builder.Services.AddSingleton<LockoutEnforcer>();
         builder.Services.AddHostedService<EnforcementWorker>();
         builder.Services.AddHostedService<ControlPipeServer>();
         builder.Build().Run();
@@ -86,12 +90,22 @@ switch (cmd)
         return resp.Ok ? 0 : 2;
     }
 
+    case "unlock":
+    {
+        var user = args.ElementAtOrDefault(1);
+        if (user is null || !int.TryParse(args.ElementAtOrDefault(2), out var minutes) || minutes is < 1 or > 1440)
+        { Console.Error.WriteLine("usage: guardian unlock USER MINUTES (1-1440)"); return 1; }
+        var resp = ControlPipeServer.Send(new ControlRequest("unlock", Cli.ReadPassword("Password"), minutes.ToString(), user));
+        Console.WriteLine(resp.Message);
+        return resp.Ok ? 0 : 2;
+    }
+
     case "status":
         Console.WriteLine(store.Exists ? $"Installed as '{store.Load().ServiceName}'." : "Not installed.");
         return 0;
 
     default:
-        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery");
+        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery | unlock USER MINUTES");
         return cmd == "help" ? 0 : 1;
 }
 
