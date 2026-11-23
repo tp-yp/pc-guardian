@@ -43,6 +43,9 @@ public sealed class AppPolicy
     public bool Enabled { get; set; } = true;
     /// <summary>Unknown executables are blocked unless an Allow rule matches.</summary>
     public bool DefaultDeny { get; set; } = true;
+    /// <summary>Treat everything under Program Files as known (only admins can install there).
+    /// Portable apps in Downloads, Desktop, USB drives etc. stay blocked by default.</summary>
+    public bool TrustProgramFiles { get; set; } = true;
     public List<AppRule> Rules { get; set; } = new();
 }
 

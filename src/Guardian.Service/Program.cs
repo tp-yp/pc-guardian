@@ -12,6 +12,7 @@ using Guardian.Service.Enforcers;
 // guardian export FILE.json            -> write current policy (no secrets) to a file
 // guardian import FILE.json            -> replace policy from a file
 // guardian set-password admin|recovery
+// guardian hash FILE.exe               -> print SHA-256 for an app rule
 // guardian unlock USER MINUTES         -> temporarily lift the schedule lock for a user
 
 var cmd = args.FirstOrDefault() ?? "help";
@@ -25,6 +26,7 @@ switch (cmd)
         builder.Services.AddSingleton(store);
         builder.Services.AddSingleton<LockoutExemptions>();
         builder.Services.AddSingleton<LockoutEnforcer>();
+        builder.Services.AddSingleton<AppBlocker>();
         builder.Services.AddHostedService<EnforcementWorker>();
         builder.Services.AddHostedService<ControlPipeServer>();
         builder.Build().Run();
@@ -100,12 +102,21 @@ switch (cmd)
         return resp.Ok ? 0 : 2;
     }
 
+    case "hash":
+    {
+        var f = args.ElementAtOrDefault(1);
+        if (f is null || !File.Exists(f)) { Console.Error.WriteLine("usage: guardian hash FILE.exe"); return 1; }
+        using var fs = File.OpenRead(f);
+        Console.WriteLine(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fs)));
+        return 0;
+    }
+
     case "status":
         Console.WriteLine(store.Exists ? $"Installed as '{store.Load().ServiceName}'." : "Not installed.");
         return 0;
 
     default:
-        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery | unlock USER MINUTES");
+        Console.WriteLine("usage: guardian install [--name NAME] | uninstall | status | export FILE | import FILE | set-password admin|recovery | unlock USER MINUTES | hash FILE");
         return cmd == "help" ? 0 : 1;
 }
 
