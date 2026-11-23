@@ -55,8 +55,18 @@ public sealed class NetworkPolicy
 {
     public bool Enabled { get; set; } = true;
     public UrlMode Mode { get; set; } = UrlMode.Blocklist;
-    /// <summary>Domains; "example.com" also covers subdomains.</summary>
+    /// <summary>Domains ("example.com", covers subdomains) or URL prefixes ("youtube.com/shorts").</summary>
     public List<string> Domains { get; set; } = new();
     /// <summary>Executables denied any network access (outbound firewall rules).</summary>
     public List<string> BlockedAppPaths { get; set; } = new();
+    /// <summary>
+    /// Route web traffic through the local HTTPS-inspecting proxy so full URLs can be filtered.
+    /// Also switches Windows Firewall to "block outbound by default": only the proxy, Windows
+    /// services and <see cref="AllowDirectApps"/> may connect out directly.
+    /// </summary>
+    public bool UrlFiltering { get; set; } = true;
+    /// <summary>Hosts tunnelled without decryption (banks, apps with certificate pinning). Filtered by domain only.</summary>
+    public List<string> NoDecryptDomains { get; set; } = new();
+    /// <summary>Executables allowed to reach the internet directly, bypassing the proxy (e.g. games, Steam).</summary>
+    public List<string> AllowDirectApps { get; set; } = new();
 }
