@@ -77,6 +77,10 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
 
             if (!Authorized(req)) { await SendJson(res, 401, new { error = "Login required." }); return; }
 
+            // Which rules a request reads or edits: the general ones (no user) or one account's own rules.
+            var who = body.GetValueOrDefault("user") ?? req.QueryString["user"];
+            if (string.IsNullOrWhiteSpace(who)) who = null;
+
             switch (path, req.HttpMethod)
             {
                 case ("/api/logout", "POST"):
@@ -92,16 +96,18 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 case ("/api/catalog", "GET"):
                 {
                     var apps = await catalog.GetAsync(refresh: req.QueryString["refresh"] == "1");
-                    await SendJson(res, 200, AppCatalog.WithState(apps, store.Load()));
+                    await SendJson(res, 200, AppCatalog.WithState(apps, UserScopes.View(store.Load(), who)));
                     break;
                 }
                 case ("/api/catalog/set", "POST"):
                 {
                     var cfg = store.Load();
-                    if (!AppCatalog.TrySet(cfg, body.GetValueOrDefault("path") ?? "", body.GetValueOrDefault("kind") ?? "", body.GetValueOrDefault("value") == "true", out var err))
+                    var view = UserScopes.View(cfg, who);
+                    if (!AppCatalog.TrySet(view, body.GetValueOrDefault("path") ?? "", body.GetValueOrDefault("kind") ?? "", body.GetValueOrDefault("value") == "true", out var err))
                     { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
                     store.Save(cfg);
-                    await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), cfg));
+                    await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
                     break;
                 }
                 case ("/api/apps/allow", "POST"):
@@ -109,13 +115,15 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var exePath = body.GetValueOrDefault("path") ?? "";
                     var value = body.GetValueOrDefault("scope") == "folder" ? ConfigEditing.AppFolderOf(exePath) : exePath;
                     var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
                     // Allowing also removes a matching lock, otherwise the lock would still win.
-                    cfg.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Block && r.When.Windows.Count == 0 &&
+                    view.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Block && r.When.Windows.Count == 0 &&
                         (string.Equals(r.PathPrefix, exePath, StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(r.FileName, Path.GetFileName(exePath), StringComparison.OrdinalIgnoreCase)));
-                    if (!ConfigEditing.TryEditAppList(cfg, "allowApps", "add", value, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    if (!ConfigEditing.TryEditAppList(view, "allowApps", "add", value, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
                     store.Save(cfg);
-                    await SendJson(res, 200, new { ok = true, allowed = value });
+                    await SendJson(res, 200, new { ok = true, allowed = value, user = UserScopes.Find(cfg, who)?.UserName });
                     break;
                 }
                 case ("/api/site", "POST"):
@@ -123,10 +131,12 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var target = body.GetValueOrDefault("target") ?? "";
                     if (body.GetValueOrDefault("whole") == "true") target = UrlPolicy.NormalizeHost(target);
                     var cfg = store.Load();
-                    ConfigEditing.SetSiteAccess(cfg.Network, target, body.GetValueOrDefault("allow") == "true");
-                    if (body.GetValueOrDefault("allow") != "true") cfg.Network.Enabled = true;
+                    var view = UserScopes.View(cfg, who);
+                    ConfigEditing.SetSiteAccess(view.Network, target, body.GetValueOrDefault("allow") == "true");
+                    if (body.GetValueOrDefault("allow") != "true") view.Network.Enabled = true;
+                    UserScopes.Commit(cfg, view);
                     store.Save(cfg);
-                    await SendJson(res, 200, State(cfg));
+                    await SendJson(res, 200, State(cfg, who));
                     break;
                 }
                 case ("/api/direct", "GET"):
@@ -149,6 +159,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                         {
                             name = a,
                             rule = cfg.UserLockouts.FirstOrDefault(r => Guardian.Core.Lockout.LockoutPlanner.SameUser(r.UserName, a)),
+                            ownRules = UserScopes.Find(cfg, a) != null,
                             unlockedUntil = exemptions.Until.TryGetValue(a, out var u) && u > DateTime.Now ? u : (DateTime?)null,
                         }),
                         everyoneLocked = ConfigEditing.EveryAccountHasLockout(cfg, accounts),
@@ -176,6 +187,15 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     await SendJson(res, 200, new { ok = true });
                     break;
                 }
+                case ("/api/users/own", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (!UserScopes.TrySetOwnRules(cfg, body.GetValueOrDefault("name") ?? "", body.GetValueOrDefault("own") == "true", out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    await SendJson(res, 200, State(cfg, null));
+                    break;
+                }
                 case ("/api/settings/idle", "POST"):
                 {
                     if (!int.TryParse(body.GetValueOrDefault("minutes"), out var m) || !GuardianConfig.IdleLockChoices.Contains(m))
@@ -183,7 +203,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var cfg = store.Load();
                     cfg.UiIdleLockMinutes = m;
                     store.Save(cfg);
-                    await SendJson(res, 200, State(cfg));
+                    await SendJson(res, 200, State(cfg, null));
                     break;
                 }
                 case ("/api/health", "GET"):
@@ -194,46 +214,54 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     });
                     break;
                 case ("/api/state", "GET"):
-                    await SendJson(res, 200, State(store.Load()));
+                    await SendJson(res, 200, State(store.Load(), who));
                     break;
                 case ("/api/settings", "POST"):
                 {
                     var cfg = store.Load();
-                    if (!ConfigEditing.TrySetToggle(cfg, body.GetValueOrDefault("key") ?? "", body.GetValueOrDefault("value") == "true", out var err))
+                    var view = UserScopes.View(cfg, who);
+                    if (!ConfigEditing.TrySetToggle(view, body.GetValueOrDefault("key") ?? "", body.GetValueOrDefault("value") == "true", out var err))
                     { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     log.LogInformation("UI: {Key} = {Value}", body["key"], body["value"]);
-                    await SendJson(res, 200, State(cfg));
+                    await SendJson(res, 200, State(cfg, who));
                     break;
                 }
                 case ("/api/apps/list", "POST"):
                 {
                     var cfg = store.Load();
-                    if (!ConfigEditing.TryEditAppList(cfg, body.GetValueOrDefault("list") ?? "", body.GetValueOrDefault("action") ?? "",
+                    var view = UserScopes.View(cfg, who);
+                    if (!ConfigEditing.TryEditAppList(view, body.GetValueOrDefault("list") ?? "", body.GetValueOrDefault("action") ?? "",
                             body.GetValueOrDefault("value") ?? "", out var err))
                     { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
                     store.Save(cfg);
-                    await SendJson(res, 200, State(cfg));
+                    await SendJson(res, 200, State(cfg, who));
                     break;
                 }
                 case ("/api/network/list", "POST"):
                 {
                     var cfg = store.Load();
-                    if (!ConfigEditing.TryEditNetworkList(cfg, body.GetValueOrDefault("list") ?? "", body.GetValueOrDefault("action") ?? "",
+                    var view = UserScopes.View(cfg, who);
+                    if (!ConfigEditing.TryEditNetworkList(view, body.GetValueOrDefault("list") ?? "", body.GetValueOrDefault("action") ?? "",
                             body.GetValueOrDefault("value") ?? "", out var err))
                     { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     log.LogInformation("UI: {Action} {Value} in {List}", body["action"], body["value"], body["list"]);
-                    await SendJson(res, 200, State(cfg));
+                    await SendJson(res, 200, State(cfg, who));
                     break;
                 }
                 case ("/api/network/mode", "POST"):
                 {
                     if (!Enum.TryParse<UrlMode>(body.GetValueOrDefault("mode"), out var mode)) { await SendJson(res, 400, new { error = "Bad mode." }); break; }
                     var cfg = store.Load();
-                    cfg.Network.Mode = mode;
+                    var view = UserScopes.View(cfg, who);
+                    view.Network.Mode = mode;
+                    UserScopes.Commit(cfg, view);
                     store.Save(cfg);
-                    await SendJson(res, 200, State(cfg));
+                    await SendJson(res, 200, State(cfg, who));
                     break;
                 }
                 default:
@@ -248,8 +276,16 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         }
     }
 
-    private static object State(GuardianConfig c) => new
+    private static object State(GuardianConfig cfg, string? who)
     {
+        var c = UserScopes.View(cfg, who);
+        return StateOf(c, UserScopes.Find(cfg, who)?.UserName, cfg.UserPolicies.Select(p => p.UserName).ToList());
+    }
+
+    private static object StateOf(GuardianConfig c, string? scope, List<string> scopes) => new
+    {
+        scope,
+        scopes,
         settings = new Dictionary<string, bool>
         {
             ["apps.enabled"] = c.Apps.Enabled,
