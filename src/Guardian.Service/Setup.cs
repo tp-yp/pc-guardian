@@ -57,7 +57,7 @@ public static class Setup
         DataDirSecurity.ReclaimForInstall(Paths.DataDir);
         Directory.CreateDirectory(Paths.InstallDir);
         var exe = Path.Combine(Paths.InstallDir, cfg.ServiceName + ".exe");
-        File.Copy(Environment.ProcessPath!, exe, overwrite: true);
+        CopyWithRetry(Environment.ProcessPath!, exe);
         store.Save(cfg);
         DataDirSecurity.Lock(Paths.DataDir);
         try
@@ -136,12 +136,45 @@ public static class Setup
         {
             var (ok, message) = Uninstall(store, password);
             if (!ok) return (false, message);
-            Thread.Sleep(2000);
+            // The old services and their processes need a moment to go away; installing too early
+            // was why the first update attempt could fail and only a second run worked.
+            WaitForOldVersionToStop([saved.ServiceName, saved.WatchdogServiceName]);
         }
         try { InstallWithConfig(store, saved, keepConfigOnFailure: true); }
         catch (BlockedByWindowsException ex) { return (false, ex.Message); }
         catch (Exception ex) { return (false, "Install step failed: " + ex.Message + " Your settings are kept; run the file again to finish the update."); }
         return (true, "Updated. All settings were kept.");
+    }
+
+    /// <summary>Waits (up to 30 s) until the old services are deleted and nothing runs from the install folder.</summary>
+    private static void WaitForOldVersionToStop(string[] services)
+    {
+        var until = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < until)
+        {
+            var left = System.ServiceProcess.ServiceController.GetServices().Any(s =>
+                { using (s) return services.Contains(s.ServiceName, StringComparer.OrdinalIgnoreCase); });
+            var running = System.Diagnostics.Process.GetProcesses().Any(p =>
+            {
+                using (p)
+                {
+                    if (p.Id == Environment.ProcessId) return false;
+                    var path = Native.ProcessPath.Get(p.Id);
+                    return path != null && path.StartsWith(Paths.InstallDir, StringComparison.OrdinalIgnoreCase);
+                }
+            });
+            if (!left && !running) return;
+            Thread.Sleep(500);
+        }
+    }
+
+    private static void CopyWithRetry(string from, string to)
+    {
+        for (var i = 0; ; i++)
+        {
+            try { File.Copy(from, to, overwrite: true); return; }
+            catch (Exception) when (i < 20) { Thread.Sleep(500); }
+        }
     }
 
     private static string HashFile(string path)

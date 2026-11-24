@@ -38,22 +38,54 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         _active = true;
 
         EnsureFirewallOn(cfg.Network.UrlFiltering);
-        EnsureRules(cfg.Network);
+        EnsureRules(cfg);
         if (cfg.Network.UrlFiltering) { if (!SystemProxySettings.IsApplied()) SystemProxySettings.Apply(); }
         else if (SystemProxySettings.IsApplied()) SystemProxySettings.Remove();
         EnsureLocalDns();
         EnsureBrowserDohOff();
     }
 
-    private void EnsureRules(NetworkPolicy p)
+    private List<string> _accounts = [];
+    private DateTime _accountsAt = DateTime.MinValue;
+
+    private IReadOnlyCollection<string> Accounts()
     {
+        if (DateTime.UtcNow - _accountsAt > TimeSpan.FromMinutes(5))
+        {
+            try { _accounts = AppCatalogScanner.LocalAccounts(); } catch (Exception ex) { log.LogDebug(ex, "account list failed"); }
+            _accountsAt = DateTime.UtcNow;
+        }
+        return _accounts;
+    }
+
+    /// <summary>Firewall condition "only these local accounts" (SDDL), or null if a name cannot be resolved.</summary>
+    private static string? UsersSddl(IEnumerable<string> users)
+    {
+        var aces = new List<string>();
+        foreach (var u in users)
+        {
+            try { aces.Add($"(A;;CC;;;{((System.Security.Principal.SecurityIdentifier)new System.Security.Principal.NTAccount(u).Translate(typeof(System.Security.Principal.SecurityIdentifier))).Value})"); }
+            catch (Exception) { /* account removed */ }
+        }
+        return aces.Count == 0 ? null : "O:LSD:" + string.Concat(aces.Distinct());
+    }
+
+    private void EnsureRules(GuardianConfig cfg)
+    {
+        var p = cfg.Network;
         var wanted = new List<(string Name, Action<dynamic> Setup)>
         {
             ("Guardian DNS UDP", r => { r.Protocol = 17; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; }),
             ("Guardian DNS TCP", r => { r.Protocol = 6; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; }),
         };
-        foreach (var path in p.BlockedAppPaths.Where(x => !string.IsNullOrWhiteSpace(x)))
-            wanted.Add(($"Guardian app {ShortHash(path)}", r => { r.ApplicationName = path; }));
+        // "No internet" programs: for everyone, or (with per-account rules) only for some accounts.
+        foreach (var (path, users) in Guardian.Core.Policy.UserScopes.InternetBlocks(cfg, cfg.UserPolicies.Count > 0 ? Accounts() : []))
+        {
+            if (users is null) { wanted.Add(($"Guardian app {ShortHash(path)}", r => { r.ApplicationName = path; })); continue; }
+            var sddl = UsersSddl(users);
+            if (sddl is null) continue;
+            wanted.Add(($"Guardian app {ShortHash(path + sddl)}", r => { r.ApplicationName = path; r.LocalUserAuthorizedList = sddl; }));
+        }
         if (p.UrlFiltering)
         {
             // Allow rules for "block outbound by default". Block rules above still win over these.
@@ -79,8 +111,12 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
             rule.Action = 0;     // block
             rule.Profiles = 0x7FFFFFFF;
             rule.Enabled = true;
-            setup(rule); // may override Action to allow
-            fw.Rules.Add(rule);
+            try
+            {
+                setup(rule); // may override Action to allow
+                fw.Rules.Add(rule);
+            }
+            catch (Exception ex) { log.LogWarning(ex, "Firewall rule {Name} could not be added", name); }
         }
         _rulesSig = sig;
         log.LogInformation("Firewall rules applied ({N})", wanted.Count);

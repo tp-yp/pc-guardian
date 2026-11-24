@@ -73,10 +73,12 @@ public sealed class FilterProxyTests : IAsyncLifetime
         }
     }
 
-    private async Task<string> GetViaProxy(string path)
+    private Task<string> GetViaProxy(string path) => GetViaProxy(_proxy, path);
+
+    private async Task<string> GetViaProxy(FilterProxy proxy, string path)
     {
         using var tcp = new TcpClient();
-        await tcp.ConnectAsync(IPAddress.Loopback, _proxy.Port);
+        await tcp.ConnectAsync(IPAddress.Loopback, proxy.Port);
         var s = tcp.GetStream();
         await s.WriteAsync(Encoding.ASCII.GetBytes($"CONNECT localhost:{OriginPort} HTTP/1.1\r\nHost: localhost:{OriginPort}\r\n\r\n"));
         await FilterProxy.ReadHead(s, default); // consumes "HTTP/1.1 200 Connection Established"
@@ -126,5 +128,25 @@ public sealed class FilterProxyTests : IAsyncLifetime
         await ssl.WriteAsync("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"u8.ToArray());
         var text = await new StreamReader(ssl).ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Contains("502", text);
+    }
+
+    [Fact]
+    public async Task Rules_follow_the_client_that_connected()
+    {
+        // The service maps the connection's local port to a program and its Windows account.
+        var open = new NetworkPolicy();
+        var seen = new List<IPEndPoint>();
+        var log = new List<(string Who, bool Ok)>();
+        var perUser = new FilterProxy(new IPEndPoint(IPAddress.Loopback, 0), _proxyCa, () => _policy,
+            (who, _, ok) => { lock (log) log.Add((who, ok)); },
+            upstreamValidation: (_, cert, _, _) => Trusts(_originRoot, cert),
+            identify: ep => { lock (seen) seen.Add(ep); return new ProxyClient(open, "parent"); });
+        perUser.Start();
+        _ = perUser.RunAsync(_cts.Token);
+
+        var text = await GetViaProxy(perUser, "/blocked/page");
+        Assert.Contains("origin saw GET /blocked/page", text);   // blocked in general rules, open for this user
+        lock (seen) Assert.All(seen, ep => Assert.True(IPAddress.IsLoopback(ep.Address)));
+        lock (log) Assert.Contains(log, e => e.Who == "parent" && e.Ok);
     }
 }

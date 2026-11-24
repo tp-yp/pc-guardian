@@ -17,8 +17,21 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog) : Bac
     private static readonly byte[] Entropy = "Guardian.ProxyCA.v1"u8.ToArray();
     private static string CaPath => Path.Combine(Paths.DataDir, "ca.bin");
     private volatile NetworkPolicy _policy = new() { Enabled = false };
+    private volatile GuardianConfig _cfg = new();
 
-    public void Update(GuardianConfig cfg) => _policy = cfg.Network;
+    public void Update(GuardianConfig cfg) { _cfg = cfg; _policy = cfg.Network; }
+
+    /// <summary>
+    /// The program behind a proxy connection is found from the connection's local port; its Windows
+    /// account decides which rules apply (general rules if it has none of its own, or is unknown).
+    /// </summary>
+    private ProxyClient Identify(IPEndPoint client)
+    {
+        var cfg = _cfg;
+        var pid = Native.ProcessUser.OwnerOfLoopbackConnection(client.Port, Port, client.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6);
+        var user = pid > 0 ? Native.ProcessUser.Of(pid) : null;
+        return new ProxyClient(Guardian.Core.Policy.UserScopes.Effective(cfg, user).Network, user ?? "");
+    }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -32,7 +45,7 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog) : Bac
         using (ca)
         {
             var proxy = new FilterProxy(new IPEndPoint(IPAddress.Loopback, Port), ca, () => _policy,
-                (_, url, ok) => accessLog.Add("web", url, ok), blockPage: Ui.BlockScreen.ForWebPage);
+                (user, url, ok) => accessLog.Add("web", url, ok, user), blockPage: Ui.BlockScreen.ForWebPage, identify: Identify);
             try { proxy.Start(); }
             catch (Exception ex) { log.LogError(ex, "Cannot listen on port {Port}", Port); return; }
             log.LogInformation("Filtering proxy listening on 127.0.0.1:{Port}", Port);

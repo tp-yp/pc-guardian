@@ -16,8 +16,11 @@ public sealed class GuardianConfig
     /// <summary>The management window locks itself after this many minutes without activity.</summary>
     public int UiIdleLockMinutes { get; set; } = 5;
     public static readonly int[] IdleLockChoices = [1, 3, 5, 10, 15, 30];
+    /// <summary>General rules: apply to every Windows account that has no settings of its own.</summary>
     public AppPolicy Apps { get; set; } = new();
     public NetworkPolicy Network { get; set; } = new();
+    /// <summary>Accounts with their own program and website rules (see <see cref="Policy.UserScopes"/>).</summary>
+    public List<UserPolicy> UserPolicies { get; set; } = new();
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
@@ -32,6 +35,19 @@ public sealed class GuardianConfig
         Apps = new AppPolicy { Enabled = false },
         Network = new NetworkPolicy { Enabled = false, UrlFiltering = false },
     };
+}
+
+/// <summary>
+/// Separate rules for one Windows account. Only the per-user parts are used: which programs are
+/// locked / allowed, "block unknown programs", the website list (mode, entries, exceptions) and
+/// which programs have no internet. Feature switches, the filter, no-decrypt and direct-access
+/// lists always come from the general settings.
+/// </summary>
+public sealed class UserPolicy
+{
+    public string UserName { get; set; } = "";
+    public AppPolicy Apps { get; set; } = new();
+    public NetworkPolicy Network { get; set; } = new();
 }
 
 /// <summary>While the schedule is active the user is signed out and cannot sign in.</summary>

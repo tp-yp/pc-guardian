@@ -20,9 +20,9 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
     private readonly DnsCache _cache = new();
     public string LastUpstreamError { get; private set; } = "";
     public DateTime LastUpstreamSuccess { get; private set; }
-    private volatile NetworkPolicy _policy = new() { Enabled = false };
+    private volatile GuardianConfig _cfg = new() { Network = new NetworkPolicy { Enabled = false } };
 
-    public void Update(GuardianConfig cfg) => _policy = cfg.Network;
+    public void Update(GuardianConfig cfg) => _cfg = cfg;
 
     protected override Task ExecuteAsync(CancellationToken ct) => Task.WhenAll(
         Serve(new IPEndPoint(IPAddress.Loopback, 53), ct),
@@ -58,7 +58,8 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
     {
         var q = DnsMessage.ReadQuestion(query);
         if (q is null) return null;
-        if (!DnsFilter.IsAllowed(_policy, q.Name))
+        // DNS cannot tell which account asks: only names blocked for everyone are refused here.
+        if (!Guardian.Core.Policy.UserScopes.DnsAllows(_cfg, q.Name))
         {
             accessLog.Add("dns", q.Name, allowed: false);
             return DnsMessage.BuildBlocked(query);

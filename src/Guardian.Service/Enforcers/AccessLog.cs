@@ -2,7 +2,8 @@ using System.Collections.Concurrent;
 
 namespace Guardian.Service.Enforcers;
 
-public sealed record AccessEntry(DateTime Time, string Source, string Target, bool Allowed);
+/// <param name="User">Windows account behind the entry, when known ("PC\name").</param>
+public sealed record AccessEntry(DateTime Time, string Source, string Target, bool Allowed, string? User = null);
 
 /// <summary>In-memory ring buffer of recent network decisions, for the management UI.</summary>
 public sealed class AccessLog
@@ -11,12 +12,12 @@ public sealed class AccessLog
     private readonly ConcurrentQueue<AccessEntry> _q = new();
     private string _lastKey = "";
 
-    public void Add(string source, string target, bool allowed)
+    public void Add(string source, string target, bool allowed, string? user = null)
     {
-        var key = source + target + allowed;
+        var key = source + target + allowed + user;
         if (key == _lastKey) return; // collapse bursts of identical lookups
         _lastKey = key;
-        _q.Enqueue(new(DateTime.Now, source, target, allowed));
+        _q.Enqueue(new(DateTime.Now, source, target, allowed, string.IsNullOrEmpty(user) ? null : user));
         while (_q.Count > Capacity) _q.TryDequeue(out _);
     }
 

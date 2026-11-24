@@ -83,16 +83,19 @@ public sealed class AppBlocker : IDisposable
         if (Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) &&
             _selfHash.Value is { } self && Hash(path) == self) return;
 
-        var hashNeeded = cfg.Apps.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
+        // Each Windows account may have its own rules; unknown accounts follow the general ones.
+        var user = cfg.UserPolicies.Count > 0 ? ProcessUser.Of(pid) : null;
+        var rules = UserScopes.Effective(cfg, user).Apps;
+        var hashNeeded = rules.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
         var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null);
-        var decision = AppPolicyEvaluator.Evaluate(cfg.Apps, info, DateTime.Now, _trusted);
+        var decision = AppPolicyEvaluator.Evaluate(rules, info, DateTime.Now, _trusted);
         if (decision.Action == RuleAction.Allow) return;
 
         try
         {
             proc.Kill(entireProcessTree: true);
             _log.LogInformation("Blocked {Path} (pid {Pid}): {Reason}", path, pid, decision.Reason);
-            _access.Add("app", path, allowed: false);
+            _access.Add("app", path, allowed: false, user ?? ProcessUser.Of(pid));
             NotifyOnce(proc.SessionId, path);
         }
         catch (Exception ex) { _log.LogWarning(ex, "Could not terminate {Path}", path); }

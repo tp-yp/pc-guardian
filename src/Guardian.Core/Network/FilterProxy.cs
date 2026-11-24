@@ -8,6 +8,9 @@ using Guardian.Core.Policy;
 
 namespace Guardian.Core.Network;
 
+/// <summary>Who is behind a proxy connection (found from its local port), and which rules apply to them.</summary>
+public sealed record ProxyClient(NetworkPolicy Policy, string? User);
+
 /// <summary>
 /// Local HTTP/HTTPS filtering proxy. HTTPS is decrypted with a per-machine CA so the full URL
 /// can be checked; hosts in <see cref="NetworkPolicy.NoDecryptDomains"/> are tunnelled as-is and
@@ -21,8 +24,10 @@ public sealed class FilterProxy(
     Func<NetworkPolicy> policy,
     Action<string, string, bool>? log = null,
     RemoteCertificateValidationCallback? upstreamValidation = null,
-    Func<string, string>? blockPage = null)
+    Func<string, string>? blockPage = null,
+    Func<IPEndPoint, ProxyClient>? identify = null)
 {
+
     private TcpListener? _listener;
 
     public int Port => ((IPEndPoint)_listener!.LocalEndpoint).Port;
@@ -58,11 +63,14 @@ public sealed class FilterProxy(
             if (head is null) return;
             var (host, port, path) = head.Resolve(tls: false);
             if (host.Length == 0) return;
-            var p = policy();
+            ProxyClient who;
+            try { who = identify?.Invoke((IPEndPoint)client.Client.RemoteEndPoint!) ?? new(policy(), null); }
+            catch (Exception) { who = new(policy(), null); }
+            var p = who.Policy;
 
             if (head.Method != "CONNECT")
             {
-                await Forward(clientStream, head, rest, host, port, path, tls: false, ct);
+                await Forward(clientStream, head, rest, host, port, path, tls: false, who, ct);
                 return;
             }
 
@@ -71,7 +79,7 @@ public sealed class FilterProxy(
             if (p.NoDecryptDomains.Any(d => UrlPolicy.HostMatches(host, d)))
             {
                 var ok = UrlPolicy.IsHostAllowed(p, host);
-                log?.Invoke(host, host + " (tunnel)", ok);
+                Log(who, host, host + " (tunnel)", ok);
                 if (!ok) return;
                 using var up = await ConnectTcp(host, port, ct);
                 await Pipe(clientStream, up.GetStream(), rest, ct);
@@ -89,7 +97,7 @@ public sealed class FilterProxy(
             var (inner, innerRest) = await ReadHead(tls, ct);
             if (inner is null) return;
             var (_, _, innerPath) = inner.Resolve(tls: true);
-            await Forward(tls, inner, innerRest, host, port, innerPath, tls: true, ct);
+            await Forward(tls, inner, innerRest, host, port, innerPath, tls: true, who, ct);
         }
         catch (Exception e) when (e is IOException or SocketException or AuthenticationException or OperationCanceledException or ObjectDisposedException)
         {
@@ -97,11 +105,14 @@ public sealed class FilterProxy(
         }
     }
 
-    private async Task Forward(Stream client, HttpHead head, byte[] rest, string host, int port, string path, bool tls, CancellationToken ct)
+    /// <summary>Log callback receives (user or host, url, allowed); the user is known when <c>identify</c> is set.</summary>
+    private void Log(ProxyClient who, string host, string url, bool ok) => log?.Invoke(who.User ?? host, url, ok);
+
+    private async Task Forward(Stream client, HttpHead head, byte[] rest, string host, int port, string path, bool tls, ProxyClient who, CancellationToken ct)
     {
         var url = (tls ? "https://" : "http://") + host + (port is 80 or 443 ? "" : ":" + port) + path;
-        var allowed = UrlPolicy.IsUrlAllowed(policy(), host, path);
-        log?.Invoke(host, url, allowed);
+        var allowed = UrlPolicy.IsUrlAllowed(who.Policy, host, path);
+        Log(who, host, url, allowed);
         if (!allowed)
         {
             await client.WriteAsync(HttpHead.BlockedResponse(url, blockPage), ct);

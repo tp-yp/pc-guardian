@@ -53,6 +53,9 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 .win{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:6px}
 .days label{font-size:12px;display:inline-flex;align-items:center;gap:2px;margin-left:6px}
 .user{border-bottom:1px solid var(--line);padding:12px 0}.user:last-child{border:0}
+.scopebar{background:#111827;color:#fff;padding:10px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.scopebar select{background:#fff;color:#111;border:0}
+.scopebar.general{background:var(--soft);color:var(--text)}.scopebar.general select{border:1px solid var(--line)}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;max-width:90vw;z-index:10;box-shadow:0 4px 14px #0004}
 #toast.bad{background:#7f1d1d}
 #login{max-width:380px;margin:15vh auto;padding:0 16px}
@@ -70,6 +73,7 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <button data-tab="features" class="on">יכולות</button><button data-tab="programs">תוכנות</button><button data-tab="net">רשת</button><button data-tab="users">משתמשים</button><button data-tab="log">פעילות</button><button data-tab="settings">הגדרות</button>
 </nav>
 <button class="ghost" id="logout">נעילה</button></header>
+<div id="scopebar" class="scopebar general" hidden><label>ההגדרות שמוצגות ונערכות עכשיו: <select id="scope"></select></label><span id="scopeText"></span></div>
 
 <main>
 <!-- ===== יכולות ===== -->
@@ -153,6 +157,8 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <p class="hint">לכל משתמש במחשב אפשר לקבוע שעות שבהן אסור לו להיות מחובר. כשמגיעה השעה, המשתמש מקבל הודעה כמה דקות לפני, ואז הוא מנותק והמחשב חוזר למסך הכניסה. בזמן הזה הוא גם לא יכול להיכנס.<br>
 טווח שעות שעובר חצות (למשל 23:00 עד 07:00) נחשב ליום שבו הוא מתחיל. כדי לחסום יום שלם, בחרו אותה שעה בהתחלה ובסוף.</p>
 <div id="allLocked" class="warn" hidden>שימו לב: לכל המשתמשים במחשב יש שעות נעילה. אם יש שעה שבה כולם נעולים, אף אחד לא יוכל להיכנס למחשב בזמן הזה, גם לא כדי לשנות הגדרות. כדאי להשאיר לפחות משתמש מנהל אחד בלי נעילה.</div>
+<div class="tip" style="margin-bottom:10px"><b>הגדרות נפרדות לכל משתמש:</b> כברירת מחדל כל המשתמשים במחשב מקבלים את אותן הגדרות (ה"כלליות"). אפשר לתת למשתמש הגדרות משלו לתוכנות ולאתרים: אילו תוכנות נעולות, אילו בלי אינטרנט, אילו אתרים חסומים, והאם תוכנות לא מוכרות נחסמות. ההגדרות הנפרדות מתחילות כהעתק של הכלליות, ואחר כך משנים אותן בלשוניות "תוכנות" ו"רשת" אחרי שבוחרים את המשתמש בפס העליון. המתגים בלשונית "יכולות" (חוץ מ"חסימת כל תוכנה לא מוכרת") משותפים לכולם.</div>
+<div id="scopeUrlWarn" class="warn" hidden>יש משתמשים עם הגדרות אתרים נפרדות, אבל "סינון לפי כתובת מלאה" כבוי. בלעדיו אפשר להבדיל בין משתמשים רק בתוכנות. אתר ייחסם רק אם הוא חסום לכל המשתמשים.</div>
 <div id="users"></div>
 </section>
 </div>
@@ -162,7 +168,7 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <section class="wide"><h2>פעילות בזמן אמת</h2>
 <p class="hint">כל אתר שנפתח וכל תוכנה שנחסמה מופיעים כאן. אפשר לחסום או להתיר כל שורה: רק את הכתובת המדויקת, או את כל האתר (הדומיין). לתוכנה שנחסמה אפשר להתיר רק את הקובץ, או את כל התיקייה שלה (מומלץ לתוכנות שמורכבות מכמה קבצים, כמו Discord או Zoom).</p>
 <div class="row"><label><input type="checkbox" id="onlyBlocked"> רק מה שנחסם</label><input id="filter" placeholder="סינון…" style="flex:1;min-width:160px"><label><input type="checkbox" id="pause"> עצירת עדכון</label></div>
-<div class="scroll" style="margin-top:8px"><table><thead><tr><th>שעה</th><th>סוג</th><th>מצב</th><th>מה</th><th>פעולות</th></tr></thead><tbody id="log"></tbody></table></div></section>
+<div class="scroll" style="margin-top:8px"><table><thead><tr><th>שעה</th><th>משתמש</th><th>סוג</th><th>מצב</th><th>מה</th><th>פעולות</th></tr></thead><tbody id="log"></tbody></table></div></section>
 </div>
 
 <!-- ===== הגדרות ===== -->
@@ -190,7 +196,11 @@ let idleMin=5,lastAct=Date.now(),lastPing=Date.now(),state=null;
 function toast(msg,bad){const t=$('toast');t.textContent=msg;t.className=bad?'bad':'';t.hidden=false;clearTimeout(t._t);t._t=setTimeout(()=>t.hidden=true,4500)}
 function api(p,o={},active=true){const h={'X-Guardian':'1','Content-Type':'application/json'};if(active)h['X-Active']='1';
  return fetch(p,{...o,headers:h,credentials:'same-origin'}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401&&p!=='/api/login'){show(false)}if(!r.ok)throw new Error(HE[j.error]||j.error||('שגיאה '+r.status));return j})}
-const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b)});
+let scope='';const SCOPED=['/api/settings','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow'];
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(SCOPED.includes(p)&&!('user' in b)?{...b,user:scope}:b)});
+const q=(p,extra)=>p+'?user='+encodeURIComponent(scope)+(extra||'');
+const short=u=>u?String(u).split('\\').pop():'';
+const scopeName=()=>scope?'של '+scope:'הכלליות';
 const fail=x=>toast(x.message,true);
 
 function show(app){$('app').hidden=!app;$('login').hidden=app;if(app){lastAct=Date.now();load();tick()}else{$('pw').focus()}}
@@ -216,7 +226,9 @@ const TOGGLES=[
  ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Guardian מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
 ];
 function sw(checked,onchange,label,disabled){const i=el('input',{type:'checkbox',checked,disabled:!!disabled});i.setAttribute('aria-label',label);i.onchange=()=>onchange(i);return el('label',{class:'switch',title:label},i,el('span',{class:'slider'}))}
-function renderToggles(s){$('toggles').replaceChildren(...TOGGLES.map(([k,t,d,w])=>{const txt=el('div',{},el('b',{},t),el('small',{},d));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
+const PER_USER=['apps.defaultDeny'];
+function renderToggles(s){$('toggles').replaceChildren(...TOGGLES.map(([k,t,d,w])=>{const txt=el('div',{},el('b',{},t),el('small',{},d));
+ if(state&&state.scopes.length)txt.append(el('small',{class:'badge',style:'display:inline-block;margin-top:4px'},PER_USER.includes(k)?(scope?'ההגדרה הזו חלה רק על '+scope:'ההגדרה הזו חלה על מי שבהגדרות הכלליות'):'משותף לכל המשתמשים'));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
  return el('div',{class:'toggle'},txt,sw(s[k],i=>post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
 
 // Lists
@@ -230,17 +242,23 @@ function renderMode(st){const allow=st.mode==='Allowlist';$('mode').value=st.mod
  $('domainsTitle').textContent=allow?'אתרים מותרים':'אתרים חסומים';
  $('excHint').textContent=allow?'כתובות שייחסמו למרות שהאתר שלהן ברשימת המותרים. למשל: youtube.com מותר, אבל youtube.com/shorts חסום.':'כתובות שיהיו פתוחות למרות שהאתר שלהן חסום. למשל: youtube.com חסום, אבל סרטון מסוים מותר.';
  $('netOff').hidden=st.settings['network.enabled'];$('urlOff').hidden=!st.settings['network.enabled']||st.settings['network.urlFiltering']}
-function render(st){state=st;idleMin=st.idleMinutes||5;renderToggles(st.settings);renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
+function renderScope(st){const bar=$('scopebar');bar.hidden=!st.scopes.length&&!scope;
+ $('scope').replaceChildren(el('option',{value:''},'הגדרות כלליות (כל המשתמשים בלי הגדרות משלהם)'),...st.scopes.map(u=>el('option',{value:u},'ההגדרות הנפרדות של '+u)));$('scope').value=st.scope||'';
+ bar.className='scopebar'+(st.scope?'':' general');$('scopeText').textContent=st.scope?'שינויים בתוכנות ובאתרים יחולו רק על '+st.scope+'.':'';
+ $('scopeUrlWarn').hidden=!(st.scopes.length&&!st.settings['network.urlFiltering'])}
+$('scope').onchange=e=>setScope(e.target.value);
+function setScope(u){scope=u||'';catalog=null;api(q('/api/state')).then(st=>{render(st);if(!document.querySelector('[data-page=programs]').hidden)loadCatalog(false);toast(scope?'עכשיו עורכים את ההגדרות הנפרדות של '+scope:'עכשיו עורכים את ההגדרות הכלליות')}).catch(fail)}
+function render(st){state=st;scope=st.scope||'';renderScope(st);idleMin=st.idleMinutes||5;renderToggles(st.settings);renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
  $('idle').replaceChildren(...st.idleChoices.map(m=>el('option',{value:m,selected:m===idleMin},String(m))));if(catalog)renderCatalog()}
-function load(){api('/api/state').then(render).catch(fail)}
+function load(){api(q('/api/state')).then(render).catch(fail)}
 $('idle').onchange=e=>post('/api/settings/idle',{minutes:e.target.value}).then(st=>{render(st);toast('הממשק יינעל אחרי '+e.target.value+' דקות ללא פעילות')}).catch(fail);
 
 // Programs (catalog)
 let catalog=null;const SRCN={StartMenu:'תפריט התחל',InstalledApps:'אפליקציות מותקנות',Store:'Microsoft Store'};
-function loadCatalog(refresh){$('catNote').textContent='טוען את רשימת התוכנות… (בפעם הראשונה זה יכול לקחת כחצי דקה)';api('/api/catalog'+(refresh?'?refresh=1':'')).then(c=>{catalog=c;renderCatalog()}).catch(x=>{$('catNote').textContent='';fail(x)})}
+function loadCatalog(refresh){$('catNote').textContent='טוען את רשימת התוכנות… (בפעם הראשונה זה יכול לקחת כחצי דקה)';api(q('/api/catalog',refresh?'&refresh=1':'')).then(c=>{catalog=c;renderCatalog()}).catch(x=>{$('catNote').textContent='';fail(x)})}
 $('refresh').onclick=()=>loadCatalog(true);$('q').oninput=()=>renderCatalog();$('onlySet').onchange=()=>renderCatalog();
 function setApp(a,kind,i){post('/api/catalog/set',{path:a.exePath,kind,value:String(i.checked)}).then(c=>{catalog=c;load();
- const msg={lock:['ננעלה','שוחררה מנעילה'],internet:['לא תוכל להתחבר לאינטרנט','יכולה שוב להתחבר לאינטרנט'],direct:['קיבלה גישה ישירה לאינטרנט','תעבור שוב דרך הסינון']}[kind];toast(a.name+' '+(i.checked?msg[0]:msg[1]))}).catch(x=>{fail(x);i.checked=!i.checked})}
+ const msg={lock:['ננעלה','שוחררה מנעילה'],internet:['לא תוכל להתחבר לאינטרנט','יכולה שוב להתחבר לאינטרנט'],direct:['קיבלה גישה ישירה לאינטרנט','תעבור שוב דרך הסינון']}[kind];toast(a.name+' '+(i.checked?msg[0]:msg[1])+(kind==='direct'?'':(scope?' (עבור '+scope+')':'')))}).catch(x=>{fail(x);i.checked=!i.checked})}
 function renderCatalog(){if(!catalog)return;const q=$('q').value.trim().toLowerCase(),only=$('onlySet').checked,direct=state&&state.settings['network.urlFiltering'];
  const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet));
  $('catNote').textContent=catalog.length+' תוכנות נמצאו'+(q||only?', מוצגות '+rows.length:'')+'.'+(state&&!state.settings['apps.enabled']&&catalog.some(a=>a.locked)?' שימו לב: "נעילת תוכנות" כבויה בלשונית "יכולות", ולכן הנעילות לא נאכפות.':'');
@@ -257,6 +275,13 @@ const DAYS=[['Sunday','א'],['Monday','ב'],['Tuesday','ג'],['Wednesday','ד'],
 function winRow(w){const d=el('span',{class:'days'},...DAYS.map(([v,l])=>el('label',{},el('input',{type:'checkbox',value:v,checked:w.days.includes(v)}),l)));
  const r=el('div',{class:'win'},d,'מ-',el('input',{type:'time',value:w.start,class:'s'}),'עד',el('input',{type:'time',value:w.end,class:'e'}),el('button',{class:'link',onclick:()=>r.remove()},'מחיקה'));return r}
 function readWins(box){return[...box.querySelectorAll('.win')].map(r=>({days:[...r.querySelectorAll('.days input:checked')].map(i=>i.value),start:r.querySelector('.s').value,end:r.querySelector('.e').value}))}
+function ownRow(a){const r=el('div',{class:'row',style:'margin-top:8px'});
+ if(a.ownRules){const back=el('button',{class:'link'},'לבטל ולחזור להגדרות הכלליות');let armed=false;
+  back.onclick=()=>{if(!armed){armed=true;back.textContent='בטוח? ההגדרות הנפרדות של '+a.name+' יימחקו. לחץ שוב לאישור';return}
+   post('/api/users/own',{name:a.name,own:'false'}).then(st=>{if(scope.toLowerCase()===a.name.toLowerCase())scope='';load();loadUsers();toast(a.name+' חזר להגדרות הכלליות')}).catch(fail)};
+  r.append(el('span',{class:'badge'},'תוכנות ואתרים: הגדרות נפרדות'),el('button',{class:'ghost',onclick:()=>{setScope(a.name);openTab('programs')}},'עריכת ההגדרות של '+a.name),back)}
+ else r.append(el('span',{class:'badge'},'תוכנות ואתרים: לפי ההגדרות הכלליות'),el('button',{class:'ghost',onclick:()=>post('/api/users/own',{name:a.name,own:'true'}).then(()=>{loadUsers();setScope(a.name);toast(a.name+' קיבל הגדרות נפרדות (העתק של הכלליות). עכשיו אפשר לשנות אותן.')}).catch(fail)},'ליצור ל-'+a.name+' הגדרות נפרדות'));
+ return r}
 function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyoneLocked;$('users').replaceChildren(...u.accounts.map(a=>{
  const wins=a.rule?a.rule.lockedDuring.windows:[];const box=el('div');wins.forEach(w=>box.append(winRow(w)));
  const warn=el('input',{type:'number',min:0,max:60,value:a.rule?a.rule.warningMinutes:5,style:'width:70px'});
@@ -267,6 +292,7 @@ function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyon
   el('button',{class:'ghost',onclick:()=>post('/api/users/unlock',{user:a.name,minutes:mins.value}).then(()=>{toast(a.name+' יכול להשתמש במחשב גם בשעות הנעילה, למשך '+mins.selectedOptions[0].textContent);loadUsers()}).catch(fail)},'לשחרר'),
   a.unlockedUntil?el('button',{class:'link',onclick:()=>post('/api/users/unlock',{user:a.name,minutes:'0'}).then(()=>{toast('השחרור הזמני בוטל');loadUsers()}).catch(fail)},'ביטול השחרור'):null);
  return el('div',{class:'user'},el('div',{class:'row'},el('b',{},a.name),status),
+  ownRow(a),
   el('div',{class:'hint',style:'margin:6px 0 0'},'שעות שבהן '+a.name+' לא יכול להיות מחובר:'),box,
   el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.slice(0,5).map(d=>d[0]),start:'23:00',end:'07:00'}))},'+ טווח שעות'),
    el('label',{},'התראה ',warn,' דקות לפני הניתוק'),el('button',{onclick:save},'שמירה')),wins.length?unlock:null)}))}).catch(fail)}
@@ -275,21 +301,24 @@ function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyon
 const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר'};
 const hostOf=t=>{try{return new URL(/^[a-z]+:\/\//i.test(t)?t:'http://'+t).hostname}catch{return t}};
 const isFullUrl=t=>/^[a-z]+:\/\/[^/]+\/./i.test(t)||(/^[^:/]+\/./.test(t));
-function site(target,allow,whole){return post('/api/site',{target,allow:String(allow),whole:String(whole)}).then(st=>{render(st);
- toast((whole?'האתר '+hostOf(target):'הכתובת')+(allow?' הותר':' נחסם')+(whole?'':'ה')+'. השינוי ייכנס לתוקף בטעינה הבאה של הדף.')}).catch(fail)}
-function appAllow(path,scope){return post('/api/apps/allow',{path,scope}).then(r=>{load();toast((scope==='folder'?'כל התוכנות בתיקייה הותרו: ':'התוכנה הותרה: ')+r.allowed+'. אפשר לפתוח אותה שוב.')}).catch(fail)}
+// A row is changed in the rules of the account it came from (its own rules, or the general ones).
+const rowScope=r=>{const u=short(r.user);return state&&u&&state.scopes.some(s=>s.toLowerCase()===u.toLowerCase())?u:''};
+const forWhom=u=>u?' (עבור '+u+')':(state&&state.scopes.length?' (בהגדרות הכלליות)':'');
+function site(target,allow,whole,u){return post('/api/site',{target,allow:String(allow),whole:String(whole),user:u}).then(()=>{load();
+ toast((whole?'האתר '+hostOf(target):'הכתובת')+(allow?' הותר':' נחסם')+(whole?'':'ה')+forWhom(u)+'. השינוי ייכנס לתוקף בטעינה הבאה של הדף.')}).catch(fail)}
+function appAllow(path,kind,u){return post('/api/apps/allow',{path,scope:kind,user:u}).then(r=>{load();toast((kind==='folder'?'כל התוכנות בתיקייה הותרו: ':'התוכנה הותרה: ')+r.allowed+forWhom(u)+'. אפשר לפתוח אותה שוב.')}).catch(fail)}
 const btn=(t,f)=>el('button',{class:'link',onclick:f},t);
-function actions(r){const t=r.target;
+function actions(r){const t=r.target,u=rowScope(r);
  if(r.source==='web'||r.source==='dns'){const b=[];const h=hostOf(t);
-  if(isFullUrl(t))b.push(r.allowed?btn('לחסום כתובת זו',()=>site(t,false,false)):btn('להתיר כתובת זו',()=>site(t,true,false)));
-  b.push(r.allowed?btn('לחסום את כל '+h,()=>site(t,false,true)):btn('להתיר את כל '+h,()=>site(t,true,true)));return b}
- if(r.source==='app'&&!r.allowed)return[btn('להתיר תוכנה זו',()=>appAllow(t,'file')),btn('להתיר את כל התיקייה',()=>appAllow(t,'folder'))];
+  if(isFullUrl(t))b.push(r.allowed?btn('לחסום כתובת זו',()=>site(t,false,false,u)):btn('להתיר כתובת זו',()=>site(t,true,false,u)));
+  b.push(r.allowed?btn('לחסום את כל '+h,()=>site(t,false,true,u)):btn('להתיר את כל '+h,()=>site(t,true,true,u)));return b}
+ if(r.source==='app'&&!r.allowed)return[btn('להתיר תוכנה זו',()=>appAllow(t,'file',u)),btn('להתיר את כל התיקייה',()=>appAllow(t,'folder',u))];
  if(r.source==='direct')return[btn('לאפשר גישה ישירה',()=>edit('directApps','add',t).then(()=>toast('התוכנה קיבלה גישה ישירה')).catch(()=>{}))];
  return[]}
 let timer;function tick(){clearTimeout(timer);if($('app').hidden)return;if($('pause').checked||document.querySelector('[data-page=log]').hidden){timer=setTimeout(tick,3000);return}
  api('/api/log',{},false).then(rows=>{const ob=$('onlyBlocked').checked,q=$('filter').value.toLowerCase();
  $('log').replaceChildren(...rows.filter(r=>(!ob||!r.allowed)&&(!q||r.target.toLowerCase().includes(q))).slice(0,200).map(r=>el('tr',{},
-  el('td',{},new Date(r.time).toLocaleTimeString('he-IL')),el('td',{},SRC[r.source]||r.source),el('td',{class:r.allowed?'ok':'bad'},r.allowed?'הותר':'נחסם'),
+  el('td',{},new Date(r.time).toLocaleTimeString('he-IL')),el('td',{},short(r.user)||(r.source==='dns'?'(לא ידוע)':'')),el('td',{},SRC[r.source]||r.source),el('td',{class:r.allowed?'ok':'bad'},r.allowed?'הותר':'נחסם'),
   el('td',{class:'l'},r.target),el('td',{},el('div',{class:'acts'},...actions(r))))))}).catch(()=>{}).finally(()=>timer=setTimeout(tick,3000))}
 $('pause').onchange=()=>tick();
 
@@ -300,7 +329,7 @@ function loadHealth(){api('/api/health').then(h=>{$('health').replaceChildren(
 $('healthBtn').onclick=loadHealth;
 $('uninstall').onclick=()=>{if(window.chrome&&chrome.webview){chrome.webview.postMessage('uninstall')}else{$('uninstallNote').hidden=false}};
 
-api('/api/state',{},false).then(st=>{show(true);render(st)}).catch(()=>show(false));
+api(q('/api/state'),{},false).then(st=>{show(true);render(st)}).catch(()=>show(false));
 </script>
 </body></html>
 """;
