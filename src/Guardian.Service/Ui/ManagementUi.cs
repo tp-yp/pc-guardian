@@ -20,7 +20,7 @@ namespace Guardian.Service.Ui;
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
 public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
-    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp)
+    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock)
     : BackgroundService
 {
     public const int Port = 8898;
@@ -83,7 +83,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.")) who = null;
 
             switch (path, req.HttpMethod)
             {
@@ -107,7 +107,9 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 {
                     var cfg = store.Load();
                     var view = UserScopes.View(cfg, who);
-                    if (!AppCatalog.TrySet(view, body.GetValueOrDefault("path") ?? "", body.GetValueOrDefault("kind") ?? "", body.GetValueOrDefault("value") == "true", out var err))
+                    var exe = body.GetValueOrDefault("path") ?? "";
+                    var orig = body.GetValueOrDefault("kind") == "lock" && File.Exists(exe) ? AppBlocker.ReadOriginalName(exe) : null;
+                    if (!AppCatalog.TrySet(view, exe, body.GetValueOrDefault("kind") ?? "", body.GetValueOrDefault("value") == "true", out var err, orig))
                     { await SendJson(res, 400, new { error = err }); break; }
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
@@ -164,7 +166,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                             name = a,
                             rule = cfg.UserLockouts.FirstOrDefault(r => Guardian.Core.Lockout.LockoutPlanner.SameUser(r.UserName, a)),
                             ownRules = UserScopes.Find(cfg, a) != null,
-                            unlockedUntil = exemptions.Until.TryGetValue(a, out var u) && u > DateTime.Now ? u : (DateTime?)null,
+                            unlockedUntil = exemptions.Until.TryGetValue(a, out var u) && u > clock.LocalNow ? u : (DateTime?)null,
                         }),
                         everyoneLocked = ConfigEditing.EveryAccountHasLockout(cfg, accounts),
                     });
@@ -187,7 +189,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var user = body.GetValueOrDefault("user") ?? "";
                     if (!int.TryParse(body.GetValueOrDefault("minutes"), out var mins) || mins is < 0 or > 1440 || user.Length == 0)
                     { await SendJson(res, 400, new { error = "Bad request." }); break; }
-                    if (mins == 0) exemptions.Until.TryRemove(user, out _); else exemptions.Until[user] = DateTime.Now.AddMinutes(mins);
+                    if (mins == 0) exemptions.Until.TryRemove(user, out _); else exemptions.Until[user] = clock.LocalNow.AddMinutes(mins);
                     await SendJson(res, 200, new { ok = true });
                     break;
                 }
@@ -213,10 +215,39 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 case ("/api/health", "GET"):
                     await SendJson(res, 200, new
                     {
+                        clockSynced = clock.Synced,
+                        clockLastSync = clock.Synced ? clock.LastSync.ToLocalTime() : (DateTime?)null,
+                        clockTrusted = clock.LocalNow,
                         dnsLastSuccess = dns.LastUpstreamSuccess == default ? (DateTime?)null : dns.LastUpstreamSuccess.ToLocalTime(),
                         dnsLastError = dns.LastUpstreamError,
                     });
                     break;
+                case ("/api/network/msupdates", "POST"):
+                {
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    var office = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles), @"microsoft shared\ClickToRun\OfficeClickToRun.exe");
+                    ConfigEditing.AllowMicrosoftUpdates(view, office);
+                    UserScopes.Commit(cfg, view);
+                    store.Save(cfg);
+                    log.LogInformation("UI: Microsoft updates allowed");
+                    await SendJson(res, 200, State(cfg, who));
+                    break;
+                }
+                case ("/api/password", "POST"):
+                {
+                    // Changing a password asks for the current one again, even inside an open session.
+                    var cfg = store.Load();
+                    var auth = gate.Authenticate(cfg, body.GetValueOrDefault("current") ?? "");
+                    if (auth == AuthResult.LockedOut) { await SendJson(res, 429, new { error = "Too many attempts. Try again later." }); break; }
+                    if (auth == AuthResult.Denied) { await SendJson(res, 401, new { error = "הסיסמה הנוכחית שגויה." }); break; }
+                    if (!ConfigEditing.TrySetPassword(cfg, auth, body.GetValueOrDefault("which") ?? "", body.GetValueOrDefault("next") ?? "", out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    log.LogInformation("UI: {Which} password changed", body["which"]);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
                 case ("/api/isp", "GET"):
                     await SendJson(res, 200, IspState(store.Load()));
                     break;
@@ -320,6 +351,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             signer = IspFilterCheck.Signer(r.Chain),
             chain = r.Chain.Select(c => new { name = IspFilterCheck.ShortName(c.Subject), issuer = IspFilterCheck.ShortName(c.Issuer), thumbprint = c.Thumbprint }),
             names = cfg.IspFilter.IssuerNames,
+            providers = cfg.IspFilter.Providers,
             thumbprints = cfg.IspFilter.Thumbprints,
             apps = cfg.IspFilter.ClientApps,
         };
@@ -344,6 +376,9 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["network.urlFiltering"] = c.Network.UrlFiltering,
             ["boot.lockdown"] = c.Boot.Lockdown,
             ["isp.required"] = c.IspFilter.Required,
+            ["isp.netfree"] = c.IspFilter.Providers.Contains("NetFree", StringComparer.OrdinalIgnoreCase),
+            ["isp.etrog"] = c.IspFilter.Providers.Contains("Etrog", StringComparer.OrdinalIgnoreCase),
+            ["clock.locked"] = c.Clock.Locked,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>
@@ -355,7 +390,8 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["directApps"] = c.Network.AllowDirectApps,
             ["allowApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Allow),
             ["blockApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Block),
-            ["ispNames"] = c.IspFilter.IssuerNames,
+            // Provider names left by an older version are chosen with the provider boxes now, so they are not listed.
+            ["ispNames"] = c.IspFilter.IssuerNames.Where(n => !IspFilterCheck.ProviderNames.Values.Any(v => v.Contains(n, StringComparer.OrdinalIgnoreCase))).ToList(),
             ["ispThumbprints"] = c.IspFilter.Thumbprints,
             ["ispApps"] = c.IspFilter.ClientApps,
         },

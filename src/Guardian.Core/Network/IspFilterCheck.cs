@@ -25,10 +25,27 @@ public static class IspFilterCheck
         if (chain.Count == 0) return false;
         var pins = policy.Thumbprints.Select(Normalize).Where(t => t.Length > 0).ToHashSet();
         if (chain.Any(c => pins.Contains(Normalize(c.Thumbprint)))) return true;
-        var names = policy.IssuerNames.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()).ToList();
+        var names = Names(policy);
         // The site's own certificate names the site; only issuers (and certs above the leaf) identify the signer.
         return chain.Select((c, i) => i == 0 ? c.Issuer : c.Subject + " " + c.Issuer)
             .Any(text => names.Any(n => text.Contains(n, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>Certificate names of each provider that can be chosen. Etrog is built on NetSpark.</summary>
+    public static readonly Dictionary<string, string[]> ProviderNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["NetFree"] = ["NetFree"],
+        ["Etrog"] = ["Etrog", "NetSpark"],
+    };
+
+    /// <summary>Names that identify the filter: the chosen providers plus extra names. A provider's name in the
+    /// extra list (left there by an older version) does not count unless that provider is chosen.</summary>
+    public static List<string> Names(IspFilterPolicy policy)
+    {
+        var builtIn = ProviderNames.Values.SelectMany(v => v).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return policy.Providers.Where(ProviderNames.ContainsKey).SelectMany(p => ProviderNames[p])
+            .Concat(policy.IssuerNames.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()).Where(n => !builtIn.Contains(n)))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>Combines the per-site results: any filter chain wins; reachable sites without it mean "not filtered".</summary>

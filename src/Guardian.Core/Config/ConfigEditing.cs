@@ -51,7 +51,7 @@ public static class ConfigEditing
     }
 
     public static readonly string[] Toggles =
-        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required"];
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked"];
 
     /// <summary>Turns one feature on or off.</summary>
     public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
@@ -75,9 +75,24 @@ public static class ConfigEditing
                 cfg.IspFilter.Required = value;
                 if (value) cfg.Network.Enabled = true; // the firewall part lives in the network layer
                 return true;
+            case "isp.netfree":
+            case "isp.etrog":
+            {
+                var provider = key == "isp.netfree" ? "NetFree" : "Etrog";
+                cfg.IspFilter.Providers.RemoveAll(p => string.Equals(p, provider, StringComparison.OrdinalIgnoreCase));
+                if (value) cfg.IspFilter.Providers.Add(provider);
+                return true;
+            }
+            case "clock.locked":
+                cfg.Clock.Locked = value;
+                // The time zone in effect now is the one kept (changing it is another way to move the clock).
+                if (value) cfg.Clock.TimeZoneId = TimeZoneInfo.Local.Id;
+                return true;
             default: error = "Unknown setting."; return false;
         }
     }
+
+    public const string ProtectedError = "זה רכיב חיוני של ווינדוס, ואי אפשר לחסום אותו.";
 
     /// <summary>Allow/Block app rules by path or file name ("allowApps" / "blockApps").</summary>
     public static bool TryEditAppList(GuardianConfig cfg, string list, string action, string value, out string error)
@@ -88,6 +103,8 @@ public static class ConfigEditing
         if (kind is null) { error = "Unknown list."; return false; }
         if (value.Length is 0 or > 500 || value.Any(char.IsControl)) { error = "Invalid value."; return false; }
         var isPath = value.Contains('\\') || value.Contains('/');
+        if (kind == RuleAction.Block && action == "add" && (Policy.ProtectedApps.IsProtectedName(value) || Policy.ProtectedApps.IsProtected(value)))
+        { error = ProtectedError; return false; }
         bool Same(AppRule r) => r.Action == kind && r.When.Windows.Count == 0 &&
             string.Equals(isPath ? r.PathPrefix : r.FileName, value, StringComparison.OrdinalIgnoreCase);
         var existing = cfg.Apps.Rules.FindIndex(Same);
@@ -211,6 +228,7 @@ public static class ConfigEditing
         if (target is null) { error = "Unknown list."; return false; }
         if (value.Length is 0 or > 500 || value.Any(char.IsControl) || (list is "domains" or "noDecrypt" or "exceptions" && value.Contains(' ')))
         { error = "Invalid value."; return false; }
+        if (list == "blockedApps" && action == "add" && Policy.ProtectedApps.IsProtected(value)) { error = ProtectedError; return false; }
         var existing = target.FindIndex(v => v.Equals(value, StringComparison.OrdinalIgnoreCase));
         switch (action)
         {
@@ -220,6 +238,43 @@ public static class ConfigEditing
             case "remove": error = "Not in list."; return false;
             default: error = "Unknown action."; return false;
         }
+    }
+
+    /// <summary>Addresses Windows Update, Microsoft Store downloads and Office updates use.</summary>
+    public static readonly string[] MicrosoftUpdateDomains =
+    [
+        "windowsupdate.com", "update.microsoft.com", "windowsupdate.microsoft.com", "delivery.mp.microsoft.com",
+        "download.microsoft.com", "officecdn.microsoft.com", "officecdn.microsoft.com.edgesuite.net",
+        "officeclient.microsoft.com", "config.office.com", "go.microsoft.com",
+    ];
+
+    /// <summary>
+    /// One click so Windows and Office updates keep working: the update addresses are allowed (added to an
+    /// allow-list, taken off a block-list), not decrypted by the full-URL filter, and the Office updater may
+    /// connect directly. Returns what changed, for the message shown.
+    /// </summary>
+    public static int AllowMicrosoftUpdates(GuardianConfig cfg, string officeUpdaterPath)
+    {
+        var n = cfg.Network;
+        var changes = 0;
+        bool Has(List<string> l, string v) => l.Any(x => x.Equals(v, StringComparison.OrdinalIgnoreCase));
+        foreach (var d in MicrosoftUpdateDomains)
+        {
+            if (n.Mode == UrlMode.Allowlist)
+            {
+                if (!Has(n.Domains, d)) { n.Domains.Add(d); changes++; }
+                changes += n.Exceptions.RemoveAll(x => Policy.UrlPolicy.HostMatches(Policy.UrlPolicy.ParseEntry(x).Host, d));
+            }
+            else
+            {
+                changes += n.Domains.RemoveAll(x => Policy.UrlPolicy.HostMatches(Policy.UrlPolicy.ParseEntry(x).Host, d));
+                // Also open them if a wider entry (say "microsoft.com") is blocked.
+                if (!Has(n.Exceptions, d)) { n.Exceptions.Add(d); changes++; }
+            }
+            if (!Has(n.NoDecryptDomains, d)) { n.NoDecryptDomains.Add(d); changes++; }
+        }
+        if (!Has(n.AllowDirectApps, officeUpdaterPath)) { n.AllowDirectApps.Add(officeUpdaterPath); changes++; }
+        return changes;
     }
 
     public static void Validate(GuardianConfig c)

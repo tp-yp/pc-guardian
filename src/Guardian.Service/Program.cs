@@ -75,6 +75,7 @@ switch (cmd)
         builder.Services.AddSingleton<DirectConnectionWatcher>();
         builder.Services.AddSingleton<BootGuard>();
         builder.Services.AddSingleton<IspFilterMonitor>();
+        builder.Services.AddSingleton<TrustedClock>();
         builder.Services.AddSingleton<AppCatalogScanner>();
         builder.Services.AddSingleton<DnsFilterServer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DnsFilterServer>());

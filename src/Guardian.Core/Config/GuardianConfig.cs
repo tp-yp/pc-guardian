@@ -25,6 +25,7 @@ public sealed class GuardianConfig
     public BootPolicy Boot { get; set; } = new();
     /// <summary>Require the internet connection to go through an ISP content filter (NetFree, Etrog/NetSpark).</summary>
     public IspFilterPolicy IspFilter { get; set; } = new();
+    public ClockPolicy Clock { get; set; } = new();
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
@@ -70,11 +71,22 @@ public sealed class BootPolicy
 /// their own root certificate. Guardian regularly opens TLS connections to well-known sites and checks
 /// who signed them. If it is not the filter, all internet traffic is blocked until the filter is back.
 /// </summary>
+/// <summary>Keeps the computer's clock honest so schedules cannot be dodged by changing the time.</summary>
+public sealed class ClockPolicy
+{
+    public bool Locked { get; set; }
+    /// <summary>The time zone to keep (Windows id), saved when the lock is turned on.</summary>
+    public string TimeZoneId { get; set; } = "";
+}
+
 public sealed class IspFilterPolicy
 {
     public bool Required { get; set; }
-    /// <summary>Text that identifies the filter's certificate (matched in subject/issuer names, case-insensitive).</summary>
-    public List<string> IssuerNames { get; set; } = ["NetFree", "NetSpark", "Etrog"];
+    /// <summary>Which filtering providers count: "NetFree", "Etrog" (Etrog is built on NetSpark), or both.</summary>
+    public List<string> Providers { get; set; } = ["NetFree", "Etrog"];
+    /// <summary>Extra text that identifies the filter's certificate (matched in subject/issuer names, case-insensitive).
+    /// Provider names are not listed here; they come from <see cref="Providers"/>.</summary>
+    public List<string> IssuerNames { get; set; } = new();
     /// <summary>Exact certificates trusted as the filter (SHA-1 thumbprints, e.g. pinned with "this is my filter").</summary>
     public List<string> Thumbprints { get; set; } = new();
     /// <summary>Programs that still may connect while blocked (e.g. a filter's own connection client).</summary>
@@ -98,8 +110,11 @@ public sealed class AppRule
     public string? PathPrefix { get; set; }
     /// <summary>SHA-256 of the executable (hex). Survives renaming/moving portable apps.</summary>
     public string? Sha256 { get; set; }
-    /// <summary>Executable file name, e.g. "chrome.exe" (weakest match; easy to rename).</summary>
+    /// <summary>Executable file name, e.g. "chrome.exe". Block rules also match the name written inside the
+    /// file (its original file name), so renaming the file does not get around them.</summary>
     public string? FileName { get; set; }
+    /// <summary>The original file name stored inside the program (version info), e.g. "Discord.exe".</summary>
+    public string? OriginalName { get; set; }
     /// <summary>When the rule applies. Empty = always.</summary>
     public WeeklySchedule When { get; set; } = new();
 }
