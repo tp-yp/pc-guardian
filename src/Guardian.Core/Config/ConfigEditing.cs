@@ -51,7 +51,7 @@ public static class ConfigEditing
     }
 
     public static readonly string[] Toggles =
-        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked", "vpn.block"];
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked", "vpn.block", "wifi.knownOnly", "apps.blockAdminTools"];
 
     /// <summary>Turns one feature on or off.</summary>
     public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
@@ -62,6 +62,7 @@ public static class ConfigEditing
             case "apps.enabled": cfg.Apps.Enabled = value; return true;
             case "apps.defaultDeny": cfg.Apps.DefaultDeny = value; return true;
             case "apps.trustProgramFiles": cfg.Apps.TrustProgramFiles = value; return true;
+            case "apps.blockAdminTools": cfg.Apps.BlockAdminTools = value; return true;
             case "network.enabled":
                 cfg.Network.Enabled = value;
                 if (!value) cfg.Network.UrlFiltering = false;
@@ -87,6 +88,7 @@ public static class ConfigEditing
                 cfg.Vpn.Block = value;
                 if (value) cfg.Network.Enabled = true; // VPN sites are refused by the DNS filter, ports by the firewall
                 return true;
+            case "wifi.knownOnly": cfg.Wifi.KnownOnly = value; return true;
             case "clock.locked":
                 cfg.Clock.Locked = value;
                 // The time zone in effect now is the one kept (changing it is another way to move the clock).
@@ -189,7 +191,7 @@ public static class ConfigEditing
     }
 
     /// <summary>Sets (or with no windows, removes) the lock-out schedule of one Windows account.</summary>
-    public static bool TrySetLockout(GuardianConfig cfg, string user, IEnumerable<Scheduling.TimeWindow> windows, int warningMinutes, out string error)
+    public static bool TrySetLockout(GuardianConfig cfg, string user, IEnumerable<Scheduling.TimeWindow> windows, int warningMinutes, out string error, int breakEveryMinutes = 0)
     {
         error = "";
         user = user.Trim();
@@ -198,11 +200,12 @@ public static class ConfigEditing
         var list = windows.ToList();
         if (list.Any(w => w.Days.Length == 0)) { error = "Pick at least one day for each time range."; return false; }
         if (warningMinutes is < 0 or > 60) { error = "Warning must be 0-60 minutes."; return false; }
+        if (breakEveryMinutes != 0 && breakEveryMinutes is < 5 or > 600) { error = "זמן השימוש הרציף צריך להיות בין 5 ל-600 דקות."; return false; }
         cfg.UserLockouts.RemoveAll(r => Lockout.LockoutPlanner.SameUser(r.UserName, user));
-        if (list.Count > 0)
+        if (list.Count > 0 || breakEveryMinutes > 0)
             cfg.UserLockouts.Add(new UserLockoutRule
             {
-                UserName = user, WarningMinutes = warningMinutes,
+                UserName = user, WarningMinutes = warningMinutes, BreakEveryMinutes = breakEveryMinutes,
                 LockedDuring = new Scheduling.WeeklySchedule { Windows = list },
             });
         return true;
@@ -211,6 +214,21 @@ public static class ConfigEditing
     /// <summary>True if, with this config, every given account has some lock-out schedule.</summary>
     public static bool EveryAccountHasLockout(GuardianConfig cfg, IEnumerable<string> accounts) =>
         accounts.Any() && accounts.All(a => cfg.UserLockouts.Any(r => Lockout.LockoutPlanner.SameUser(r.UserName, a) && r.LockedDuring.Windows.Count > 0));
+
+    /// <summary>Adds/removes a Wi-Fi network name that may still be joined while "known networks only" is on.</summary>
+    public static bool TryEditWifiList(GuardianConfig cfg, string action, string ssid, out string error)
+    {
+        error = "";
+        ssid = ssid.Trim();
+        if (!Network.WifiFilters.IsValidSsid(ssid)) { error = "שם רשת לא תקין."; return false; }
+        var i = cfg.Wifi.Allowed.FindIndex(x => x == ssid);
+        switch (action)
+        {
+            case "add": if (i < 0) cfg.Wifi.Allowed.Add(ssid); return true;
+            case "remove": if (i >= 0) cfg.Wifi.Allowed.RemoveAt(i); return true;
+            default: error = "Unknown action."; return false;
+        }
+    }
 
     /// <summary>Adds/removes one entry of a network list ("domains", "noDecrypt", "blockedApps", "directApps").</summary>
     public static bool TryEditNetworkList(GuardianConfig cfg, string list, string action, string value, out string error)

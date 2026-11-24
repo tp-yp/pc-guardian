@@ -11,6 +11,15 @@ public sealed class LockoutExemptions
     public ConcurrentDictionary<string, DateTime> Until { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
+/// <summary>Temporary release of the admin tools (password, from the management window). Key "*" = everyone.</summary>
+public sealed class AdminToolsExemptions
+{
+    public ConcurrentDictionary<string, DateTime> Until { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool IsExempt(string? user, DateTime now) =>
+        Until.Any(e => e.Value > now && (e.Key == "*" || (user != null && LockoutPlanner.SameUser(e.Key, user))));
+}
+
 /// <summary>
 /// Two layers: (1) Windows logon hours on the account, so the lock screen itself refuses sign-in
 /// for fully locked hours; (2) a 5-second loop that warns and signs out sessions minute-accurately.
@@ -18,6 +27,7 @@ public sealed class LockoutExemptions
 public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExemptions exemptions, TrustedClock clock)
 {
     private readonly LockoutPlanner _planner = new();
+    private readonly BreakPlanner _breaks = new();
     private readonly HashSet<string> _managedUsers = new(StringComparer.OrdinalIgnoreCase);
     private string _appliedSignature = "";
 
@@ -25,7 +35,20 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
     {
         ApplyLogonHours(cfg);
         var now = clock.LocalNow; // not the Windows clock: changing the time must not open a locked account
-        foreach (var a in _planner.Plan(cfg.UserLockouts, Wts.UserSessions(), now, exemptions.Until))
+        var sessions = Wts.UserSessions();
+        // Addiction prevention: a sign-out after N minutes of continuous use; signing in again is allowed.
+        foreach (var a in _breaks.Plan(cfg.UserLockouts, sessions, clock.UtcNow,
+                     u => exemptions.Until.Any(e => LockoutPlanner.SameUser(e.Key, u) && e.Value > now)))
+        {
+            if (a.Kind == LockoutKind.Warn)
+                Wts.Notify(a.Session.SessionId, "Guardian", $"הגיע הזמן להפסקה: בעוד {a.MinutesLeft} דקות תתבצע יציאה מהחשבון. כדאי לשמור את העבודה עכשיו. אחרי היציאה אפשר להיכנס שוב.");
+            else
+            {
+                log.LogInformation("Break time: signing out {User} (session {Id})", a.Session.UserName, a.Session.SessionId);
+                Wts.Logoff(a.Session.SessionId);
+            }
+        }
+        foreach (var a in _planner.Plan(cfg.UserLockouts, sessions, now, exemptions.Until))
         {
             if (a.Kind == LockoutKind.Warn)
             {

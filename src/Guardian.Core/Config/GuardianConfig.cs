@@ -27,6 +27,8 @@ public sealed class GuardianConfig
     public IspFilterPolicy IspFilter { get; set; } = new();
     public ClockPolicy Clock { get; set; } = new();
     public VpnPolicy Vpn { get; set; } = new();
+    public WifiPolicy Wifi { get; set; } = new();
+    public CoolingPolicy Cooling { get; set; } = new();
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
@@ -73,6 +75,37 @@ public sealed class BootPolicy
 /// who signed them. If it is not the filter, all internet traffic is blocked until the filter is back.
 /// </summary>
 /// <summary>Blocks VPN programs, VPN connections and proxies, which would get around the filtering.</summary>
+/// <summary>
+/// "Delay before turning off": a change that weakens protection waits this many hours before it happens,
+/// and can be cancelled meanwhile. Removing Guardian needs a request made that long before.
+/// </summary>
+public sealed class CoolingPolicy
+{
+    public int Hours { get; set; }
+    public List<PendingChange> Pending { get; set; } = new();
+    /// <summary>When a requested removal becomes possible (null = not requested).</summary>
+    public DateTime? UninstallDueUtc { get; set; }
+}
+
+/// <summary>A management-window request kept until <see cref="DueUtc"/>, then carried out as if sent again.</summary>
+public sealed class PendingChange
+{
+    public string Id { get; set; } = "";
+    public string Path { get; set; } = "";
+    public Dictionary<string, string> Body { get; set; } = new();
+    public string? User { get; set; }
+    public DateTime RequestedUtc { get; set; }
+    public DateTime DueUtc { get; set; }
+}
+
+/// <summary>Wi-Fi: only networks already known to this computer may be joined (Windows' own network filters).</summary>
+public sealed class WifiPolicy
+{
+    public bool KnownOnly { get; set; }
+    /// <summary>Network names (SSIDs) that stay allowed; filled from the saved Wi-Fi networks when the switch is turned on.</summary>
+    public List<string> Allowed { get; set; } = new();
+}
+
 public sealed class VpnPolicy
 {
     public bool Block { get; set; }
@@ -106,6 +139,8 @@ public sealed class UserLockoutRule
     public string UserName { get; set; } = "";
     public WeeklySchedule LockedDuring { get; set; } = new();
     public int WarningMinutes { get; set; } = 5;
+    /// <summary>"Addiction prevention": sign the user out after this many minutes of continuous use (0 = off). Signing in again is allowed.</summary>
+    public int BreakEveryMinutes { get; set; }
 }
 
 public enum RuleAction { Allow, Block }
@@ -134,6 +169,8 @@ public sealed class AppPolicy
     /// <summary>Treat everything under Program Files as known (only admins can install there).
     /// Portable apps in Downloads, Desktop, USB drives etc. stay blocked by default.</summary>
     public bool TrustProgramFiles { get; set; } = true;
+    /// <summary>Block command line, PowerShell, registry editor and similar tools (see AdminTools).</summary>
+    public bool BlockAdminTools { get; set; }
     public List<AppRule> Rules { get; set; } = new();
 }
 

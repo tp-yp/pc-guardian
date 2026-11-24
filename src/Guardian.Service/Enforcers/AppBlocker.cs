@@ -31,8 +31,11 @@ public sealed class AppBlocker : IDisposable
     private readonly TrustedClock _clock;
     private readonly Lazy<string?> _selfHash = new(() => HashFile(Environment.ProcessPath!));
 
-    public AppBlocker(ILogger<AppBlocker> log, AccessLog access, TrustedClock clock)
+    private readonly AdminToolsExemptions _toolsExempt;
+
+    public AppBlocker(ILogger<AppBlocker> log, AccessLog access, TrustedClock clock, AdminToolsExemptions toolsExempt)
     {
+        _toolsExempt = toolsExempt;
         _log = log;
         _access = access;
         _clock = clock;
@@ -89,12 +92,21 @@ public sealed class AppBlocker : IDisposable
         // identified by identical file contents, not by name.
         if (Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) &&
             _selfHash.Value is { } self && Hash(path) == self) return;
-        // Essential parts of Windows (and Guardian's folder) are never closed, whatever the rules say.
-        if (ProtectedApps.IsProtected(path, WindowsDir, Paths.InstallDir)) return;
-
         // Each Windows account may have its own rules; unknown accounts follow the general ones.
         var user = cfg.UserPolicies.Count > 0 ? ProcessUser.Of(pid) : null;
         var rules = UserScopes.Effective(cfg, user).Apps;
+
+        // Admin tools are checked before the protected-parts rule: copies of them also live in WinSxS.
+        // (Not while Guardian is being removed or updated: its config is already gone and it runs sc.exe itself.)
+        if (rules.BlockAdminTools && AdminTools.Is(path, OriginalName(path)) && File.Exists(Path.Combine(Paths.DataDir, "config.bin"))
+            && AdminTools.StartedByHand(ProcessParent.PathOf(pid)) && !_toolsExempt.IsExempt(user ?? ProcessUser.Of(pid), _clock.LocalNow))
+        {
+            Kill(proc, pid, path, "admin tool", user);
+            return;
+        }
+
+        // Essential parts of Windows (and Guardian's folder) are never closed, whatever the rules say.
+        if (ProtectedApps.IsProtected(path, WindowsDir, Paths.InstallDir)) return;
         var hashNeeded = rules.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
         var nameNeeded = rules.Rules.Any(r => r.Action == RuleAction.Block && (!string.IsNullOrEmpty(r.FileName) || !string.IsNullOrEmpty(r.OriginalName)));
         var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null, nameNeeded ? OriginalName(path) : null);
@@ -103,11 +115,15 @@ public sealed class AppBlocker : IDisposable
         if (decision.Action == RuleAction.Allow && cfg.Vpn.Block && Guardian.Core.Network.VpnLists.IsVpnProgram(path, info.OriginalName ?? OriginalName(path)))
             decision = new AppDecision(RuleAction.Block, "VPN / proxy program");
         if (decision.Action == RuleAction.Allow) return;
+        Kill(proc, pid, path, decision.Reason, user);
+    }
 
+    private void Kill(Process proc, int pid, string path, string reason, string? user)
+    {
         try
         {
             proc.Kill(entireProcessTree: true);
-            _log.LogInformation("Blocked {Path} (pid {Pid}): {Reason}", path, pid, decision.Reason);
+            _log.LogInformation("Blocked {Path} (pid {Pid}): {Reason}", path, pid, reason);
             _access.Add("app", path, allowed: false, user ?? ProcessUser.Of(pid));
             NotifyOnce(proc.SessionId, path);
         }

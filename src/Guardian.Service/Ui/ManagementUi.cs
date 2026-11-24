@@ -20,16 +20,19 @@ namespace Guardian.Service.Ui;
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
 public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
-    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot)
+    AppCatalogScanner catalog, LockoutExemptions exemptions, AdminToolsExemptions toolsExempt, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot)
     : BackgroundService
 {
     public const int Port = 8898;
     private static readonly string[] AllowedHosts = [$"127.0.0.1:{Port}", $"localhost:{Port}"];
     private readonly ConcurrentDictionary<string, DateTime> _sessions = new();
     private static readonly JsonSerializerOptions Json = EncryptedConfigStore.Json;
+    // Delayed changes are carried out by sending the saved request to this window again, marked with this secret.
+    private readonly string _replaySecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        _ = Task.Run(() => ReplayLoop(ct), ct);
         using var http = new HttpListener();
         http.Prefixes.Add($"http://127.0.0.1:{Port}/");
         http.Prefixes.Add($"http://localhost:{Port}/");
@@ -83,10 +86,71 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.")) who = null;
+
+            // "Delay before turning off": a change that weakens protection is kept and carried out later.
+            if (req.HttpMethod == "POST" && !IsReplay(req))
+            {
+                var cur = store.Load();
+                if (Cooling.IsActive(cur) && Cooling.IsWeakening(cur, who, path, body))
+                {
+                    var pending = new PendingChange
+                    {
+                        Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)), Path = path, Body = body, User = who,
+                        RequestedUtc = clock.UtcNow, DueUtc = clock.UtcNow.AddHours(cur.Cooling.Hours),
+                    };
+                    cur.Cooling.Pending.Add(pending);
+                    store.Save(cur);
+                    log.LogInformation("UI: {Path} delayed until {Due:u}", path, pending.DueUtc);
+                    await SendJson(res, 202, new { pending = true, due = pending.DueUtc.ToLocalTime(), hours = cur.Cooling.Hours });
+                    return;
+                }
+            }
 
             switch (path, req.HttpMethod)
             {
+                case ("/api/cooling", "GET"):
+                {
+                    var cfg = store.Load();
+                    await SendJson(res, 200, new
+                    {
+                        hours = cfg.Cooling.Hours,
+                        pending = cfg.Cooling.Pending.Select(p => new { p.Id, p.Path, p.Body, p.User, due = p.DueUtc.ToLocalTime() }),
+                        uninstallDue = cfg.Cooling.UninstallDueUtc?.ToLocalTime(),
+                        uninstallReady = cfg.Cooling.UninstallDueUtc is { } u && u <= clock.UtcNow,
+                    });
+                    break;
+                }
+                case ("/api/cooling/set", "POST"):
+                {
+                    if (!int.TryParse(body.GetValueOrDefault("hours"), out var hours) || hours < 0 || hours > 1_000_000)
+                    { await SendJson(res, 400, new { error = "מספר שעות לא תקין." }); break; }
+                    var cfg = store.Load();
+                    cfg.Cooling.Hours = hours;
+                    if (hours == 0) cfg.Cooling.UninstallDueUtc = null;
+                    store.Save(cfg);
+                    log.LogInformation("UI: delay before turning off = {H} h", hours);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
+                case ("/api/cooling/cancel", "POST"):
+                {
+                    var cfg = store.Load();
+                    cfg.Cooling.Pending.RemoveAll(p => p.Id == body.GetValueOrDefault("id"));
+                    store.Save(cfg);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
+                case ("/api/cooling/uninstall", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (body.GetValueOrDefault("action") == "cancel") cfg.Cooling.UninstallDueUtc = null;
+                    else cfg.Cooling.UninstallDueUtc ??= clock.UtcNow.AddHours(cfg.Cooling.Hours);
+                    store.Save(cfg);
+                    log.LogInformation("UI: removal {Action}", body.GetValueOrDefault("action") ?? "request");
+                    await SendJson(res, 200, new { ok = true, due = cfg.Cooling.UninstallDueUtc?.ToLocalTime() });
+                    break;
+                }
                 case ("/api/logout", "POST"):
                     _sessions.TryRemove(req.Cookies["gsid"]?.Value ?? "", out _);
                     await SendJson(res, 200, new { ok = true });
@@ -114,6 +178,49 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
+                    break;
+                }
+                case ("/api/catalog/hours", "POST"):
+                {
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    var exe = body.GetValueOrDefault("path") ?? "";
+                    List<Guardian.Core.Scheduling.TimeWindow> windows;
+                    try { windows = JsonSerializer.Deserialize<List<Guardian.Core.Scheduling.TimeWindow>>(body.GetValueOrDefault("windows") ?? "[]", Json) ?? []; }
+                    catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
+                    var orig = windows.Count > 0 && File.Exists(exe) ? AppBlocker.ReadOriginalName(exe) : null;
+                    if (!AppCatalog.TrySetHours(view, exe, windows, out var err, orig)) { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
+                    store.Save(cfg);
+                    log.LogInformation("UI: blocked hours for {Exe}: {N} ranges", exe, windows.Count);
+                    await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
+                    break;
+                }
+                case ("/api/tools/unlock", "POST"):
+                {
+                    // Temporary release of the admin tools for the account being managed (or everyone in the general scope).
+                    if (!int.TryParse(body.GetValueOrDefault("minutes"), out var mins) || mins is < 0 or > 480)
+                    { await SendJson(res, 400, new { error = "Bad request." }); break; }
+                    var key = who ?? "*";
+                    if (mins == 0) toolsExempt.Until.TryRemove(key, out _); else toolsExempt.Until[key] = clock.LocalNow.AddMinutes(mins);
+                    log.LogInformation("UI: admin tools released for {Who} for {Min} min", key, mins);
+                    await SendJson(res, 200, new { ok = true, until = mins == 0 ? (DateTime?)null : toolsExempt.Until[key] });
+                    break;
+                }
+                case ("/api/wifi", "GET"):
+                {
+                    var cfg = store.Load();
+                    var saved = WifiGuard.SavedNetworks();
+                    await SendJson(res, 200, new { on = cfg.Wifi.KnownOnly, allowed = cfg.Wifi.Allowed, saved, hasWifi = saved != null });
+                    break;
+                }
+                case ("/api/wifi/list", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (!ConfigEditing.TryEditWifiList(cfg, body.GetValueOrDefault("action") ?? "", body.GetValueOrDefault("value") ?? "", out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    await SendJson(res, 200, new { ok = true });
                     break;
                 }
                 case ("/api/apps/allow", "POST"):
@@ -179,7 +286,8 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     try { windows = JsonSerializer.Deserialize<List<Guardian.Core.Scheduling.TimeWindow>>(body.GetValueOrDefault("windows") ?? "[]", Json) ?? []; }
                     catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
                     int.TryParse(body.GetValueOrDefault("warning"), out var warn);
-                    if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    int.TryParse(body.GetValueOrDefault("breakEvery"), out var breakEvery);
+                    if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err, breakEvery)) { await SendJson(res, 400, new { error = err }); break; }
                     store.Save(cfg);
                     await SendJson(res, 200, new { ok = true });
                     break;
@@ -235,7 +343,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                         computer = new
                         {
                             network = cfg.Network.Enabled, urlFiltering = cfg.Network.UrlFiltering, boot = cfg.Boot.Lockdown,
-                            clock = cfg.Clock.Locked, vpn = cfg.Vpn.Block, isp = ispNow,
+                            clock = cfg.Clock.Locked, vpn = cfg.Vpn.Block, wifi = cfg.Wifi.KnownOnly, isp = ispNow,
                             otherFirewalls = SecurityProducts.ActiveThirdPartyFirewalls(),
                         },
                         general = UserScopes.Summarize(cfg, null),
@@ -315,7 +423,17 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 {
                     var cfg = store.Load();
                     var view = UserScopes.View(cfg, who);
-                    if (!ConfigEditing.TrySetToggle(view, body.GetValueOrDefault("key") ?? "", body.GetValueOrDefault("value") == "true", out var err))
+                    var key = body.GetValueOrDefault("key") ?? "";
+                    var turningOn = body.GetValueOrDefault("value") == "true";
+                    if (key == "wifi.knownOnly" && turningOn)
+                    {
+                        // The networks saved on this computer right now become the allowed ones.
+                        var saved = WifiGuard.SavedNetworks();
+                        if (saved is null) { await SendJson(res, 400, new { error = "לא נמצא במחשב חיבור Wi-Fi." }); break; }
+                        foreach (var s in saved) if (!cfg.Wifi.Allowed.Contains(s)) cfg.Wifi.Allowed.Add(s);
+                        if (cfg.Wifi.Allowed.Count == 0) { await SendJson(res, 400, new { error = "אין במחשב רשתות Wi-Fi שמורות. התחברו קודם לרשת הבית, ואז הפעילו." }); break; }
+                    }
+                    if (!ConfigEditing.TrySetToggle(view, key, turningOn, out var err))
                     { await SendJson(res, 400, new { error = err }); break; }
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
@@ -409,6 +527,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["apps.enabled"] = c.Apps.Enabled,
             ["apps.defaultDeny"] = c.Apps.DefaultDeny,
             ["apps.trustProgramFiles"] = c.Apps.TrustProgramFiles,
+            ["apps.blockAdminTools"] = c.Apps.BlockAdminTools,
             ["network.enabled"] = c.Network.Enabled,
             ["network.urlFiltering"] = c.Network.UrlFiltering,
             ["boot.lockdown"] = c.Boot.Lockdown,
@@ -417,6 +536,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["isp.etrog"] = c.IspFilter.Providers.Contains("Etrog", StringComparer.OrdinalIgnoreCase),
             ["clock.locked"] = c.Clock.Locked,
             ["vpn.block"] = c.Vpn.Block,
+            ["wifi.knownOnly"] = c.Wifi.KnownOnly,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>
@@ -438,8 +558,46 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         idleChoices = GuardianConfig.IdleLockChoices,
     };
 
+    /// <summary>Carries out delayed changes whose time has come (measured on the trusted clock).</summary>
+    private async Task ReplayLoop(CancellationToken ct)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{Port}/") };
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(20), ct);
+                if (!store.Exists) continue;
+                var cfg = store.Load();
+                var due = cfg.Cooling.Pending.Where(p => p.DueUtc <= clock.UtcNow).ToList();
+                if (due.Count == 0) continue;
+                cfg.Cooling.Pending.RemoveAll(p => due.Contains(p));
+                store.Save(cfg);
+                foreach (var p in due)
+                {
+                    var msg = new HttpRequestMessage(HttpMethod.Post, p.Path.TrimStart('/'))
+                    {
+                        Content = new StringContent(JsonSerializer.Serialize(p.Body, Json), System.Text.Encoding.UTF8, "application/json"),
+                    };
+                    msg.Headers.Add("X-Guardian", "1");
+                    msg.Headers.Add("X-Guardian-Replay", _replaySecret);
+                    var r = await client.SendAsync(msg, ct);
+                    log.LogInformation("Delayed change {Path} carried out ({Status})", p.Path, (int)r.StatusCode);
+                    accessLog.Add("cooling", p.Path, allowed: r.IsSuccessStatusCode, p.User);
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { log.LogWarning(ex, "Delayed changes failed"); }
+        }
+    }
+
+    private bool IsReplay(HttpListenerRequest req) =>
+        req.Headers["X-Guardian-Replay"] is { } s && CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(s), System.Text.Encoding.ASCII.GetBytes(_replaySecret));
+
     private bool Authorized(HttpListenerRequest req)
     {
+        if (IsReplay(req)) return true;
         var token = req.Cookies["gsid"]?.Value;
         if (token is null || !_sessions.TryGetValue(token, out var exp) || exp < DateTime.UtcNow) return false;
         // Only real use keeps the window unlocked; background refreshes (the activity list) do not.
