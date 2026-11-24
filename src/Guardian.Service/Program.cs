@@ -17,6 +17,9 @@ using Guardian.Service.Enforcers;
 // guardian hash FILE.exe               -> print SHA-256 for an app rule
 // guardian unlock USER MINUTES         -> temporarily lift the schedule lock for a user
 
+// Guardian is a windowed program, so it has no console of its own. When started from a terminal,
+// print to that terminal (does nothing on a double-click).
+Setup.AttachParentConsole();
 var cmd = args.FirstOrDefault() ?? "gui";
 var store = new EncryptedConfigStore(Paths.DataDir, new DpapiKeyProtector());
 

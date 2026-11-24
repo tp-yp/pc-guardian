@@ -7,6 +7,8 @@
     <ApplicationIcon>..\..\assets\guardian.ico</ApplicationIcon>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>guardian</AssemblyName>
+    <!-- A Windows (not console) program: no terminal window opens with Guardian. Command-line use attaches to the calling terminal. -->
+    <OutputType>WinExe</OutputType>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>

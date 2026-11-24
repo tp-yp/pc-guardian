@@ -151,7 +151,7 @@ public static class Setup
         if (auth is not (AuthResult.Admin or AuthResult.Recovery)) return (false, "Wrong password.");
         if (IsInstalled())
         {
-            var (ok, message) = Uninstall(store, password);
+            var (ok, message) = Uninstall(store, password, forUpdate: true);
             if (!ok) return (false, message);
             // The old services and their processes need a moment to go away; installing too early
             // was why the first update attempt could fail and only a second run worked.
@@ -209,7 +209,7 @@ public static class Setup
     }
 
     /// <summary>Uninstalls with the admin or recovery password. Works even if the service is not running.</summary>
-    public static (bool Ok, string Message) Uninstall(EncryptedConfigStore store, string password)
+    public static (bool Ok, string Message) Uninstall(EncryptedConfigStore store, string password, bool forUpdate = false)
     {
         if (!store.Exists)
         {
@@ -222,7 +222,7 @@ public static class Setup
         string[] services;
         try
         {
-            var resp = ControlPipeServer.Send(new ControlRequest("uninstall", password), timeoutMs: 5000);
+            var resp = ControlPipeServer.Send(new ControlRequest(forUpdate ? "uninstall-update" : "uninstall", password), timeoutMs: 5000);
             if (!resp.Ok) return (false, resp.Message);
             services = resp.Message.Split(',', StringSplitOptions.RemoveEmptyEntries);
             Thread.Sleep(1500);
@@ -233,6 +233,8 @@ public static class Setup
             var cfg = store.Load();
             var auth = new AdminGate().Authenticate(cfg, password);
             if (auth is not (AuthResult.Admin or AuthResult.Recovery)) return (false, "Access denied.");
+            if (!forUpdate && cfg.Cooling.Hours > 0 && !(cfg.Cooling.UninstallDueUtc is { } due && due <= DateTime.UtcNow))
+                return (false, "ההסרה מושהית (השהיית כיבוי). בקשו הסרה בחלון הניהול והמתינו לזמן שנקבע.");
             services = new[] { cfg.ServiceName, cfg.WatchdogServiceName }.Where(n => n.Length > 0).ToArray();
             if (!Uninstaller.LiftProtectionsViaSystemTask(password))
                 return (false, "The service did not answer and the fallback failed. Restart the computer and try again.");
@@ -246,6 +248,19 @@ public static class Setup
     public static void OpenUrl(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 
     // ---- console handling for double-click launches ----
+    [DllImport("kernel32.dll")] private static extern bool AttachConsole(int pid);
+
+    public static void AttachParentConsole()
+    {
+        if (!AttachConsole(-1)) return; // ATTACH_PARENT_PROCESS
+        try
+        {
+            Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+            Console.SetError(new StreamWriter(Console.OpenStandardError()) { AutoFlush = true });
+        }
+        catch { /* no usable console */ }
+    }
+
     [DllImport("kernel32.dll")] private static extern IntPtr GetConsoleWindow();
     [DllImport("kernel32.dll")] private static extern uint GetConsoleProcessList(uint[] list, uint count);
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int cmd);

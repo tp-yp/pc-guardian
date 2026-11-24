@@ -27,9 +27,12 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
     private static readonly string[] AllowedHosts = [$"127.0.0.1:{Port}", $"localhost:{Port}"];
     private readonly ConcurrentDictionary<string, DateTime> _sessions = new();
     private static readonly JsonSerializerOptions Json = EncryptedConfigStore.Json;
+    // Delayed changes are carried out by sending the saved request to this window again, marked with this secret.
+    private readonly string _replaySecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        _ = Task.Run(() => ReplayLoop(ct), ct);
         using var http = new HttpListener();
         http.Prefixes.Add($"http://127.0.0.1:{Port}/");
         http.Prefixes.Add($"http://localhost:{Port}/");
@@ -85,8 +88,69 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             // The filtered-line settings are for the whole computer, never one account.
             if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.")) who = null;
 
+            // "Delay before turning off": a change that weakens protection is kept and carried out later.
+            if (req.HttpMethod == "POST" && !IsReplay(req))
+            {
+                var cur = store.Load();
+                if (Cooling.IsActive(cur) && Cooling.IsWeakening(cur, who, path, body))
+                {
+                    var pending = new PendingChange
+                    {
+                        Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)), Path = path, Body = body, User = who,
+                        RequestedUtc = clock.UtcNow, DueUtc = clock.UtcNow.AddHours(cur.Cooling.Hours),
+                    };
+                    cur.Cooling.Pending.Add(pending);
+                    store.Save(cur);
+                    log.LogInformation("UI: {Path} delayed until {Due:u}", path, pending.DueUtc);
+                    await SendJson(res, 202, new { pending = true, due = pending.DueUtc.ToLocalTime(), hours = cur.Cooling.Hours });
+                    return;
+                }
+            }
+
             switch (path, req.HttpMethod)
             {
+                case ("/api/cooling", "GET"):
+                {
+                    var cfg = store.Load();
+                    await SendJson(res, 200, new
+                    {
+                        hours = cfg.Cooling.Hours,
+                        pending = cfg.Cooling.Pending.Select(p => new { p.Id, p.Path, p.Body, p.User, due = p.DueUtc.ToLocalTime() }),
+                        uninstallDue = cfg.Cooling.UninstallDueUtc?.ToLocalTime(),
+                        uninstallReady = cfg.Cooling.UninstallDueUtc is { } u && u <= clock.UtcNow,
+                    });
+                    break;
+                }
+                case ("/api/cooling/set", "POST"):
+                {
+                    if (!int.TryParse(body.GetValueOrDefault("hours"), out var hours) || hours < 0 || hours > 1_000_000)
+                    { await SendJson(res, 400, new { error = "מספר שעות לא תקין." }); break; }
+                    var cfg = store.Load();
+                    cfg.Cooling.Hours = hours;
+                    if (hours == 0) cfg.Cooling.UninstallDueUtc = null;
+                    store.Save(cfg);
+                    log.LogInformation("UI: delay before turning off = {H} h", hours);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
+                case ("/api/cooling/cancel", "POST"):
+                {
+                    var cfg = store.Load();
+                    cfg.Cooling.Pending.RemoveAll(p => p.Id == body.GetValueOrDefault("id"));
+                    store.Save(cfg);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
+                case ("/api/cooling/uninstall", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (body.GetValueOrDefault("action") == "cancel") cfg.Cooling.UninstallDueUtc = null;
+                    else cfg.Cooling.UninstallDueUtc ??= clock.UtcNow.AddHours(cfg.Cooling.Hours);
+                    store.Save(cfg);
+                    log.LogInformation("UI: removal {Action}", body.GetValueOrDefault("action") ?? "request");
+                    await SendJson(res, 200, new { ok = true, due = cfg.Cooling.UninstallDueUtc?.ToLocalTime() });
+                    break;
+                }
                 case ("/api/logout", "POST"):
                     _sessions.TryRemove(req.Cookies["gsid"]?.Value ?? "", out _);
                     await SendJson(res, 200, new { ok = true });
@@ -494,8 +558,46 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         idleChoices = GuardianConfig.IdleLockChoices,
     };
 
+    /// <summary>Carries out delayed changes whose time has come (measured on the trusted clock).</summary>
+    private async Task ReplayLoop(CancellationToken ct)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{Port}/") };
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(20), ct);
+                if (!store.Exists) continue;
+                var cfg = store.Load();
+                var due = cfg.Cooling.Pending.Where(p => p.DueUtc <= clock.UtcNow).ToList();
+                if (due.Count == 0) continue;
+                cfg.Cooling.Pending.RemoveAll(p => due.Contains(p));
+                store.Save(cfg);
+                foreach (var p in due)
+                {
+                    var msg = new HttpRequestMessage(HttpMethod.Post, p.Path.TrimStart('/'))
+                    {
+                        Content = new StringContent(JsonSerializer.Serialize(p.Body, Json), System.Text.Encoding.UTF8, "application/json"),
+                    };
+                    msg.Headers.Add("X-Guardian", "1");
+                    msg.Headers.Add("X-Guardian-Replay", _replaySecret);
+                    var r = await client.SendAsync(msg, ct);
+                    log.LogInformation("Delayed change {Path} carried out ({Status})", p.Path, (int)r.StatusCode);
+                    accessLog.Add("cooling", p.Path, allowed: r.IsSuccessStatusCode, p.User);
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { log.LogWarning(ex, "Delayed changes failed"); }
+        }
+    }
+
+    private bool IsReplay(HttpListenerRequest req) =>
+        req.Headers["X-Guardian-Replay"] is { } s && CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.ASCII.GetBytes(s), System.Text.Encoding.ASCII.GetBytes(_replaySecret));
+
     private bool Authorized(HttpListenerRequest req)
     {
+        if (IsReplay(req)) return true;
         var token = req.Cookies["gsid"]?.Value;
         if (token is null || !_sessions.TryGetValue(token, out var exp) || exp < DateTime.UtcNow) return false;
         // Only real use keeps the window unlocked; background refreshes (the activity list) do not.

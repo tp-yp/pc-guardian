@@ -98,7 +98,8 @@ public sealed class AppBlocker : IDisposable
 
         // Admin tools are checked before the protected-parts rule: copies of them also live in WinSxS.
         // (Not while Guardian is being removed or updated: its config is already gone and it runs sc.exe itself.)
-        if (rules.BlockAdminTools && AdminTools.Is(path, OriginalName(path)) && File.Exists(Path.Combine(Paths.DataDir, "config.bin")) && !_toolsExempt.IsExempt(user ?? ProcessUser.Of(pid), _clock.LocalNow))
+        if (rules.BlockAdminTools && AdminTools.Is(path, OriginalName(path)) && File.Exists(Path.Combine(Paths.DataDir, "config.bin"))
+            && AdminTools.StartedByHand(ProcessParent.PathOf(pid)) && !_toolsExempt.IsExempt(user ?? ProcessUser.Of(pid), _clock.LocalNow))
         {
             Kill(proc, pid, path, "admin tool", user);
             return;

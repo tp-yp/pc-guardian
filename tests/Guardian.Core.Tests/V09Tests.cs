@@ -153,3 +153,57 @@ public class AdminToolsTests
         Assert.True(UserScopes.AnyAppBlocking(cfg));
     }
 }
+
+public class CoolingTests
+{
+    private static Dictionary<string, string> B(params string[] kv) =>
+        Enumerable.Range(0, kv.Length / 2).ToDictionary(i => kv[2 * i], i => kv[2 * i + 1]);
+
+    [Fact]
+    public void Turning_off_weakens_turning_on_does_not()
+    {
+        var cfg = new GuardianConfig { Cooling = { Hours = 24 } };
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/settings", B("key", "apps.enabled", "value", "false")));
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/settings", B("key", "apps.enabled", "value", "true")));
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/settings", B("key", "apps.trustProgramFiles", "value", "true")));
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/cooling/set", B("hours", "2")));
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/cooling/set", B("hours", "48")));
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/tools/unlock", B("minutes", "30")));
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/tools/unlock", B("minutes", "0")));
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/password", B()));
+    }
+
+    [Fact]
+    public void Lists_and_hours()
+    {
+        var cfg = new GuardianConfig();
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/network/list", B("list", "domains", "action", "remove", "value", "a.com")));
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/network/list", B("list", "domains", "action", "add", "value", "a.com")));
+        cfg.Network.Mode = UrlMode.Allowlist;
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/network/list", B("list", "domains", "action", "add", "value", "a.com")));
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/catalog/set", B("kind", "lock", "value", "false")));
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/catalog/set", B("kind", "lock", "value", "true")));
+
+        const string w1 = """[{"days":["Monday"],"start":"18:00","end":"21:00"}]""";
+        const string w2 = """[{"days":["Monday"],"start":"18:00","end":"21:00"},{"days":["Friday"],"start":"10:00","end":"12:00"}]""";
+        AppCatalog.TrySetHours(cfg, @"C:\g.exe", System.Text.Json.JsonSerializer.Deserialize<List<TimeWindow>>(w1, Guardian.Core.Storage.EncryptedConfigStore.Json)!, out _);
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/catalog/hours", B("path", @"C:\g.exe", "windows", w2))); // more hours = stricter
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/catalog/hours", B("path", @"C:\g.exe", "windows", "[]")));
+
+        ConfigEditing.TrySetLockout(cfg, "kid", [], 5, out _, breakEveryMinutes: 30);
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/users/set", B("user", "kid", "windows", "[]", "breakEvery", "20")));
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/users/set", B("user", "kid", "windows", "[]", "breakEvery", "0")));
+    }
+}
+
+public class AdminToolsParentTests
+{
+    [Theory]
+    [InlineData(@"C:\Windows\explorer.exe", true)]
+    [InlineData(@"C:\Windows\System32\Taskmgr.exe", true)]
+    [InlineData(@"C:\Windows\System32\cmd.exe", true)]
+    [InlineData(null, true)]
+    [InlineData(@"C:\Program Files\Vendor\updater.exe", false)]
+    public void Tools_started_by_hand_are_blocked_background_ones_are_not(string? parent, bool byHand) =>
+        Assert.Equal(byHand, AdminTools.StartedByHand(parent));
+}
