@@ -95,12 +95,14 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
 
     public static ControlResponse Send(ControlRequest req, int timeoutMs = 10_000)
     {
-        using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
+        // Pipes do not support ReadTimeout (it throws), so the wait for the answer is bounded with an async read.
+        using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         pipe.Connect(timeoutMs);
-        pipe.ReadTimeout = 60_000;
         var writer = new StreamWriter(pipe) { AutoFlush = true };
         writer.WriteLine(JsonSerializer.Serialize(req));
-        var line = new StreamReader(pipe).ReadLine();
+        string? line;
+        try { line = new StreamReader(pipe).ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(60)).GetAwaiter().GetResult(); }
+        catch (TimeoutException) { throw new IOException("The service did not answer in time."); }
         return JsonSerializer.Deserialize<ControlResponse>(line ?? "") ?? new(false, "no response");
     }
 }

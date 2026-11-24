@@ -113,7 +113,7 @@ public static class Setup
             services = resp.Message.Split(',', StringSplitOptions.RemoveEmptyEntries);
             Thread.Sleep(1500);
         }
-        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             // The service is not answering. Check the password here, then lift protections as SYSTEM.
             var cfg = store.Load();
