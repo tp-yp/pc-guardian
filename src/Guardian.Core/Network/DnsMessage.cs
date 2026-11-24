@@ -64,6 +64,20 @@ public static class DnsMessage
         return [.. header, .. answer];
     }
 
+    /// <summary>SERVFAIL for the query, so the client retries quickly instead of timing out.</summary>
+    public static byte[] BuildServFail(ReadOnlySpan<byte> query)
+    {
+        var q = ReadQuestion(query) ?? throw new ArgumentException("Malformed query.");
+        var header = query[..q.EndOffset].ToArray();
+        header[2] = (byte)(0x80 | (header[2] & 0x79));
+        header[3] = 0x82; // RA + SERVFAIL
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(4), 1);
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(6), 0);
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(8), 0);
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(10), 0);
+        return header;
+    }
+
     /// <summary>Builds a standard query (used in tests and health checks).</summary>
     public static byte[] BuildQuery(ushort id, string name, ushort type)
     {

@@ -25,27 +25,129 @@ public static class Setup
         catch (System.ComponentModel.Win32Exception) { return false; }
     }
 
-    public static string Install(EncryptedConfigStore store, string adminPassword, string recoveryPassword, string? name = null)
+    public static string Install(EncryptedConfigStore store, string adminPassword, string recoveryPassword, string? name = null, int idleLockMinutes = 5)
     {
         name ??= ServiceNameGenerator.Generate();
         if (!ServiceNameGenerator.IsValid(name)) throw new ArgumentException("Invalid service name (letters/digits only).");
         if (adminPassword.Length < 8 || recoveryPassword.Length < 8) throw new ArgumentException("Passwords must be at least 8 characters.");
         if (adminPassword == recoveryPassword) throw new ArgumentException("The recovery password must differ from the admin password.");
 
-        Directory.CreateDirectory(Paths.InstallDir);
-        var exe = Path.Combine(Paths.InstallDir, name + ".exe");
-        File.Copy(Environment.ProcessPath!, exe, overwrite: true);
+        if (!GuardianConfig.IdleLockChoices.Contains(idleLockMinutes)) throw new ArgumentException("Choose when the settings lock themselves.");
 
         var watchdogName = ServiceNameGenerator.Generate();
         while (watchdogName == name) watchdogName = ServiceNameGenerator.Generate();
-        store.Save(GuardianConfig.CreateInitial(name, watchdogName,
-            PasswordHasher.Hash(adminPassword), PasswordHasher.Hash(recoveryPassword)));
-        DataDirSecurity.Lock(Paths.DataDir);
-        ServiceHardening.Install(name, exe);
-        ServiceHardening.Install(watchdogName, exe, "watchdog");
-        Uninstaller.RegisterInWindows(exe);
-        DataDirSecurity.Lock(Paths.InstallDir);
+        var cfg = GuardianConfig.CreateInitial(name, watchdogName, PasswordHasher.Hash(adminPassword), PasswordHasher.Hash(recoveryPassword));
+        cfg.UiIdleLockMinutes = idleLockMinutes;
+        InstallWithConfig(store, cfg);
         return name;
+    }
+
+    /// <summary>
+    /// Copies this exe into place, writes the config, and creates both services. The services are
+    /// started before they are hardened: if Windows refuses to run them, everything is rolled back
+    /// (the config is kept when <paramref name="keepConfigOnFailure"/>, so an update can be retried).
+    /// </summary>
+    private static void InstallWithConfig(EncryptedConfigStore store, GuardianConfig cfg, bool keepConfigOnFailure = false)
+    {
+        // Any service still pointing into the install folder is from an earlier attempt (the old version was
+        // already uninstalled at this point), including ones with the same names that never started.
+        try { ServiceHardening.RemoveLeftovers([]); Thread.Sleep(1000); } catch { /* best effort */ }
+        // Folders may still be locked by an earlier attempt; the installer needs to write into them.
+        DataDirSecurity.ReclaimForInstall(Paths.InstallDir);
+        DataDirSecurity.ReclaimForInstall(Paths.DataDir);
+        Directory.CreateDirectory(Paths.InstallDir);
+        var exe = Path.Combine(Paths.InstallDir, cfg.ServiceName + ".exe");
+        File.Copy(Environment.ProcessPath!, exe, overwrite: true);
+        store.Save(cfg);
+        DataDirSecurity.Lock(Paths.DataDir);
+        try
+        {
+            ServiceHardening.Create(cfg.ServiceName, exe);
+            ServiceHardening.Create(cfg.WatchdogServiceName, exe, "watchdog");
+            ServiceHardening.Start(cfg.ServiceName);
+            ServiceHardening.Start(cfg.WatchdogServiceName);
+        }
+        catch
+        {
+            foreach (var n in new[] { cfg.ServiceName, cfg.WatchdogServiceName }) try { ServiceHardening.RemoveUnhardened(n); } catch { }
+            Thread.Sleep(1000);
+            try { File.Delete(exe); } catch { }
+            if (!keepConfigOnFailure) try { Directory.Delete(Paths.DataDir, true); } catch { }
+            throw;
+        }
+        ServiceHardening.Harden(cfg.ServiceName);
+        ServiceHardening.Harden(cfg.WatchdogServiceName);
+        Uninstaller.RegisterInWindows(exe);
+        DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true);
+    }
+
+    public enum SmartAppControl { Off, On, Evaluation, Unknown }
+
+    /// <summary>Windows 11 Smart App Control. When it is on (or may switch itself on), Windows refuses to run Guardian's unsigned service.</summary>
+    public static SmartAppControl SmartAppControlState()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\CI\Policy");
+            return k?.GetValue("VerifiedAndReputablePolicyState") switch
+            {
+                0 => SmartAppControl.Off, 1 => SmartAppControl.On, 2 => SmartAppControl.Evaluation,
+                null => SmartAppControl.Off, _ => SmartAppControl.Unknown,
+            };
+        }
+        catch { return SmartAppControl.Unknown; }
+    }
+
+    /// <summary>A config left by an update whose install step failed: setup offers to finish it.</summary>
+    public static bool HasPendingUpdate(EncryptedConfigStore store) => !IsInstalled() && store.Exists;
+
+    /// <summary>Installed? Read from "Installed apps" so it also works without admin rights.</summary>
+    public static bool IsInstalled() => InstalledExe() != null;
+
+    /// <summary>The installed exe, if any (from the "Installed apps" entry, readable by everyone).</summary>
+    public static string? InstalledExe()
+    {
+        using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(Uninstaller.ArpKey);
+        var p = k?.GetValue("DisplayIcon") as string;
+        return p != null && File.Exists(p) ? p : null;
+    }
+
+    /// <summary>True when this exe is a different build from the installed one.</summary>
+    public static bool IsDifferentBuildThanInstalled()
+    {
+        var installed = InstalledExe();
+        if (installed is null) return false;
+        if (string.Equals(Path.GetFullPath(installed), Path.GetFullPath(Environment.ProcessPath!), StringComparison.OrdinalIgnoreCase)) return false;
+        return HashFile(installed) != HashFile(Environment.ProcessPath!);
+    }
+
+    /// <summary>
+    /// Update to this build, keeping every setting and both passwords: a clean uninstall
+    /// (which works with any older version) followed by an install with the saved config.
+    /// </summary>
+    public static (bool Ok, string Message) Upgrade(EncryptedConfigStore store, string password)
+    {
+        if (!store.Exists) return (false, "Guardian is not installed.");
+        var saved = store.Load();
+        if (saved.UiIdleLockMinutes == 0) saved.UiIdleLockMinutes = 5;
+        var auth = new AdminGate().Authenticate(saved, password);
+        if (auth is not (AuthResult.Admin or AuthResult.Recovery)) return (false, "Wrong password.");
+        if (IsInstalled())
+        {
+            var (ok, message) = Uninstall(store, password);
+            if (!ok) return (false, message);
+            Thread.Sleep(2000);
+        }
+        try { InstallWithConfig(store, saved, keepConfigOnFailure: true); }
+        catch (BlockedByWindowsException ex) { return (false, ex.Message); }
+        catch (Exception ex) { return (false, "Install step failed: " + ex.Message + " Your settings are kept; run the file again to finish the update."); }
+        return (true, "Updated. All settings were kept.");
+    }
+
+    private static string HashFile(string path)
+    {
+        using var fs = File.OpenRead(path);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fs));
     }
 
     /// <summary>Uninstalls with the admin or recovery password. Works even if the service is not running.</summary>
@@ -60,7 +162,7 @@ public static class Setup
             services = resp.Message.Split(',', StringSplitOptions.RemoveEmptyEntries);
             Thread.Sleep(1500);
         }
-        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             // The service is not answering. Check the password here, then lift protections as SYSTEM.
             var cfg = store.Load();

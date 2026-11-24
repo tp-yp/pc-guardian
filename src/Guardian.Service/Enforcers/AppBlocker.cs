@@ -103,7 +103,11 @@ public sealed class AppBlocker : IDisposable
         var key = sessionId + "|" + path;
         if (_lastNotified.TryGetValue(key, out var t) && DateTime.UtcNow - t < TimeSpan.FromMinutes(1)) return;
         _lastNotified[key] = DateTime.UtcNow;
-        Wts.Notify(sessionId, "Blocked", $"{Path.GetFileName(path)} is blocked by policy.");
+        var name = DisplayName(path);
+        // A styled Hebrew screen on the user's desktop; a plain message box if that fails.
+        var arg = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(name));
+        if (!UserLauncher.Launch(sessionId, Environment.ProcessPath!, $"blocked {arg}"))
+            Wts.Notify(sessionId, "Guardian", $"התוכנה \"{name}\" חסומה במחשב הזה.");
     }
 
     private string? Hash(string path)
@@ -119,6 +123,18 @@ public sealed class AppBlocker : IDisposable
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+    }
+
+    private static string DisplayName(string path)
+    {
+        try
+        {
+            var v = FileVersionInfo.GetVersionInfo(path);
+            var n = !string.IsNullOrWhiteSpace(v.FileDescription) ? v.FileDescription : v.ProductName;
+            if (!string.IsNullOrWhiteSpace(n)) return n.Trim();
+        }
+        catch { /* fall back to the file name */ }
+        return Path.GetFileNameWithoutExtension(path);
     }
 
     private static string? HashFile(string path)

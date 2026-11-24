@@ -3,71 +3,112 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Guardian.Core.Config;
 using Guardian.Core.Storage;
 
 namespace Guardian.Service.Ui;
 
-/// <summary>
-/// Install / uninstall screens shown in the browser when the exe is double-clicked.
-/// A one-off listener on a random loopback port, reachable only through a secret path,
-/// so no other page or program can drive it. Ends when the step is done or after 30 minutes.
-/// </summary>
-internal static class SetupWeb
-{
-    public static void Run(EncryptedConfigStore store, bool uninstall)
-    {
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
-        var port = FreePort();
-        var prefix = $"http://127.0.0.1:{port}/{token}/";
-        using var http = new HttpListener();
-        http.Prefixes.Add(prefix);
-        http.Start();
-        Setup.OpenUrl(prefix);
+public enum SetupMode { Install, Update, Uninstall }
 
-        var finished = new ManualResetEventSlim();
-        var deadline = DateTime.UtcNow.AddMinutes(30);
-        _ = Task.Run(async () =>
-        {
-            while (!finished.IsSet)
-            {
-                HttpListenerContext ctx;
-                try { ctx = await http.GetContextAsync(); } catch { return; }
-                try
-                {
-                    if (ctx.Request.HttpMethod == "GET")
-                    {
-                        await Send(ctx, 200, "text/html; charset=utf-8", uninstall ? SetupPages.Uninstall : SetupPages.Install);
-                        continue;
-                    }
-                    if (ctx.Request.Headers["X-Guardian"] != "1") { await Send(ctx, 403, "text/plain", "Forbidden"); continue; }
-                    var body = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(ctx.Request.InputStream) ?? new();
-                    if (uninstall)
-                    {
-                        var (ok, msg) = Setup.Uninstall(store, body.GetValueOrDefault("password") ?? "");
-                        await SendJson(ctx, ok ? 200 : 400, new { ok, message = msg });
-                        if (ok) finished.Set();
-                    }
-                    else
-                    {
-                        if (store.Exists) { await SendJson(ctx, 200, new { ok = true, ui = "http://127.0.0.1:8898/" }); finished.Set(); continue; }
-                        try
-                        {
-                            Setup.Install(store, body.GetValueOrDefault("admin") ?? "", body.GetValueOrDefault("recovery") ?? "");
-                            await SendJson(ctx, 200, new { ok = true, ui = "http://127.0.0.1:8898/" });
-                            finished.Set();
-                        }
-                        catch (ArgumentException ex) { await SendJson(ctx, 400, new { ok = false, message = ex.Message }); }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    try { await SendJson(ctx, 500, new { ok = false, message = ex.Message }); } catch { /* gone */ }
-                }
-            }
-        });
-        while (!finished.Wait(1000) && DateTime.UtcNow < deadline) { }
-        Thread.Sleep(1500); // let the last response reach the browser
+/// <summary>
+/// Install / update / uninstall screens. Served by a one-off listener on a random loopback port,
+/// reachable only through a secret path, and shown in Guardian's own window.
+/// </summary>
+internal sealed class SetupWeb : IDisposable
+{
+    private readonly HttpListener _http = new();
+    private readonly EncryptedConfigStore _store;
+    private readonly SetupMode _mode;
+    public string Url { get; }
+    public bool Succeeded { get; private set; }
+
+    public SetupWeb(EncryptedConfigStore store, SetupMode mode)
+    {
+        _store = store;
+        _mode = mode;
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+        Url = $"http://127.0.0.1:{FreePort()}/{token}/";
+        _http.Prefixes.Add(Url);
+        _http.Start();
+        _ = Task.Run(Loop);
     }
+
+    private async Task Loop()
+    {
+        while (_http.IsListening)
+        {
+            HttpListenerContext ctx;
+            try { ctx = await _http.GetContextAsync(); } catch { return; }
+            _ = Task.Run(() => Handle(ctx));
+        }
+    }
+
+    private async Task Handle(HttpListenerContext ctx)
+    {
+        try
+        {
+            if (ctx.Request.HttpMethod == "GET")
+            {
+                var page = _mode switch { SetupMode.Install => SetupPages.Install, SetupMode.Update => SetupPages.Update, _ => SetupPages.Uninstall };
+                var sac = Setup.SmartAppControlState();
+                page = page.Replace("<!--SAC-->", sac is Setup.SmartAppControl.On or Setup.SmartAppControl.Evaluation
+                    ? SetupPages.SmartAppControlWarning(sac == Setup.SmartAppControl.Evaluation) : "");
+                await Send(ctx, 200, "text/html; charset=utf-8", page);
+                return;
+            }
+            if (ctx.Request.Headers["X-Guardian"] != "1") { await Send(ctx, 403, "text/plain", "Forbidden"); return; }
+            var body = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(ctx.Request.InputStream) ?? new();
+            switch (_mode)
+            {
+                case SetupMode.Uninstall:
+                {
+                    var (ok, msg) = Setup.Uninstall(_store, body.GetValueOrDefault("password") ?? "");
+                    Succeeded |= ok;
+                    await SendJson(ctx, ok ? 200 : 400, new { ok, message = Hebrew(msg) });
+                    break;
+                }
+                case SetupMode.Update:
+                {
+                    var (ok, msg) = Setup.Upgrade(_store, body.GetValueOrDefault("password") ?? "");
+                    Succeeded |= ok;
+                    await SendJson(ctx, ok ? 200 : 400, new { ok, message = Hebrew(msg), ui = "http://127.0.0.1:8898/" });
+                    break;
+                }
+                default:
+                    if (Setup.IsInstalled()) { await SendJson(ctx, 200, new { ok = true, ui = "http://127.0.0.1:8898/" }); break; }
+                    try
+                    {
+                        int.TryParse(body.GetValueOrDefault("idle"), out var idle);
+                        Setup.Install(_store, body.GetValueOrDefault("admin") ?? "", body.GetValueOrDefault("recovery") ?? "", idleLockMinutes: idle);
+                        Succeeded = true;
+                        await SendJson(ctx, 200, new { ok = true, ui = "http://127.0.0.1:8898/" });
+                    }
+                    catch (ArgumentException ex) { await SendJson(ctx, 400, new { ok = false, message = Hebrew(ex.Message) }); }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            try { await SendJson(ctx, 500, new { ok = false, message = Hebrew(ex.Message) }); } catch { /* gone */ }
+        }
+    }
+
+    /// <summary>Hebrew for the messages people can actually hit.</summary>
+    private static string Hebrew(string m) => m switch
+    {
+        "Access denied." or "Wrong password." => "הסיסמה שגויה.",
+        "Too many wrong passwords. Try again later." => "יותר מדי ניסיונות שגויים. נסה שוב בעוד 15 דקות.",
+        "Guardian is not installed." => "Guardian לא מותקן.",
+        "Choose when the settings lock themselves." => "בחר אחרי כמה זמן ההגדרות יינעלו.",
+        "The recovery password must differ from the admin password." => "הסיסמה המצילה חייבת להיות שונה מסיסמת הניהול.",
+        "Passwords must be at least 8 characters." => "כל סיסמה צריכה להיות באורך 8 תווים לפחות.",
+        "Updated. All settings were kept." => "עודכן. כל ההגדרות נשמרו.",
+        _ when m.StartsWith("Guardian was removed") => "Guardian הוסר, וכל מה שהוא שינה הוחזר.",
+        _ when m.StartsWith("Blocked by Windows") => "ווינדוס סירב להפעיל את Guardian כשירות רקע (Smart App Control או האנטי-וירוס חסמו את הקובץ). שום דבר לא הותקן ושום דבר לא נשאר מאחור. פרטים: " + m["Blocked by Windows: ".Length..],
+        _ when m.StartsWith("Install step failed") => "שלב ההתקנה נכשל. ההגדרות שלך נשמרו, הפעל את הקובץ שוב כדי להשלים את העדכון. פרטים: " + m,
+        _ when m.StartsWith("The service did not answer") => "השירות לא ענה וגם הדרך החלופית נכשלה. הפעל מחדש את המחשב ונסה שוב.",
+        _ => m,
+    };
 
     private static int FreePort()
     {
@@ -90,5 +131,10 @@ internal static class SetupWeb
         ctx.Response.ContentLength64 = bytes.Length;
         await ctx.Response.OutputStream.WriteAsync(bytes);
         ctx.Response.Close();
+    }
+
+    public void Dispose()
+    {
+        try { _http.Stop(); _http.Close(); } catch { /* already closed */ }
     }
 }

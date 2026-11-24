@@ -20,7 +20,8 @@ public sealed class FilterProxy(
     LocalCertificateAuthority ca,
     Func<NetworkPolicy> policy,
     Action<string, string, bool>? log = null,
-    RemoteCertificateValidationCallback? upstreamValidation = null)
+    RemoteCertificateValidationCallback? upstreamValidation = null,
+    Func<string, string>? blockPage = null)
 {
     private TcpListener? _listener;
 
@@ -103,7 +104,7 @@ public sealed class FilterProxy(
         log?.Invoke(host, url, allowed);
         if (!allowed)
         {
-            await client.WriteAsync(HttpHead.BlockedResponse(url), ct);
+            await client.WriteAsync(HttpHead.BlockedResponse(url, blockPage), ct);
             return;
         }
 

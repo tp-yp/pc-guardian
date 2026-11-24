@@ -15,6 +15,8 @@ public static class Uninstaller
 {
     public const string ArpKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Guardian";
     public static string StartMenuLink =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Guardian.lnk");
+    private static string OldStartMenuLink =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Guardian.url");
 
     /// <summary>Returns the service names to stop and delete afterwards.</summary>
@@ -29,6 +31,7 @@ public static class Uninstaller
         Try(() => LockoutEnforcer.RestoreAll(cfg));
         Try(() => (network ?? new NetworkEnforcer(NullLogger<NetworkEnforcer>.Instance)).Restore());
         Try(ProxyHost.RemoveCa);
+        Try(() => Run("auditpol.exe", "/set /subcategory:\"{0CCE9226-69AE-11D9-BED3-505054503030}\" /failure:disable"));
         Try(() => DataDirSecurity.Unlock(Paths.InstallDir));
         Try(() => File.Delete(Path.Combine(Paths.DataDir, "config.bin")));
         Try(() => File.Delete(Path.Combine(Paths.DataDir, "key.bin")));
@@ -43,6 +46,7 @@ public static class Uninstaller
         Thread.Sleep(1500);
         Try(() => Registry.LocalMachine.DeleteSubKeyTree(ArpKey, false));
         Try(() => File.Delete(StartMenuLink));
+        Try(() => File.Delete(OldStartMenuLink));
         Try(() => Directory.Delete(Paths.InstallDir, recursive: true));
         Try(() => Directory.Delete(Paths.DataDir, recursive: true));
     }
@@ -60,7 +64,14 @@ public static class Uninstaller
             k.SetValue("NoModify", 1, RegistryValueKind.DWord);
             k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
         }
-        File.WriteAllText(StartMenuLink, "[InternetShortcut]\r\nURL=http://127.0.0.1:8898/\r\n");
+        Try(() => File.Delete(OldStartMenuLink));
+        dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+        dynamic link = shell.CreateShortcut(StartMenuLink);
+        link.TargetPath = exe;
+        link.Arguments = "app";
+        link.IconLocation = exe + ",0";
+        link.Description = "Guardian – ניהול";
+        link.Save();
     }
 
     /// <summary>

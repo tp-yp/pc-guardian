@@ -13,6 +13,9 @@ public sealed class GuardianConfig
     /// <summary>Recovery ("rescue") password. Unlocks everything, including uninstall.</summary>
     public string RecoveryPasswordHash { get; set; } = "";
     public List<UserLockoutRule> UserLockouts { get; set; } = new();
+    /// <summary>The management window locks itself after this many minutes without activity.</summary>
+    public int UiIdleLockMinutes { get; set; } = 5;
+    public static readonly int[] IdleLockChoices = [1, 3, 5, 10, 15, 30];
     public AppPolicy Apps { get; set; } = new();
     public NetworkPolicy Network { get; set; } = new();
 
@@ -73,6 +76,9 @@ public sealed class NetworkPolicy
     public UrlMode Mode { get; set; } = UrlMode.Blocklist;
     /// <summary>Domains ("example.com", covers subdomains) or URL prefixes ("youtube.com/shorts").</summary>
     public List<string> Domains { get; set; } = new();
+    /// <summary>Exceptions to <see cref="Domains"/> with the opposite meaning: in blocklist mode always
+    /// allowed, in allowlist mode always blocked. Lets the owner allow one page of a blocked site, etc.</summary>
+    public List<string> Exceptions { get; set; } = new();
     /// <summary>Executables denied any network access (outbound firewall rules).</summary>
     public List<string> BlockedAppPaths { get; set; } = new();
     /// <summary>

@@ -13,8 +13,13 @@ namespace Guardian.Service.Enforcers;
 /// </summary>
 public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog accessLog) : BackgroundService
 {
-    private static readonly string[] Upstreams = ["https://1.1.1.1/dns-query", "https://9.9.9.9/dns-query"];
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(4) };
+    private static readonly string[] Upstreams =
+        ["https://1.1.1.1/dns-query", "https://9.9.9.9/dns-query", "https://8.8.8.8/dns-query", "https://1.0.0.1/dns-query", "https://149.112.112.112/dns-query"];
+    private readonly HttpClient _http = new(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5), UseProxy = false })
+        { Timeout = TimeSpan.FromSeconds(3) };
+    private readonly DnsCache _cache = new();
+    public string LastUpstreamError { get; private set; } = "";
+    public DateTime LastUpstreamSuccess { get; private set; }
     private volatile NetworkPolicy _policy = new() { Enabled = false };
 
     public void Update(GuardianConfig cfg) => _policy = cfg.Network;
@@ -59,16 +64,44 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
             return DnsMessage.BuildBlocked(query);
         }
         accessLog.Add("dns", q.Name, allowed: true);
-        foreach (var url in Upstreams)
+        if (_cache.Get(query, q) is { } cached) return cached;
+
+        // Ask two upstreams at once and take the first good answer; then the rest, one by one.
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var first = new[] { Ask(Upstreams[0], query, cts.Token), Ask(Upstreams[1], query, cts.Token) }.ToList();
+        while (first.Count > 0)
         {
-            try
-            {
-                using var content = new ByteArrayContent(query);
-                content.Headers.ContentType = new MediaTypeHeaderValue("application/dns-message");
-                using var resp = await _http.PostAsync(url, content, ct);
-                if (resp.IsSuccessStatusCode) return await resp.Content.ReadAsByteArrayAsync(ct);
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { /* try next */ }
+            var done = await Task.WhenAny(first);
+            first.Remove(done);
+            if (await done is { } answer) { cts.Cancel(); return Remember(q, answer); }
+        }
+        foreach (var url in Upstreams.Skip(2))
+            if (await Ask(url, query, ct) is { } answer) return Remember(q, answer);
+
+        // Every upstream failed: an old answer is better than no internet; otherwise tell the client to retry.
+        return _cache.Get(query, q, allowStale: true) ?? DnsMessage.BuildServFail(query);
+    }
+
+    private byte[] Remember(DnsMessage.Question q, byte[] answer)
+    {
+        _cache.Put(q, answer);
+        LastUpstreamSuccess = DateTime.UtcNow;
+        return answer;
+    }
+
+    private async Task<byte[]?> Ask(string url, byte[] query, CancellationToken ct)
+    {
+        try
+        {
+            using var content = new ByteArrayContent(query);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/dns-message");
+            using var resp = await _http.PostAsync(url, content, ct);
+            if (resp.IsSuccessStatusCode) return await resp.Content.ReadAsByteArrayAsync(ct);
+            LastUpstreamError = $"{url}: HTTP {(int)resp.StatusCode}";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            if (!ct.IsCancellationRequested) { LastUpstreamError = $"{url}: {ex.Message}"; log.LogDebug("DNS upstream {Url} failed: {Msg}", url, ex.Message); }
         }
         return null;
     }

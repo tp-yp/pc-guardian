@@ -98,10 +98,93 @@ public static class ConfigEditing
         }
     }
 
+    /// <summary>
+    /// The folder to allow for an app, so its helpers and updated versions are allowed too.
+    /// Versioned sub-folders ("app-1.0.9", "1.2.3", "current") are skipped upwards:
+    /// C:\Users\me\AppData\Local\Discord\app-1.0.9\Discord.exe -> C:\Users\me\AppData\Local\Discord\
+    /// </summary>
+    public static string AppFolderOf(string exePath)
+    {
+        var dir = exePath.Replace('/', '\\');
+        var cut = dir.LastIndexOf('\\');
+        if (cut <= 0) return exePath;
+        dir = dir[..cut];
+        while (true)
+        {
+            var i = dir.LastIndexOf('\\');
+            if (i <= 2) break;
+            var name = dir[(i + 1)..];
+            var versioned = System.Text.RegularExpressions.Regex.IsMatch(name, @"^(app-)?v?\d+(\.\d+)+$|^(current|bin|x64|x86)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!versioned) break;
+            dir = dir[..i];
+        }
+        return dir + "\\";
+    }
+
     /// <summary>Simple (unscheduled) app rules shown in the UI lists.</summary>
     public static List<string> SimpleAppList(GuardianConfig cfg, RuleAction kind) =>
         cfg.Apps.Rules.Where(r => r.Action == kind && r.When.Windows.Count == 0 && r.Sha256 is null)
             .Select(r => r.PathPrefix ?? r.FileName ?? "").Where(v => v.Length > 0).ToList();
+
+    /// <summary>
+    /// "Block this" / "Allow this" for a site or page, whatever the list mode is.
+    /// <paramref name="target"/> is a domain ("youtube.com") or a page/prefix ("youtube.com/shorts").
+    /// </summary>
+    public static void SetSiteAccess(NetworkPolicy p, string target, bool allow)
+    {
+        target = NormalizeTarget(target);
+        if (target.Length == 0) return;
+        var listMeansAllow = p.Mode == UrlMode.Allowlist;
+        static bool Same(string a, string b) => NormalizeTarget(a) == NormalizeTarget(b);
+        if (allow == listMeansAllow)
+        {
+            p.Exceptions.RemoveAll(e => Same(e, target));
+            if (!p.Domains.Any(d => Same(d, target))) p.Domains.Add(target);
+        }
+        else
+        {
+            var removed = p.Domains.RemoveAll(d => Same(d, target));
+            // Still covered by a broader entry (e.g. allowing one page of a blocked site): add an exception.
+            var e = Policy.UrlPolicy.ParseEntry(target);
+            var stillCovered = p.Domains.Any(d => Policy.UrlPolicy.UrlMatches(d, e.Host, e.Path.Length == 0 ? "/" : e.Path));
+            if ((removed == 0 || stillCovered) && !p.Exceptions.Any(x => Same(x, target))) p.Exceptions.Add(target);
+        }
+    }
+
+    /// <summary>"https://www.Site.com/a/b?q=1" -> "www.site.com/a/b"; "site.com/" -> "site.com".</summary>
+    public static string NormalizeTarget(string raw)
+    {
+        var e = Policy.UrlPolicy.ParseEntry(raw);
+        var path = e.Path;
+        var q = path.IndexOfAny(['?', '#']);
+        if (q >= 0) path = path[..q];
+        path = path.TrimEnd('/');
+        return e.Host + path;
+    }
+
+    /// <summary>Sets (or with no windows, removes) the lock-out schedule of one Windows account.</summary>
+    public static bool TrySetLockout(GuardianConfig cfg, string user, IEnumerable<Scheduling.TimeWindow> windows, int warningMinutes, out string error)
+    {
+        error = "";
+        user = user.Trim();
+        if (user.Length is 0 or > 104 || user.Any(ch => char.IsControl(ch) || "\\/\"[]:|<>+=;,?*@".Contains(ch)))
+        { error = "Invalid user name."; return false; }
+        var list = windows.ToList();
+        if (list.Any(w => w.Days.Length == 0)) { error = "Pick at least one day for each time range."; return false; }
+        if (warningMinutes is < 0 or > 60) { error = "Warning must be 0-60 minutes."; return false; }
+        cfg.UserLockouts.RemoveAll(r => Lockout.LockoutPlanner.SameUser(r.UserName, user));
+        if (list.Count > 0)
+            cfg.UserLockouts.Add(new UserLockoutRule
+            {
+                UserName = user, WarningMinutes = warningMinutes,
+                LockedDuring = new Scheduling.WeeklySchedule { Windows = list },
+            });
+        return true;
+    }
+
+    /// <summary>True if, with this config, every given account has some lock-out schedule.</summary>
+    public static bool EveryAccountHasLockout(GuardianConfig cfg, IEnumerable<string> accounts) =>
+        accounts.Any() && accounts.All(a => cfg.UserLockouts.Any(r => Lockout.LockoutPlanner.SameUser(r.UserName, a) && r.LockedDuring.Windows.Count > 0));
 
     /// <summary>Adds/removes one entry of a network list ("domains", "noDecrypt", "blockedApps", "directApps").</summary>
     public static bool TryEditNetworkList(GuardianConfig cfg, string list, string action, string value, out string error)
@@ -112,12 +195,13 @@ public static class ConfigEditing
         {
             "domains" => cfg.Network.Domains,
             "noDecrypt" => cfg.Network.NoDecryptDomains,
+            "exceptions" => cfg.Network.Exceptions,
             "blockedApps" => cfg.Network.BlockedAppPaths,
             "directApps" => cfg.Network.AllowDirectApps,
             _ => null,
         };
         if (target is null) { error = "Unknown list."; return false; }
-        if (value.Length is 0 or > 500 || value.Any(char.IsControl) || (list is "domains" or "noDecrypt" && value.Contains(' ')))
+        if (value.Length is 0 or > 500 || value.Any(char.IsControl) || (list is "domains" or "noDecrypt" or "exceptions" && value.Contains(' ')))
         { error = "Invalid value."; return false; }
         var existing = target.FindIndex(v => v.Equals(value, StringComparison.OrdinalIgnoreCase));
         switch (action)

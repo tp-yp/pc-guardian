@@ -32,7 +32,7 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog) : Bac
         using (ca)
         {
             var proxy = new FilterProxy(new IPEndPoint(IPAddress.Loopback, Port), ca, () => _policy,
-                (_, url, ok) => accessLog.Add("web", url, ok));
+                (_, url, ok) => accessLog.Add("web", url, ok), blockPage: Ui.BlockScreen.ForWebPage);
             try { proxy.Start(); }
             catch (Exception ex) { log.LogError(ex, "Cannot listen on port {Port}", Port); return; }
             log.LogInformation("Filtering proxy listening on 127.0.0.1:{Port}", Port);

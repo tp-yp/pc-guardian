@@ -3,7 +3,9 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Guardian.Core.Apps;
 using Guardian.Core.Config;
+using Guardian.Core.Policy;
 using Guardian.Core.Security;
 using Guardian.Core.Storage;
 using Guardian.Service.Enforcers;
@@ -16,7 +18,8 @@ namespace Guardian.Service.Ui;
 /// Host header check (DNS rebinding), SameSite=Strict HttpOnly session cookie, and a custom
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
-public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog)
+public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
+    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns)
     : BackgroundService
 {
     public const int Port = 8898;
@@ -66,7 +69,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 if (auth == AuthResult.LockedOut) { await SendJson(res, 429, new { error = "Too many attempts. Try again later." }); return; }
                 if (auth == AuthResult.Denied) { await SendJson(res, 401, new { error = "Wrong password." }); return; }
                 var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-                _sessions[token] = DateTime.UtcNow.AddMinutes(30);
+                _sessions[token] = DateTime.UtcNow.AddMinutes(IdleMinutes());
                 res.Headers.Add("Set-Cookie", $"gsid={token}; Path=/; HttpOnly; SameSite=Strict");
                 await SendJson(res, 200, new { ok = true });
                 return;
@@ -85,6 +88,110 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     break;
                 case ("/api/network", "GET"):
                     await SendJson(res, 200, store.Load().Network);
+                    break;
+                case ("/api/catalog", "GET"):
+                {
+                    var apps = await catalog.GetAsync(refresh: req.QueryString["refresh"] == "1");
+                    await SendJson(res, 200, AppCatalog.WithState(apps, store.Load()));
+                    break;
+                }
+                case ("/api/catalog/set", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (!AppCatalog.TrySet(cfg, body.GetValueOrDefault("path") ?? "", body.GetValueOrDefault("kind") ?? "", body.GetValueOrDefault("value") == "true", out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), cfg));
+                    break;
+                }
+                case ("/api/apps/allow", "POST"):
+                {
+                    var exePath = body.GetValueOrDefault("path") ?? "";
+                    var value = body.GetValueOrDefault("scope") == "folder" ? ConfigEditing.AppFolderOf(exePath) : exePath;
+                    var cfg = store.Load();
+                    // Allowing also removes a matching lock, otherwise the lock would still win.
+                    cfg.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Block && r.When.Windows.Count == 0 &&
+                        (string.Equals(r.PathPrefix, exePath, StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(r.FileName, Path.GetFileName(exePath), StringComparison.OrdinalIgnoreCase)));
+                    if (!ConfigEditing.TryEditAppList(cfg, "allowApps", "add", value, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    await SendJson(res, 200, new { ok = true, allowed = value });
+                    break;
+                }
+                case ("/api/site", "POST"):
+                {
+                    var target = body.GetValueOrDefault("target") ?? "";
+                    if (body.GetValueOrDefault("whole") == "true") target = UrlPolicy.NormalizeHost(target);
+                    var cfg = store.Load();
+                    ConfigEditing.SetSiteAccess(cfg.Network, target, body.GetValueOrDefault("allow") == "true");
+                    if (body.GetValueOrDefault("allow") != "true") cfg.Network.Enabled = true;
+                    store.Save(cfg);
+                    await SendJson(res, 200, State(cfg));
+                    break;
+                }
+                case ("/api/direct", "GET"):
+                {
+                    var cfg = store.Load();
+                    await SendJson(res, 200, direct.Recent().Select(d => new
+                    {
+                        d.AppPath, d.LastDestination, d.Count, d.Last,
+                        allowed = cfg.Network.AllowDirectApps.Contains(d.AppPath, StringComparer.OrdinalIgnoreCase),
+                    }));
+                    break;
+                }
+                case ("/api/users", "GET"):
+                {
+                    var cfg = store.Load();
+                    var accounts = AppCatalogScanner.LocalAccounts();
+                    await SendJson(res, 200, new
+                    {
+                        accounts = accounts.Select(a => new
+                        {
+                            name = a,
+                            rule = cfg.UserLockouts.FirstOrDefault(r => Guardian.Core.Lockout.LockoutPlanner.SameUser(r.UserName, a)),
+                            unlockedUntil = exemptions.Until.TryGetValue(a, out var u) && u > DateTime.Now ? u : (DateTime?)null,
+                        }),
+                        everyoneLocked = ConfigEditing.EveryAccountHasLockout(cfg, accounts),
+                    });
+                    break;
+                }
+                case ("/api/users/set", "POST"):
+                {
+                    var cfg = store.Load();
+                    List<Guardian.Core.Scheduling.TimeWindow> windows;
+                    try { windows = JsonSerializer.Deserialize<List<Guardian.Core.Scheduling.TimeWindow>>(body.GetValueOrDefault("windows") ?? "[]", Json) ?? []; }
+                    catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
+                    int.TryParse(body.GetValueOrDefault("warning"), out var warn);
+                    if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
+                case ("/api/users/unlock", "POST"):
+                {
+                    var user = body.GetValueOrDefault("user") ?? "";
+                    if (!int.TryParse(body.GetValueOrDefault("minutes"), out var mins) || mins is < 0 or > 1440 || user.Length == 0)
+                    { await SendJson(res, 400, new { error = "Bad request." }); break; }
+                    if (mins == 0) exemptions.Until.TryRemove(user, out _); else exemptions.Until[user] = DateTime.Now.AddMinutes(mins);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
+                case ("/api/settings/idle", "POST"):
+                {
+                    if (!int.TryParse(body.GetValueOrDefault("minutes"), out var m) || !GuardianConfig.IdleLockChoices.Contains(m))
+                    { await SendJson(res, 400, new { error = "Bad value." }); break; }
+                    var cfg = store.Load();
+                    cfg.UiIdleLockMinutes = m;
+                    store.Save(cfg);
+                    await SendJson(res, 200, State(cfg));
+                    break;
+                }
+                case ("/api/health", "GET"):
+                    await SendJson(res, 200, new
+                    {
+                        dnsLastSuccess = dns.LastUpstreamSuccess == default ? (DateTime?)null : dns.LastUpstreamSuccess.ToLocalTime(),
+                        dnsLastError = dns.LastUpstreamError,
+                    });
                     break;
                 case ("/api/state", "GET"):
                     await SendJson(res, 200, State(store.Load()));
@@ -156,20 +263,29 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         {
             ["domains"] = c.Network.Domains,
             ["noDecrypt"] = c.Network.NoDecryptDomains,
+            ["exceptions"] = c.Network.Exceptions,
             ["blockedApps"] = c.Network.BlockedAppPaths,
             ["directApps"] = c.Network.AllowDirectApps,
             ["allowApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Allow),
             ["blockApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Block),
         },
         lockouts = c.UserLockouts.Count,
+        idleMinutes = c.UiIdleLockMinutes > 0 ? c.UiIdleLockMinutes : 5,
+        idleChoices = GuardianConfig.IdleLockChoices,
     };
 
     private bool Authorized(HttpListenerRequest req)
     {
         var token = req.Cookies["gsid"]?.Value;
         if (token is null || !_sessions.TryGetValue(token, out var exp) || exp < DateTime.UtcNow) return false;
-        _sessions[token] = DateTime.UtcNow.AddMinutes(30); // sliding expiry
+        // Only real use keeps the window unlocked; background refreshes (the activity list) do not.
+        if (req.Headers["X-Active"] == "1") _sessions[token] = DateTime.UtcNow.AddMinutes(IdleMinutes());
         return true;
+    }
+
+    private int IdleMinutes()
+    {
+        try { var m = store.Load().UiIdleLockMinutes; return m > 0 ? m : 5; } catch { return 5; }
     }
 
     private static Task SendJson(HttpListenerResponse res, int status, object value) =>

@@ -1,3 +1,4 @@
+using Guardian.Service.Ui;
 using Guardian.Core.Security;
 using Guardian.Core.Storage;
 using Guardian.Service;
@@ -22,11 +23,31 @@ var store = new EncryptedConfigStore(Paths.DataDir, new DpapiKeyProtector());
 switch (cmd)
 {
     case "gui":
+    {
+        // Double-click: open the app if this build is installed; otherwise install or update (needs admin).
+        Setup.HideOwnConsole();
+        if (Setup.IsInstalled() && !Setup.IsDifferentBuildThanInstalled()) return Gui.App();
+        if (!Setup.IsElevated()) { Setup.RelaunchElevated(["setup"]); return 0; }
+        return Gui.Setup(store, Setup.IsInstalled() || Setup.HasPendingUpdate(store) ? Guardian.Service.Ui.SetupMode.Update : Guardian.Service.Ui.SetupMode.Install);
+    }
+
+    case "setup":
+        Setup.HideOwnConsole();
+        return Gui.Setup(store, Setup.IsInstalled() || Setup.HasPendingUpdate(store) ? Guardian.Service.Ui.SetupMode.Update : Guardian.Service.Ui.SetupMode.Install);
+
+    case "app":
+        Setup.HideOwnConsole();
+        return Gui.App();
+
+    case "blocked":
+        Setup.HideOwnConsole();
+        return Gui.Blocked(args.ElementAtOrDefault(1) ?? "");
+
     case "uninstall-gui":
     {
         Setup.HideOwnConsole();
-        if (!Setup.IsElevated()) { Setup.RelaunchElevated(cmd == "gui" ? [] : [cmd]); return 0; }
-        if (cmd == "uninstall-gui" && Path.GetDirectoryName(Environment.ProcessPath!)!.StartsWith(Paths.InstallDir, StringComparison.OrdinalIgnoreCase))
+        if (!Setup.IsElevated()) { Setup.RelaunchElevated([cmd]); return 0; }
+        if (Path.GetDirectoryName(Environment.ProcessPath!)!.StartsWith(Paths.InstallDir, StringComparison.OrdinalIgnoreCase))
         {
             // Run from a temporary copy so the install folder can be deleted.
             var tmp = Path.Combine(Path.GetTempPath(), "guardian-uninstall.exe");
@@ -34,9 +55,7 @@ switch (cmd)
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(tmp, "uninstall-gui") { UseShellExecute = true });
             return 0;
         }
-        if (cmd == "gui" && store.Exists) { Setup.OpenUi(); return 0; }
-        Guardian.Service.Ui.SetupWeb.Run(store, uninstall: cmd == "uninstall-gui");
-        return 0;
+        return Gui.Setup(store, Guardian.Service.Ui.SetupMode.Uninstall);
     }
 
     case "uninstall-system":
@@ -53,6 +72,8 @@ switch (cmd)
         builder.Services.AddSingleton<AppBlocker>();
         builder.Services.AddSingleton<AccessLog>();
         builder.Services.AddSingleton<NetworkEnforcer>();
+        builder.Services.AddSingleton<DirectConnectionWatcher>();
+        builder.Services.AddSingleton<AppCatalogScanner>();
         builder.Services.AddSingleton<DnsFilterServer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DnsFilterServer>());
         builder.Services.AddSingleton<ProxyHost>();
@@ -127,8 +148,7 @@ switch (cmd)
     }
 
     case "ui":
-        Setup.OpenUi();
-        return 0;
+        return Gui.App();
 
     case "hash":
     {
