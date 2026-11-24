@@ -16,17 +16,24 @@ namespace Guardian.Service.Enforcers;
 ///  * Windows Firewall kept on for all profiles;
 ///  * with URL filtering: system proxy -> local proxy, and outbound "block by default" so only the
 ///    proxy, Windows services (svchost/System) and allowDirectApps can connect out directly.
+///  * "internet only through the filter" not confirmed (isolated): outbound blocked by default for
+///    services, a block rule for every program in a signed-in session, and only Guardian itself
+///    (which keeps checking for the filter), DHCP and the filter's own service programs may connect.
 /// Everything is re-checked every 30 seconds, so manual changes are reverted.
 /// </summary>
 public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
 {
     public const string RuleGroup = "Guardian policy";
     private const string NonLoopbackV4 = "0.0.0.0-126.255.255.255,128.0.0.0-255.255.255.255";
+    private const string NonLoopback = NonLoopbackV4 + ",::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff";
+    /// <summary>Firewall condition "processes of signed-in users" (the INTERACTIVE group); services are not in it.</summary>
+    private const string InteractiveSddl = "O:LSD:(A;;CC;;;IU)";
     private DateTime _nextCheck = DateTime.MinValue;
     private string _rulesSig = "";
     private bool? _active; // null = unknown (first tick after start)
 
-    public void Tick(GuardianConfig cfg, bool force = false)
+    /// <param name="isolated">The filtered-line switch is on and the filter is not confirmed: cut the internet.</param>
+    public void Tick(GuardianConfig cfg, bool force = false, bool isolated = false)
     {
         if (!force && DateTime.UtcNow < _nextCheck) return;
         _nextCheck = DateTime.UtcNow.AddSeconds(30);
@@ -37,8 +44,8 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         }
         _active = true;
 
-        EnsureFirewallOn(cfg.Network.UrlFiltering);
-        EnsureRules(cfg);
+        EnsureFirewallOn(cfg.Network.UrlFiltering || isolated);
+        EnsureRules(cfg, isolated);
         if (cfg.Network.UrlFiltering) { if (!SystemProxySettings.IsApplied()) SystemProxySettings.Apply(); }
         else if (SystemProxySettings.IsApplied()) SystemProxySettings.Remove();
         EnsureLocalDns();
@@ -70,7 +77,7 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         return aces.Count == 0 ? null : "O:LSD:" + string.Concat(aces.Distinct());
     }
 
-    private void EnsureRules(GuardianConfig cfg)
+    private void EnsureRules(GuardianConfig cfg, bool isolated)
     {
         var p = cfg.Network;
         var wanted = new List<(string Name, Action<dynamic> Setup)>
@@ -86,7 +93,19 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
             if (sddl is null) continue;
             wanted.Add(($"Guardian app {ShortHash(path + sddl)}", r => { r.ApplicationName = path; r.LocalUserAuthorizedList = sddl; }));
         }
-        if (p.UrlFiltering)
+        if (isolated)
+        {
+            // Programs people run: blocked outright (a block rule beats any allow rule Windows or an app added).
+            wanted.Add(("Guardian isolate users", r => { r.RemoteAddresses = NonLoopback; r.LocalUserAuthorizedList = InteractiveSddl; }));
+            // Services: blocked by default; only Guardian (to keep checking), DHCP and the filter's own programs.
+            var svchost = Path.Combine(Environment.SystemDirectory, "svchost.exe");
+            wanted.Add(("Guardian isolate DHCP", r => { r.ApplicationName = svchost; r.Protocol = 17; r.RemotePorts = "67,547"; r.Action = 1; }));
+            var allow = new List<string> { Environment.ProcessPath! };
+            allow.AddRange(cfg.IspFilter.ClientApps.Where(x => !string.IsNullOrWhiteSpace(x)));
+            foreach (var app in allow.Distinct(StringComparer.OrdinalIgnoreCase))
+                wanted.Add(($"Guardian isolate allow {ShortHash(app)}", r => { r.ApplicationName = app; r.Action = 1; }));
+        }
+        else if (p.UrlFiltering)
         {
             // Allow rules for "block outbound by default". Block rules above still win over these.
             var allow = new List<string> { Environment.ProcessPath!, Path.Combine(Environment.SystemDirectory, "svchost.exe"), "System" };

@@ -9,7 +9,7 @@ namespace Guardian.Service;
 /// </summary>
 public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
     NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy,
-    DirectConnectionWatcher direct, BootGuard boot) : BackgroundService
+    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -22,7 +22,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
         Run("acl", () => DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true));
         dns.Update(cfg);
         proxy.Update(cfg);
-        Run("network", () => network.Tick(cfg, force: true));
+        Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
         while (!ct.IsCancellationRequested)
         {
             await Task.Delay(TimeSpan.FromSeconds(5), ct);
@@ -33,12 +33,14 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
                 cfg = store.Load();
                 dns.Update(cfg);
                 proxy.Update(cfg);
-                Run("network", () => network.Tick(cfg, force: true));
+                Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
                 log.LogInformation("Policy reloaded.");
             }
             Run("lockout", () => lockout.Tick(cfg));
             Run("apps", () => apps.Tick(cfg));
-            Run("network", () => network.Tick(cfg));
+            var ispChanged = false;
+            Run("isp", () => ispChanged = isp.Tick(cfg));
+            Run("network", () => network.Tick(cfg, force: ispChanged, isolated: isp.Isolated(cfg)));
             Run("boot", () => boot.Tick(cfg));
             Run("direct", () => direct.SetActive(cfg.Network.Enabled && cfg.Network.UrlFiltering));
             Run("watchdog", () =>

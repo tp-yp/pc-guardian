@@ -24,7 +24,7 @@ public static class UserScopes
         return new GuardianConfig
         {
             ServiceName = cfg.ServiceName, WatchdogServiceName = cfg.WatchdogServiceName,
-            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot,
+            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter,
             Apps = Merge(cfg.Apps, p.Apps),
             Network = Merge(cfg.Network, p.Network),
         };
@@ -57,7 +57,7 @@ public static class UserScopes
         p.Network.UrlFiltering = cfg.Network.UrlFiltering;
         p.Network.NoDecryptDomains = cfg.Network.NoDecryptDomains;
         p.Network.AllowDirectApps = cfg.Network.AllowDirectApps;
-        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot };
+        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter };
     }
 
     /// <summary>Copies shared switches changed through a user view back to the general settings.</summary>

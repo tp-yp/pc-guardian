@@ -11,13 +11,15 @@ namespace Guardian.Service.Enforcers;
 /// created on first start, private key stored DPAPI-protected in the SYSTEM-only data folder,
 /// certificate installed into LocalMachine\Root so browsers trust the proxy's certificates.
 /// </summary>
-public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog) : BackgroundService
+public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog, IspFilterMonitor isp) : BackgroundService
 {
     public const int Port = 8899;
     private static readonly byte[] Entropy = "Guardian.ProxyCA.v1"u8.ToArray();
     private static string CaPath => Path.Combine(Paths.DataDir, "ca.bin");
     private volatile NetworkPolicy _policy = new() { Enabled = false };
     private volatile GuardianConfig _cfg = new();
+
+    private static readonly NetworkPolicy NoFilterPolicy = new() { Enabled = true, Mode = UrlMode.Allowlist };
 
     public void Update(GuardianConfig cfg) { _cfg = cfg; _policy = cfg.Network; }
 
@@ -28,6 +30,9 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog) : Bac
     private ProxyClient Identify(IPEndPoint client)
     {
         var cfg = _cfg;
+        // Not on the filtered line: Guardian itself may still go out (it keeps checking), so the proxy
+        // must refuse everything. An empty allow-list blocks every address.
+        if (isp.Isolated(cfg)) return new ProxyClient(NoFilterPolicy, "");
         var pid = Native.ProcessUser.OwnerOfLoopbackConnection(client.Port, Port, client.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6);
         var user = pid > 0 ? Native.ProcessUser.Of(pid) : null;
         return new ProxyClient(Guardian.Core.Policy.UserScopes.Effective(cfg, user).Network, user ?? "");
@@ -45,7 +50,7 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog) : Bac
         using (ca)
         {
             var proxy = new FilterProxy(new IPEndPoint(IPAddress.Loopback, Port), ca, () => _policy,
-                (user, url, ok) => accessLog.Add("web", url, ok, user), blockPage: Ui.BlockScreen.ForWebPage, identify: Identify);
+                (user, url, ok) => accessLog.Add("web", url, ok, user), blockPage: url => isp.Isolated(_cfg) ? Ui.BlockScreen.NoFilter(url) : Ui.BlockScreen.ForWebPage(url), identify: Identify);
             try { proxy.Start(); }
             catch (Exception ex) { log.LogError(ex, "Cannot listen on port {Port}", Port); return; }
             log.LogInformation("Filtering proxy listening on 127.0.0.1:{Port}", Port);

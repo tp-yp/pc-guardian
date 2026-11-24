@@ -23,6 +23,8 @@ public sealed class GuardianConfig
     public List<UserPolicy> UserPolicies { get; set; } = new();
     /// <summary>Hardening of the boot path (Safe Mode, recovery environment). Off by default.</summary>
     public BootPolicy Boot { get; set; } = new();
+    /// <summary>Require the internet connection to go through an ISP content filter (NetFree, Etrog/NetSpark).</summary>
+    public IspFilterPolicy IspFilter { get; set; } = new();
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
@@ -61,6 +63,22 @@ public sealed class UserPolicy
 public sealed class BootPolicy
 {
     public bool Lockdown { get; set; }
+}
+
+/// <summary>
+/// "Internet only through the filter": filters such as NetFree and Etrog (NetSpark) re-sign HTTPS with
+/// their own root certificate. Guardian regularly opens TLS connections to well-known sites and checks
+/// who signed them. If it is not the filter, all internet traffic is blocked until the filter is back.
+/// </summary>
+public sealed class IspFilterPolicy
+{
+    public bool Required { get; set; }
+    /// <summary>Text that identifies the filter's certificate (matched in subject/issuer names, case-insensitive).</summary>
+    public List<string> IssuerNames { get; set; } = ["NetFree", "NetSpark", "Etrog"];
+    /// <summary>Exact certificates trusted as the filter (SHA-1 thumbprints, e.g. pinned with "this is my filter").</summary>
+    public List<string> Thumbprints { get; set; } = new();
+    /// <summary>Programs that still may connect while blocked (e.g. a filter's own connection client).</summary>
+    public List<string> ClientApps { get; set; } = new();
 }
 
 /// <summary>While the schedule is active the user is signed out and cannot sign in.</summary>

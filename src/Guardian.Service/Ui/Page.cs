@@ -82,6 +82,17 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <section class="wide"><h2>מה פעיל עכשיו</h2>
 <p class="hint">מומלץ להדליק יכולת אחת, לבדוק שהמחשב עובד כרגיל, ורק אז להמשיך לבאה. כל שינוי נכנס לתוקף תוך כמה שניות, וכיבוי מחזיר את המצב לקדמותו.</p>
 <div id="toggles"></div>
+<div id="ispConfirm" class="warn" hidden style="margin-top:10px">
+<b>לפני שמפעילים "אינטרנט רק דרך הסינון":</b>
+<div id="ispNow" style="margin:6px 0">בודק את החיבור…</div>
+<ul style="margin:6px 0;padding-inline-start:20px;max-height:none">
+<li style="display:list-item;border:0;padding:0">אם Guardian לא מזהה את הסינון, <b>כל האינטרנט במחשב ייחסם</b> מיד, וייפתח מעצמו רק כשהחיבור יעבור שוב דרך הסינון.</li>
+<li style="display:list-item;border:0;padding:0">גם כשאין רשת בכלל, או כשהבדיקה נכשלת, האינטרנט נשאר חסום עד שהסינון מזוהה.</li>
+<li style="display:list-item;border:0;padding:0">כיבוי המתג או הסרת Guardian (שניהם דורשים סיסמה) מחזירים את האינטרנט מיד.</li>
+</ul>
+<label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="ispAgree"> הבנתי, ואני רוצה להפעיל</label>
+<div class="row" style="margin-top:8px"><button id="ispGo" disabled>להפעיל</button><button class="ghost" id="ispCancel">ביטול</button></div>
+</div>
 <div id="bootConfirm" class="warn" hidden style="margin-top:10px">
 <b>לפני שמפעילים את חסימת מצב בטוח וסביבת השחזור:</b>
 <ul style="margin:6px 0;padding-inline-start:20px;max-height:none">
@@ -93,6 +104,20 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="bootAgree"> הבנתי, ואני רוצה להפעיל את החסימה</label>
 <div class="row" style="margin-top:8px"><button id="bootGo" disabled>להפעיל את החסימה</button><button class="ghost" id="bootCancel">ביטול</button></div>
 </div></section>
+<section class="wide" id="ispSec"><h2>אינטרנט רק דרך הסינון (נטפרי / אתרוג / נטספארק)</h2>
+<p class="hint">ספקי סינון כמו נטפרי ואתרוג חותמים על האתרים המוצפנים בתעודת אבטחה משלהם. Guardian מתחבר כל דקה לכמה אתרים מוכרים ובודק מי חתם על התעודה. אם החתימה של ספק הסינון, האינטרנט פתוח. אם לא (למשל חיבור לרשת אחרת, נקודה חמה מהטלפון או רשת אורחים), וכשהמתג "אינטרנט רק דרך הסינון" דולק, Guardian חוסם את כל האינטרנט במחשב עד שהחיבור חוזר לעבור דרך הסינון.</p>
+<div id="ispStatus" style="margin:8px 0"></div>
+<div class="row"><button class="ghost" id="ispCheck">בדיקה עכשיו</button><button class="ghost" id="ispTrust">זה הסינון שלי, לסמוך על התעודה הזו</button></div>
+<div id="ispTrustNote" class="warn" hidden>לסמוך רק אם השם שמופיע למעלה הוא של ספק הסינון שלכם. אם תסמכו על תעודה של אתר רגיל, Guardian יחשוב שכל חיבור מסונן. <button id="ispTrustGo">כן, זה הסינון שלי</button> <button class="ghost" id="ispTrustCancel">ביטול</button></div>
+<details style="margin-top:10px"><summary><b>הגדרות מתקדמות: איך מזהים את הסינון</b></summary>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:10px">
+<div><h3>שמות של ספקי סינון</h3><p class="hint">אם אחד השמות האלה מופיע בשם של מי שחתם על התעודה, החיבור נחשב מסונן.</p>
+<form class="row add" data-list="ispNames"><input required style="flex:1" placeholder="NetFree"><button>הוספה</button></form><ul id="ispNames"></ul></div>
+<div><h3>תעודות שסומכים עליהן</h3><p class="hint">טביעות אצבע (Thumbprint) של תעודות הסינון. נוסף כאן אוטומטית כשלוחצים "זה הסינון שלי". זו הדרך המדויקת ביותר.</p>
+<form class="row add" data-list="ispThumbprints"><input required style="flex:1;direction:ltr" placeholder="A1B2C3…"><button>הוספה</button></form><ul id="ispThumbprints"></ul></div>
+<div><h3>תוכנות של ספק הסינון</h3><p class="hint">רק אם ספק הסינון דורש תוכנה במחשב שרצה כשירות: היא תוכל להתחבר גם כשהאינטרנט חסום. נתיב מלא לקובץ.</p>
+<form class="row add" data-list="ispApps"><input required style="flex:1" placeholder="C:\Program Files\Filter\client.exe"><button>הוספה</button></form><ul id="ispApps"></ul></div>
+</div></details></section>
 <section class="wide"><h2>נעילת ה-BIOS (מומלץ מאוד כשמשתמשים בחסימת מצב בטוח)</h2>
 <p class="hint">Guardian שומר על ווינדוס מבפנים. מי שמפעיל את המחשב מדיסק און קי (התקנת ווינדוס או "דיסק טכנאים") עוקף כל תוכנה, וזה נחסם רק בהגדרות המחשב עצמו (BIOS/UEFI). ההוראות שונות מעט בכל יצרן:</p>
 <ol class="hint steps" style="line-height:1.8;margin:0;padding-inline-start:22px">
@@ -227,7 +252,7 @@ const short=u=>u?String(u).split('\\').pop():'';
 const scopeName=()=>scope?'של '+scope:'הכלליות';
 const fail=x=>toast(x.message,true);
 
-function show(app){$('app').hidden=!app;$('login').hidden=app;if(app){lastAct=Date.now();load();tick()}else{$('pw').focus()}}
+function show(app){$('app').hidden=!app;$('login').hidden=app;if(app){lastAct=Date.now();load();loadIsp();tick()}else{$('pw').focus()}}
 $('lf').onsubmit=e=>{e.preventDefault();post('/api/login',{password:$('pw').value}).then(()=>{$('pw').value='';$('lerr').textContent='';show(true)}).catch(x=>$('lerr').textContent=x.message)};
 $('logout').onclick=()=>post('/api/logout',{}).finally(()=>show(false));
 
@@ -237,7 +262,7 @@ setInterval(()=>{if(!$('app').hidden&&Date.now()-lastAct>idleMin*60000){post('/a
 
 // Tabs
 function openTab(name){document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));document.querySelectorAll('[data-page]').forEach(m=>m.hidden=m.dataset.page!==name);
- if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings')loadHealth()}
+ if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings')loadHealth();if(name==='features')loadIsp()}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
 document.querySelectorAll('#netsub button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#netsub button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('[data-sub-page]').forEach(m=>m.hidden=m.dataset.subPage!==b.dataset.sub);if(b.dataset.sub==='netapps')loadDirect()});
 
@@ -247,6 +272,7 @@ const TOGGLES=[
  ['apps.defaultDeny','חסימת כל תוכנה לא מוכרת','כל תוכנה שלא הותקנה כרגיל תיחסם: קבצים שהורדו, תוכנות ניידות, דיסק און קי ותוכנות שמתקינות את עצמן בלי אישור מנהל. כדי לאפשר אחת מהן, התירו אותה מלשונית "פעילות" או הוסיפו אותה ב"תוכנות" > "הוספה ידנית".','לפני שמדליקים: כדאי להדליק קודם את "נעילת תוכנות", לעבוד יום רגיל, ולראות בלשונית "פעילות" מה היה נחסם.'],
  ['apps.trustProgramFiles','לסמוך על תוכנות שהותקנו כרגיל','תוכנות שהותקנו לתיקיית Program Files (התקנה רגילה שדורשת אישור מנהל) נחשבות מוכרות ולא נחסמות. מומלץ להשאיר דולק.'],
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
+ ['isp.required','אינטרנט רק דרך הסינון','חוסם את כל האינטרנט כשהמחשב לא מחובר דרך ספק סינון (נטפרי, אתרוג או נטספארק). הזיהוי לפי תעודת האבטחה, והסבר מלא בהמשך העמוד. ההפעלה דורשת אישור, וכיבוי מחזיר את האינטרנט מיד.'],
  ['boot.lockdown','חסימת מצב בטוח וסביבת השחזור','מונע עקיפה של Guardian דרך מצב בטוח, "הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש) וסביבת השחזור של ווינדוס. תיקון אוטומטי ותפריט F8 מכובים גם הם. ההפעלה דורשת אישור, והכיבוי או ההסרה מחזירים הכול כמו שהיה.'],
  ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Guardian מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
 ];
@@ -256,9 +282,33 @@ function askBoot(){$('bootConfirm').hidden=false;$('bootAgree').checked=false;$(
 $('bootAgree').onchange=()=>$('bootGo').disabled=!$('bootAgree').checked;
 $('bootCancel').onclick=()=>$('bootConfirm').hidden=true;
 $('bootGo').onclick=()=>post('/api/settings',{key:'boot.lockdown',value:'true'}).then(st=>{$('bootConfirm').hidden=true;render(st);toast('חסימת מצב בטוח וסביבת השחזור הופעלה. מומלץ לנעול גם את ה-BIOS.')}).catch(fail);
+// Filtered line (ISP filter)
+const ISPST={Filtered:['ok','החיבור עובר דרך הסינון'],NotFiltered:['bad','החיבור לא עובר דרך הסינון'],NoNetwork:['bad','אין חיבור לאינטרנט'],Unknown:['muted','עוד לא נבדק']};
+let isp=null;
+function ispLine(i){const[c,t]=ISPST[i.status]||ISPST.Unknown;return el('div',{},el('b',{class:c},t),i.signer?el('span',{},' · התעודה נחתמה על ידי: ',el('b',{style:'direction:ltr;unicode-bidi:isolate'},i.signer)):null,
+ i.time?el('small',{class:'muted'},' (נבדק ב-'+new Date(i.time).toLocaleTimeString('he-IL')+')'):null,
+ i.required?el('div',{class:i.blocked?'bad':'ok',style:'margin-top:4px'},i.blocked?'האינטרנט במחשב חסום כרגע.':'האינטרנט פתוח.'):null,
+ i.status==='NoNetwork'&&i.detail?el('small',{class:'muted',style:'display:block'},i.detail):null)}
+function renderIsp(i){isp=i;$('ispStatus').replaceChildren(ispLine(i));$('ispTrust').hidden=!(i.chain&&i.chain.length)||i.status==='Filtered';
+ if(!$('ispConfirm').hidden)renderIspNow(i)}
+function renderIspNow(i){const n=$('ispNow');n.replaceChildren(ispLine(i));
+ if(i.status!=='Filtered')n.append(el('div',{class:'bad',style:'margin-top:4px'},'שימו לב: כרגע הסינון לא מזוהה, ולכן ההפעלה תחסום את האינטרנט מיד. אם אתם כן מחוברים דרך הסינון, לחצו קודם "זה הסינון שלי" בחלק "אינטרנט רק דרך הסינון" למטה.'))}
+function loadIsp(){return api('/api/isp',{},false).then(renderIsp).catch(()=>{})}
+function checkIsp(){$('ispStatus').replaceChildren(el('span',{class:'muted'},'בודק…'));return post('/api/isp/check',{}).then(renderIsp).catch(fail)}
+$('ispCheck').onclick=checkIsp;
+$('ispTrust').onclick=()=>$('ispTrustNote').hidden=false;
+$('ispTrustCancel').onclick=()=>$('ispTrustNote').hidden=true;
+$('ispTrustGo').onclick=()=>post('/api/isp/trust',{}).then(i=>{$('ispTrustNote').hidden=true;renderIsp(i);load();toast('התעודה נוספה לתעודות שסומכים עליהן')}).catch(fail);
+function askIsp(){$('ispConfirm').hidden=false;$('ispAgree').checked=false;$('ispGo').disabled=true;$('ispNow').textContent='בודק את החיבור…';$('ispConfirm').scrollIntoView({behavior:'smooth',block:'center'});
+ post('/api/isp/check',{}).then(i=>{renderIsp(i);renderIspNow(i)}).catch(fail)}
+$('ispAgree').onchange=()=>$('ispGo').disabled=!$('ispAgree').checked;
+$('ispCancel').onclick=()=>$('ispConfirm').hidden=true;
+$('ispGo').onclick=()=>post('/api/settings',{key:'isp.required',value:'true'}).then(st=>{$('ispConfirm').hidden=true;render(st);loadIsp();toast('"אינטרנט רק דרך הסינון" הופעל')}).catch(fail);
+setInterval(()=>{if(!$('app').hidden&&!document.querySelector('[data-page=features]').hidden)loadIsp()},30000);
+const ASK={'boot.lockdown':askBoot,'isp.required':askIsp};
 function renderToggles(s){$('toggles').replaceChildren(...TOGGLES.map(([k,t,d,w])=>{const txt=el('div',{},el('b',{},t),el('small',{},d));
  if(state&&state.scopes.length)txt.append(el('small',{class:'badge',style:'display:inline-block;margin-top:4px'},PER_USER.includes(k)?(scope?'ההגדרה הזו חלה רק על '+scope:'ההגדרה הזו חלה על מי שבהגדרות הכלליות'):'משותף לכל המשתמשים'));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
- return el('div',{class:'toggle'},txt,sw(s[k],i=>(k==='boot.lockdown'&&i.checked)?(i.checked=false,askBoot()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
+ return el('div',{class:'toggle'},txt,sw(s[k],i=>(ASK[k]&&i.checked)?(i.checked=false,ASK[k]()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);if(k==='isp.required')loadIsp();toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
 
 // Lists
 const APP_LISTS=['allowApps','blockApps'];
@@ -327,7 +377,7 @@ function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyon
    el('label',{},'התראה ',warn,' דקות לפני הניתוק'),el('button',{onclick:save},'שמירה')),wins.length?unlock:null)}))}).catch(fail)}
 
 // Activity
-const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר',boot:'אתחול'};
+const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר',boot:'אתחול',isp:'סינון'};
 const hostOf=t=>{try{return new URL(/^[a-z]+:\/\//i.test(t)?t:'http://'+t).hostname}catch{return t}};
 const isFullUrl=t=>/^[a-z]+:\/\/[^/]+\/./i.test(t)||(/^[^:/]+\/./.test(t));
 // A row is changed in the rules of the account it came from (its own rules, or the general ones).

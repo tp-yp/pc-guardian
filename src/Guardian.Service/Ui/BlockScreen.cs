@@ -39,4 +39,13 @@ button:focus-visible{outline:2px solid #fff;outline-offset:3px}
 <p>Guardian חוסם את הדף הזה במחשב הזה.<br>אם צריך אותו, אפשר להתיר אותו במסך הניהול ⇐ פעילות.</p>
 </div></body></html>
 """;
+
+    public static string NoFilter(string url) => $"""
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>אין חיבור דרך הסינון</title>{Style}</head><body><div class="box">
+<div class="mark" aria-hidden="true"></div>
+<h1>אין חיבור דרך הסינון</h1>
+<div class="what">{WebUtility.HtmlEncode(url.Length > 160 ? url[..160] + "…" : url)}</div>
+<p>המחשב לא מחובר כרגע דרך ספק הסינון (נטפרי / אתרוג / נטספארק), ולכן Guardian חוסם את האינטרנט.<br>כשהחיבור יחזור לעבור דרך הסינון, האינטרנט ייפתח מעצמו תוך פחות מדקה.</p>
+</div></body></html>
+""";
 }
