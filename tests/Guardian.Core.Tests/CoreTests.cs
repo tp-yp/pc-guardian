@@ -68,6 +68,17 @@ public class StoreTests
     private static string TempDir() => Directory.CreateTempSubdirectory("guardian-test").FullName;
 
     [Fact]
+    public void Save_recreates_a_folder_removed_after_the_store_was_opened()
+    {
+        // An update uninstalls first, which deletes the data folder, then saves the kept settings.
+        var dir = TempDir();
+        var store = new EncryptedConfigStore(dir, new FakeProtector());
+        Directory.Delete(dir, true);
+        store.Save(new GuardianConfig { ServiceName = "SysSyncNet1234" });
+        Assert.Equal("SysSyncNet1234", store.Load().ServiceName);
+    }
+
+    [Fact]
     public void Roundtrips_and_is_not_plaintext()
     {
         var dir = TempDir();

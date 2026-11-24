@@ -68,6 +68,7 @@ public sealed class EncryptedConfigStore
     private static void WriteAtomic(string path, byte[] data)
     {
         var tmp = path + ".tmp";
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!); // the folder may have been removed (e.g. during an update)
         File.WriteAllBytes(tmp, data);
         File.Move(tmp, path, overwrite: true);
     }

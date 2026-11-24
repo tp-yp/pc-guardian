@@ -55,7 +55,11 @@ public static class Setup
         // Folders may still be locked by an earlier attempt; the installer needs to write into them.
         DataDirSecurity.ReclaimForInstall(Paths.InstallDir);
         DataDirSecurity.ReclaimForInstall(Paths.DataDir);
+        // An earlier removal may have scheduled these folders for deletion at the next restart; that
+        // would wipe the fresh install (same config and key file names), so cancel it.
+        Uninstaller.CancelScheduledDeletes();
         Directory.CreateDirectory(Paths.InstallDir);
+        Directory.CreateDirectory(Paths.DataDir);
         var exe = Path.Combine(Paths.InstallDir, cfg.ServiceName + ".exe");
         CopyWithRetry(Environment.ProcessPath!, exe);
         store.Save(cfg);
@@ -152,11 +156,19 @@ public static class Setup
             // The old services and their processes need a moment to go away; installing too early
             // was why the first update attempt could fail and only a second run worked.
             WaitForOldVersionToStop([saved.ServiceName, saved.WatchdogServiceName]);
+            // The uninstall removed the data folder and the settings file. Write the settings back right
+            // away, so that if the install step fails, running the file again still updates (not a fresh setup).
+            try { Uninstaller.CancelScheduledDeletes(); store.Save(saved); } catch { /* the install step saves again */ }
         }
-        try { InstallWithConfig(store, saved, keepConfigOnFailure: true); }
-        catch (BlockedByWindowsException ex) { return (false, ex.Message); }
-        catch (Exception ex) { return (false, "Install step failed: " + ex.Message + " Your settings are kept; run the file again to finish the update."); }
-        return (true, "Updated. All settings were kept.");
+        Exception? last = null;
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try { InstallWithConfig(store, saved, keepConfigOnFailure: true); return (true, "Updated. All settings were kept."); }
+            catch (BlockedByWindowsException ex) { return (false, ex.Message); }
+            catch (Exception ex) { last = ex; Thread.Sleep(3000); }
+        }
+        try { if (!store.Exists) store.Save(saved); } catch { }
+        return (false, "Install step failed: " + last!.Message + " Your settings are kept; run the file again to finish the update.");
     }
 
     /// <summary>Waits (up to 30 s) until the old services are deleted and nothing runs from the install folder.</summary>

@@ -100,6 +100,27 @@ public static class Uninstaller
         MoveFileEx(dir, null, 4); // MOVEFILE_DELAY_UNTIL_REBOOT
     }
 
+    /// <summary>Removes pending "delete at restart" entries for Guardian's folders (left by an earlier removal).</summary>
+    public static void CancelScheduledDeletes()
+    {
+        using var k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager", writable: true);
+        if (k?.GetValue("PendingFileRenameOperations") is not string[] ops || ops.Length < 2) return;
+        static bool Ours(string p)
+        {
+            var path = p.StartsWith(@"\??\") ? p[4..] : p.TrimStart('!');
+            if (path.StartsWith(@"\??\")) path = path[4..];
+            return new[] { Paths.InstallDir, Paths.DataDir }.Any(d =>
+                path.Equals(d, StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith(d.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
+        }
+        var kept = new List<string>();
+        for (var i = 0; i + 1 < ops.Length; i += 2)
+            if (!(ops[i + 1].Length == 0 && Ours(ops[i]))) { kept.Add(ops[i]); kept.Add(ops[i + 1]); }
+        if (kept.Count == ops.Length) return;
+        if (kept.Count == 0) k.DeleteValue("PendingFileRenameOperations", false);
+        else k.SetValue("PendingFileRenameOperations", kept.ToArray(), RegistryValueKind.MultiString);
+    }
+
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
     private static extern bool MoveFileEx(string existing, string? replacement, int flags);
 
