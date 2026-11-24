@@ -24,7 +24,8 @@ public sealed class AppBlocker : IDisposable
     private readonly ConcurrentDictionary<string, DateTime> _lastNotified = new(StringComparer.OrdinalIgnoreCase);
     private readonly ManagementEventWatcher? _watcher;
     private volatile GuardianConfig? _cfg;
-    private List<string> _trusted = [];
+    private List<string> _trusted = [];      // with Program Files trusted
+    private List<string> _trustedSelf = [];  // Guardian's own folder only
 
     private readonly AccessLog _access;
     private readonly TrustedClock _clock;
@@ -56,13 +57,15 @@ public sealed class AppBlocker : IDisposable
     {
         if (!ReferenceEquals(cfg, _cfg))
         {
-            _trusted = AppPolicyEvaluator.TrustedPrefixes(cfg.Apps,
+            // Whether Program Files is trusted can differ per account, so both lists are kept.
+            _trusted = AppPolicyEvaluator.TrustedPrefixes(new AppPolicy { TrustProgramFiles = true },
                 [Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                  Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)],
                 AppContext.BaseDirectory);
+            _trustedSelf = AppPolicyEvaluator.TrustedPrefixes(new AppPolicy { TrustProgramFiles = false }, [], AppContext.BaseDirectory);
             _cfg = cfg;
         }
-        if (!cfg.Apps.Enabled) return;
+        if (!UserScopes.AnyAppBlocking(cfg)) return;
         foreach (var p in Process.GetProcesses())
         {
             using (p)
@@ -76,7 +79,7 @@ public sealed class AppBlocker : IDisposable
     private void Check(int pid)
     {
         var cfg = _cfg;
-        if (cfg is null || !cfg.Apps.Enabled || pid <= 4 || pid == Environment.ProcessId) return;
+        if (cfg is null || !UserScopes.AnyAppBlocking(cfg) || pid <= 4 || pid == Environment.ProcessId) return;
         using var proc = TryGet(pid);
         if (proc is null || proc.SessionId == 0) return;
         var path = ProcessPath.Get(pid);
@@ -95,7 +98,7 @@ public sealed class AppBlocker : IDisposable
         var hashNeeded = rules.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
         var nameNeeded = rules.Rules.Any(r => r.Action == RuleAction.Block && (!string.IsNullOrEmpty(r.FileName) || !string.IsNullOrEmpty(r.OriginalName)));
         var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null, nameNeeded ? OriginalName(path) : null);
-        var decision = AppPolicyEvaluator.Evaluate(rules, info, _clock.LocalNow, _trusted);
+        var decision = AppPolicyEvaluator.Evaluate(rules, info, _clock.LocalNow, rules.TrustProgramFiles ? _trusted : _trustedSelf);
         if (decision.Action == RuleAction.Allow) return;
 
         try

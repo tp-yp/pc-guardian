@@ -222,6 +222,39 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                         dnsLastError = dns.LastUpstreamError,
                     });
                     break;
+                case ("/api/dashboard", "GET"):
+                {
+                    var cfg = store.Load();
+                    var accounts = AppCatalogScanner.LocalAccounts();
+                    List<string> online;
+                    try { online = Native.Wts.UserSessions().Select(x => x.UserName).ToList(); } catch (Exception) { online = []; }
+                    var now = clock.LocalNow;
+                    var ispNow = IspState(cfg);
+                    await SendJson(res, 200, new
+                    {
+                        computer = new
+                        {
+                            network = cfg.Network.Enabled, urlFiltering = cfg.Network.UrlFiltering, boot = cfg.Boot.Lockdown,
+                            clock = cfg.Clock.Locked, isp = ispNow,
+                        },
+                        general = UserScopes.Summarize(cfg, null),
+                        users = accounts.Select(a =>
+                        {
+                            var rule = cfg.UserLockouts.FirstOrDefault(r => Guardian.Core.Lockout.LockoutPlanner.SameUser(r.UserName, a));
+                            var until = exemptions.Until.TryGetValue(a, out var u) && u > now ? u : (DateTime?)null;
+                            return new
+                            {
+                                name = a,
+                                own = UserScopes.Find(cfg, a) != null,
+                                online = online.Any(o => Guardian.Core.Lockout.LockoutPlanner.SameUser(o, a)),
+                                lockedNow = until == null && rule != null && rule.LockedDuring.Windows.Count > 0 && rule.LockedDuring.Windows.Any(w => w.Contains(now)),
+                                unlockedUntil = until,
+                                summary = UserScopes.Summarize(cfg, a),
+                            };
+                        }),
+                    });
+                    break;
+                }
                 case ("/api/network/msupdates", "POST"):
                 {
                     var cfg = store.Load();
