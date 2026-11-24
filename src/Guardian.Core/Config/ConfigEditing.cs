@@ -51,7 +51,7 @@ public static class ConfigEditing
     }
 
     public static readonly string[] Toggles =
-        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering"];
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown"];
 
     /// <summary>Turns one feature on or off.</summary>
     public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
@@ -70,6 +70,7 @@ public static class ConfigEditing
                 cfg.Network.UrlFiltering = value;
                 if (value) cfg.Network.Enabled = true; // the proxy relies on the network layer
                 return true;
+            case "boot.lockdown": cfg.Boot.Lockdown = value; return true;
             default: error = "Unknown setting."; return false;
         }
     }

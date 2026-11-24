@@ -53,6 +53,7 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 .win{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;margin-top:6px}
 .days label{font-size:12px;display:inline-flex;align-items:center;gap:2px;margin-left:6px}
 .user{border-bottom:1px solid var(--line);padding:12px 0}.user:last-child{border:0}
+.steps li{display:list-item;border:0;padding:3px 0}
 .scopebar{background:#111827;color:#fff;padding:10px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
 .scopebar select{background:#fff;color:#111;border:0}
 .scopebar.general{background:var(--soft);color:var(--text)}.scopebar.general select{border:1px solid var(--line)}
@@ -80,7 +81,30 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <div class="page" data-page="features">
 <section class="wide"><h2>מה פעיל עכשיו</h2>
 <p class="hint">מומלץ להדליק יכולת אחת, לבדוק שהמחשב עובד כרגיל, ורק אז להמשיך לבאה. כל שינוי נכנס לתוקף תוך כמה שניות, וכיבוי מחזיר את המצב לקדמותו.</p>
-<div id="toggles"></div></section>
+<div id="toggles"></div>
+<div id="bootConfirm" class="warn" hidden style="margin-top:10px">
+<b>לפני שמפעילים את חסימת מצב בטוח וסביבת השחזור:</b>
+<ul style="margin:6px 0;padding-inline-start:20px;max-height:none">
+<li style="display:list-item;border:0;padding:0">לא יהיה אפשר להיכנס ל"הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש), לסביבת השחזור או למצב בטוח, גם לא דרך msconfig.</li>
+<li style="display:list-item;border:0;padding:0">אם ווינדוס יתקלקל ולא יעלה, <b>לא יהיה תיקון אוטומטי</b>. כדי לתקן יצטרכו דיסק און קי עם התקנת ווינדוס. כדאי להכין אחד מראש (כלי "Media Creation Tool" של Microsoft).</li>
+<li style="display:list-item;border:0;padding:0">כיבוי המתג או הסרת Guardian (שניהם דורשים סיסמה) מחזירים הכול בדיוק למצב הקודם.</li>
+<li style="display:list-item;border:0;padding:0">אתחול מדיסק חיצוני לא נחסם. לשם כך צריך לנעול את ה-BIOS (הסבר למטה).</li>
+</ul>
+<label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="bootAgree"> הבנתי, ואני רוצה להפעיל את החסימה</label>
+<div class="row" style="margin-top:8px"><button id="bootGo" disabled>להפעיל את החסימה</button><button class="ghost" id="bootCancel">ביטול</button></div>
+</div></section>
+<section class="wide"><h2>נעילת ה-BIOS (מומלץ מאוד כשמשתמשים בחסימת מצב בטוח)</h2>
+<p class="hint">Guardian שומר על ווינדוס מבפנים. מי שמפעיל את המחשב מדיסק און קי (התקנת ווינדוס או "דיסק טכנאים") עוקף כל תוכנה, וזה נחסם רק בהגדרות המחשב עצמו (BIOS/UEFI). ההוראות שונות מעט בכל יצרן:</p>
+<ol class="hint steps" style="line-height:1.8;margin:0;padding-inline-start:22px">
+<li>כדי להיכנס ל-BIOS: <b>הגדרות ווינדוס > מערכת > שחזור > הפעלה מתקדמת > הפעל מחדש עכשיו > פתרון בעיות > אפשרויות מתקדמות > הגדרות קושחת UEFI</b>. אם חסימת מצב בטוח כבר דולקת, צריך במקום זה ללחוץ בזמן ההדלקה על F2, Del, F10 או Esc, לפי היצרן.</li>
+<li><b>סיסמת מנהל ל-BIOS</b> (Supervisor / Administrator Password): בלשונית Security. שמרו אותה במקום בטוח. אם שוכחים אותה, לפעמים רק מעבדה יכולה לאפס.</li>
+<li><b>סדר אתחול</b> (Boot): להשאיר רק את הדיסק הפנימי (Windows Boot Manager), ולכבות אתחול מ-USB ומהרשת (USB Boot, PXE / Network Boot).</li>
+<li><b>תפריט אתחול חד-פעמי</b> (Boot Menu, בדרך כלל F12): לכבות אותו, או לוודא שהוא דורש את הסיסמה.</li>
+<li><b>Secure Boot</b>: להשאיר דולק (Enabled).</li>
+<li>שמירה ויציאה: בדרך כלל F10.</li>
+</ol>
+<p class="hint" style="margin-top:8px">גם אחרי כל זה, מי שפותח את המחשב פיזית יכול לאפס את ה-BIOS או להוציא את הדיסק. זו הגבלה של כל מחשב.</p>
+</section>
 </div>
 
 <!-- ===== תוכנות ===== -->
@@ -223,13 +247,18 @@ const TOGGLES=[
  ['apps.defaultDeny','חסימת כל תוכנה לא מוכרת','כל תוכנה שלא הותקנה כרגיל תיחסם: קבצים שהורדו, תוכנות ניידות, דיסק און קי ותוכנות שמתקינות את עצמן בלי אישור מנהל. כדי לאפשר אחת מהן, התירו אותה מלשונית "פעילות" או הוסיפו אותה ב"תוכנות" > "הוספה ידנית".','לפני שמדליקים: כדאי להדליק קודם את "נעילת תוכנות", לעבוד יום רגיל, ולראות בלשונית "פעילות" מה היה נחסם.'],
  ['apps.trustProgramFiles','לסמוך על תוכנות שהותקנו כרגיל','תוכנות שהותקנו לתיקיית Program Files (התקנה רגילה שדורשת אישור מנהל) נחשבות מוכרות ולא נחסמות. מומלץ להשאיר דולק.'],
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
+ ['boot.lockdown','חסימת מצב בטוח וסביבת השחזור','מונע עקיפה של Guardian דרך מצב בטוח, "הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש) וסביבת השחזור של ווינדוס. תיקון אוטומטי ותפריט F8 מכובים גם הם. ההפעלה דורשת אישור, והכיבוי או ההסרה מחזירים הכול כמו שהיה.'],
  ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Guardian מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
 ];
 function sw(checked,onchange,label,disabled){const i=el('input',{type:'checkbox',checked,disabled:!!disabled});i.setAttribute('aria-label',label);i.onchange=()=>onchange(i);return el('label',{class:'switch',title:label},i,el('span',{class:'slider'}))}
 const PER_USER=['apps.defaultDeny'];
+function askBoot(){$('bootConfirm').hidden=false;$('bootAgree').checked=false;$('bootGo').disabled=true;$('bootConfirm').scrollIntoView({behavior:'smooth',block:'center'})}
+$('bootAgree').onchange=()=>$('bootGo').disabled=!$('bootAgree').checked;
+$('bootCancel').onclick=()=>$('bootConfirm').hidden=true;
+$('bootGo').onclick=()=>post('/api/settings',{key:'boot.lockdown',value:'true'}).then(st=>{$('bootConfirm').hidden=true;render(st);toast('חסימת מצב בטוח וסביבת השחזור הופעלה. מומלץ לנעול גם את ה-BIOS.')}).catch(fail);
 function renderToggles(s){$('toggles').replaceChildren(...TOGGLES.map(([k,t,d,w])=>{const txt=el('div',{},el('b',{},t),el('small',{},d));
  if(state&&state.scopes.length)txt.append(el('small',{class:'badge',style:'display:inline-block;margin-top:4px'},PER_USER.includes(k)?(scope?'ההגדרה הזו חלה רק על '+scope:'ההגדרה הזו חלה על מי שבהגדרות הכלליות'):'משותף לכל המשתמשים'));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
- return el('div',{class:'toggle'},txt,sw(s[k],i=>post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
+ return el('div',{class:'toggle'},txt,sw(s[k],i=>(k==='boot.lockdown'&&i.checked)?(i.checked=false,askBoot()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
 
 // Lists
 const APP_LISTS=['allowApps','blockApps'];
@@ -298,7 +327,7 @@ function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyon
    el('label',{},'התראה ',warn,' דקות לפני הניתוק'),el('button',{onclick:save},'שמירה')),wins.length?unlock:null)}))}).catch(fail)}
 
 // Activity
-const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר'};
+const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר',boot:'אתחול'};
 const hostOf=t=>{try{return new URL(/^[a-z]+:\/\//i.test(t)?t:'http://'+t).hostname}catch{return t}};
 const isFullUrl=t=>/^[a-z]+:\/\/[^/]+\/./i.test(t)||(/^[^:/]+\/./.test(t));
 // A row is changed in the rules of the account it came from (its own rules, or the general ones).

@@ -73,6 +73,7 @@ switch (cmd)
         builder.Services.AddSingleton<AccessLog>();
         builder.Services.AddSingleton<NetworkEnforcer>();
         builder.Services.AddSingleton<DirectConnectionWatcher>();
+        builder.Services.AddSingleton<BootGuard>();
         builder.Services.AddSingleton<AppCatalogScanner>();
         builder.Services.AddSingleton<DnsFilterServer>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<DnsFilterServer>());
