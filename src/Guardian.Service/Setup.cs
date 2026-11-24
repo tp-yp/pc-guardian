@@ -78,7 +78,20 @@ public static class Setup
         ServiceHardening.Harden(cfg.ServiceName);
         ServiceHardening.Harden(cfg.WatchdogServiceName);
         Uninstaller.RegisterInWindows(exe);
+        RemoveOldExes(exe);
         DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true);
+    }
+
+    /// <summary>Earlier installs used other random names; their copies stay behind in the install folder. Only the running copy is kept.</summary>
+    private static void RemoveOldExes(string keep)
+    {
+        try
+        {
+            foreach (var f in Directory.GetFiles(Paths.InstallDir, "*.exe"))
+                if (!string.Equals(f, keep, StringComparison.OrdinalIgnoreCase))
+                    try { File.Delete(f); } catch { /* still in use: removed on a later install */ }
+        }
+        catch { /* best effort */ }
     }
 
     public enum SmartAppControl { Off, On, Evaluation, Unknown }

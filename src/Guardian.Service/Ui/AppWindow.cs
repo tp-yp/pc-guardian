@@ -72,7 +72,13 @@ internal sealed class AppWindow
 
         var scale = GetDpiForSystem() / 96.0;
         int w = (int)(_opt.Width * scale), h = (int)(_opt.Height * scale);
-        int x = (GetSystemMetrics(0) - w) / 2, y = (GetSystemMetrics(1) - h) / 2;
+        // Fit inside the visible work area (screen minus taskbar), so the title bar and X are always reachable.
+        if (!SystemParametersInfoW(0x30 /* SPI_GETWORKAREA */, 0, out var wa, 0))
+            wa = new RECT { Left = 0, Top = 0, Right = GetSystemMetrics(0), Bottom = GetSystemMetrics(1) };
+        int areaW = wa.Right - wa.Left, areaH = wa.Bottom - wa.Top, margin = (int)(16 * scale);
+        w = Math.Max(Math.Min(w, areaW - 2 * margin), Math.Min(areaW, (int)(480 * scale)));
+        h = Math.Max(Math.Min(h, areaH - 2 * margin), Math.Min(areaH, (int)(400 * scale)));
+        int x = wa.Left + Math.Max(0, (areaW - w) / 2), y = wa.Top + Math.Max(0, (areaH - h) / 2);
         var style = _opt.Popup ? WS_POPUP | WS_BORDER | WS_VISIBLE : WS_OVERLAPPEDWINDOW | WS_VISIBLE;
         var ex = (_opt.TopMost ? WS_EX_TOPMOST : 0) | (_opt.Popup ? WS_EX_TOOLWINDOW : 0);
         _hwnd = CreateWindowExW(ex, cls.lpszClassName, _opt.Title, style, x, y, w, h, IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
@@ -183,6 +189,7 @@ internal sealed class AppWindow
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool SetWindowTextW(IntPtr h, string text);
     [DllImport("user32.dll")] private static extern IntPtr LoadCursorW(IntPtr inst, IntPtr name);
     [DllImport("user32.dll")] private static extern int GetSystemMetrics(int i);
+    [DllImport("user32.dll")] private static extern bool SystemParametersInfoW(uint action, uint param, out RECT r, uint winIni);
     [DllImport("user32.dll")] private static extern uint GetDpiForSystem();
     [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr ctx);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr h);
