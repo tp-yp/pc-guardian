@@ -13,6 +13,9 @@ h1{font-size:20px;margin:0 0 6px}p{color:var(--muted);margin:0 0 16px;line-heigh
 input[type=password]{width:100%;font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);direction:ltr}
 .check{display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-size:14px}
 button{margin-top:18px;width:100%;font:inherit;padding:10px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}button:disabled{opacity:.6}
+.sac{background:#fffbeb;color:#78350f;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;font-size:14px;line-height:1.6;margin-bottom:6px}
+.sac ol{margin:6px 0 0;padding-inline-start:20px}.sac button{width:auto;margin-top:10px;padding:6px 16px}
+@media (prefers-color-scheme:dark){.sac{background:#2a2210;color:#fcd34d;border-color:#715a14}}
 #msg{min-height:1.3em;margin-top:12px;color:var(--bad);font-size:14px}.done{background:var(--okbg);border-radius:8px;padding:14px;line-height:1.6}
 </style></head><body><div class="card">
 """;
@@ -27,6 +30,7 @@ async function post(data){const r=await fetch(location.pathname,{method:'POST',h
     public const string Install = Head + """
 <h1>התקנת Guardian</h1>
 <p>שלושה דברים קצרים וזהו. אחרי ההתקנה <b>שום דבר עוד לא נחסם</b> – בוחרים מה לחסום במסך הניהול, צעד אחרי צעד.</p>
+<!--SAC-->
 <form id="f">
 <label for="a1">סיסמת ניהול – בה נכנסים למסך הניהול (8 תווים לפחות)</label><input id="a1" type="password" autocomplete="new-password" required minlength="8">
 <label for="a2">סיסמת ניהול – שוב</label><input id="a2" type="password" autocomplete="new-password" required>
@@ -54,6 +58,7 @@ if(res.ok){$('f').hidden=true;$('ok').hidden=false;setTimeout(()=>location.href=
     public const string Update = Head + """
 <h1>עדכון Guardian</h1>
 <p>נמצאה גרסה מותקנת. העדכון שומר את כל ההגדרות ואת הסיסמאות. במשך כמה שניות החסימות לא יפעלו.</p>
+<!--SAC-->
 <form id="f"><label for="p">סיסמת ניהול או סיסמה מצילה</label><input id="p" type="password" required autofocus>
 <button id="go">עדכון</button><div id="msg"></div></form>
 <div id="ok" class="done" hidden>✓ עודכן. עוד רגע נפתח מסך הניהול…</div>
@@ -77,5 +82,15 @@ $('f').onsubmit=async e=>{e.preventDefault();$('go').disabled=true;$('go').textC
 const res=await post({password:$('p').value});
 if(res.ok){$('f').hidden=true;$('ok').hidden=false}else{$('msg').textContent=res.message||'ההסרה נכשלה';$('go').disabled=false;$('go').textContent='הסרה'}};
 </script></div></body></html>
+""";
+
+    /// <summary>Shown above the form when Smart App Control would stop Guardian from running.</summary>
+    public static string SmartAppControlWarning(bool evaluation) => (evaluation
+        ? "<div class=\"sac\"><b>לפני ההתקנה: כדאי לכבות את \"בקרת אפליקציות חכמה\".</b><br>היא כרגע במצב הערכה, ווינדוס עלול להדליק אותה לבד בהמשך. אז הוא יפסיק להפעיל את Guardian, כי Guardian הוא תוכנה אישית בלי חתימה דיגיטלית מסחרית."
+        : "<div class=\"sac\"><b>צריך לכבות את \"בקרת אפליקציות חכמה\" לפני ההתקנה.</b><br>כשהיא פועלת, ווינדוס לא מאפשר להפעיל את Guardian, כי Guardian הוא תוכנה אישית בלי חתימה דיגיטלית מסחרית. ההתקנה תיכשל (בלי להשאיר שום דבר במחשב).")
+        + """
+<ol><li>פתח את "אבטחת Windows" (חפש בתפריט התחל).</li><li>"בקרת אפליקציות ודפדפן" > "הגדרות בקרת אפליקציות חכמה".</li><li>בחר "כבוי".</li></ol>
+האנטי-וירוס של ווינדוס ממשיך לפעול כרגיל. שים לב: בחלק מגרסאות ווינדוס אי אפשר להדליק אותה שוב בלי איפוס.<br>
+<button type="button" onclick="location.reload()">כיביתי, לבדוק שוב</button></div>
 """;
 }

@@ -81,6 +81,23 @@ public static class Setup
         DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true);
     }
 
+    public enum SmartAppControl { Off, On, Evaluation, Unknown }
+
+    /// <summary>Windows 11 Smart App Control. When it is on (or may switch itself on), Windows refuses to run Guardian's unsigned service.</summary>
+    public static SmartAppControl SmartAppControlState()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\CI\Policy");
+            return k?.GetValue("VerifiedAndReputablePolicyState") switch
+            {
+                0 => SmartAppControl.Off, 1 => SmartAppControl.On, 2 => SmartAppControl.Evaluation,
+                null => SmartAppControl.Off, _ => SmartAppControl.Unknown,
+            };
+        }
+        catch { return SmartAppControl.Unknown; }
+    }
+
     /// <summary>A config left by an update whose install step failed: setup offers to finish it.</summary>
     public static bool HasPendingUpdate(EncryptedConfigStore store) => !IsInstalled() && store.Exists;
 

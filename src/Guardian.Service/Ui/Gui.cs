@@ -29,6 +29,17 @@ div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:i
                 if (!e.IsSuccess && wv.Source.StartsWith(AppUrl)) wv.NavigateToString(NotRunning);
             };
             wv.Navigate(AppUrl);
+        }, (w, msg) =>
+        {
+            // "Remove Guardian" in the settings screen: start the uninstaller (it asks for admin
+            // rights and the password itself) and close this window.
+            if (msg != "uninstall") return;
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!, "uninstall-gui") { UseShellExecute = true });
+                w.Close();
+            }
+            catch (System.ComponentModel.Win32Exception) { /* the admin prompt was declined */ }
         });
         if (!shown) NoWebView2(AppUrl);
         return 0;

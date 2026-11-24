@@ -50,6 +50,9 @@ internal sealed class SetupWeb : IDisposable
             if (ctx.Request.HttpMethod == "GET")
             {
                 var page = _mode switch { SetupMode.Install => SetupPages.Install, SetupMode.Update => SetupPages.Update, _ => SetupPages.Uninstall };
+                var sac = Setup.SmartAppControlState();
+                page = page.Replace("<!--SAC-->", sac is Setup.SmartAppControl.On or Setup.SmartAppControl.Evaluation
+                    ? SetupPages.SmartAppControlWarning(sac == Setup.SmartAppControl.Evaluation) : "");
                 await Send(ctx, 200, "text/html; charset=utf-8", page);
                 return;
             }

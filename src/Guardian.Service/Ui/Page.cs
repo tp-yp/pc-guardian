@@ -173,6 +173,10 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <section><h2>מצב החיבור</h2>
 <p class="hint">כאן רואים אם Guardian מצליח לברר כתובות אתרים. אם יש "מחובר, אין אינטרנט", הסתכלו כאן קודם.</p>
 <div id="health" class="hint"></div><button class="ghost" id="healthBtn">בדיקה</button></section>
+<section class="wide"><h2>הסרת Guardian</h2>
+<p class="hint">מסיר את Guardian מהמחשב ומחזיר את כל מה שהוא שינה: חומת האש, הגדרות הרשת, תעודת האבטחה ושעות הכניסה של המשתמשים. ווינדוס יבקש אישור מנהל, ואחריו צריך להקליד את סיסמת הניהול או את הסיסמה המצילה.</p>
+<button class="ghost" id="uninstall" style="color:var(--bad);border-color:var(--bad)">הסרת Guardian…</button>
+<div id="uninstallNote" class="hint" hidden style="margin-top:8px">אפשר גם להסיר דרך הגדרות ווינדוס: אפליקציות > אפליקציות מותקנות > Guardian > הסרת התקנה.</div></section>
 </div>
 </main>
 </div>
@@ -294,6 +298,7 @@ function loadHealth(){api('/api/health').then(h=>{$('health').replaceChildren(
  h.dnsLastSuccess?el('div',{class:'ok'},'בירור כתובות עובד. הצלחה אחרונה: '+new Date(h.dnsLastSuccess).toLocaleTimeString('he-IL')):el('div',{class:'muted'},'עדיין לא היו בירורי כתובות (סינון האתרים כבוי או שהשירות רק התחיל).'),
  h.dnsLastError?el('div',{class:'bad'},'שגיאה אחרונה: '+h.dnsLastError):null)}).catch(fail)}
 $('healthBtn').onclick=loadHealth;
+$('uninstall').onclick=()=>{if(window.chrome&&chrome.webview){chrome.webview.postMessage('uninstall')}else{$('uninstallNote').hidden=false}};
 
 api('/api/state',{},false).then(st=>{show(true);render(st)}).catch(()=>show(false));
 </script>
