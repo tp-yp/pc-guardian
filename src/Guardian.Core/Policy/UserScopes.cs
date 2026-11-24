@@ -25,7 +25,7 @@ public static class UserScopes
         return new GuardianConfig
         {
             ServiceName = cfg.ServiceName, WatchdogServiceName = cfg.WatchdogServiceName,
-            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock,
+            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn,
             Apps = Merge(cfg.Apps, p.Apps),
             Network = Merge(cfg.Network, p.Network),
         };
@@ -52,7 +52,7 @@ public static class UserScopes
         p.Network.UrlFiltering = cfg.Network.UrlFiltering;
         p.Network.NoDecryptDomains = cfg.Network.NoDecryptDomains;
         p.Network.AllowDirectApps = cfg.Network.AllowDirectApps;
-        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock };
+        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn };
     }
 
     /// <summary>Copies shared switches changed through a user view back to the general settings.</summary>
@@ -90,7 +90,7 @@ public static class UserScopes
     }
 
     /// <summary>True if program blocking is on for anyone (the general rules or any account).</summary>
-    public static bool AnyAppBlocking(GuardianConfig cfg) => cfg.Apps.Enabled || cfg.UserPolicies.Any(p => p.Apps.Enabled);
+    public static bool AnyAppBlocking(GuardianConfig cfg) => cfg.Apps.Enabled || cfg.Vpn.Block || cfg.UserPolicies.Any(p => p.Apps.Enabled);
 
     /// <summary>What is on for one scope, for the dashboard.</summary>
     public static ScopeSummary Summarize(GuardianConfig cfg, string? user)
@@ -115,8 +115,8 @@ public static class UserScopes
     /// enforced by the full-URL filter, which knows the program (and so the account) behind each request.
     /// </summary>
     public static bool DnsAllows(GuardianConfig cfg, string host) =>
-        DnsFilter.IsAllowed(cfg.Network, host) ||
-        cfg.UserPolicies.Any(p => DnsFilter.IsAllowed(Effective(cfg, p.UserName).Network, host));
+        !(cfg.Vpn.Block && VpnLists.IsVpnSite(host)) && (DnsFilter.IsAllowed(cfg.Network, host) ||
+        cfg.UserPolicies.Any(p => DnsFilter.IsAllowed(Effective(cfg, p.UserName).Network, host)));
 
     /// <summary>
     /// Firewall "no internet" rules. Returns each program with the accounts it is blocked for,

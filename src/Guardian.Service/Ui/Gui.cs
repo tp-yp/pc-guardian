@@ -15,11 +15,27 @@ body{font-family:"Segoe UI",system-ui,sans-serif;display:grid;place-items:center
 div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:inherit;padding:8px 22px;border:0;border-radius:7px;background:#2563eb;color:#fff;cursor:pointer}
 </style></head><body><div><h2>השירות של Guardian לא עונה</h2>
 <p>אם הרגע התקנת או עדכנת, זה לוקח כמה שניות. אם זה נמשך, הפעל מחדש את המחשב.</p>
+<p style="font-size:13px;opacity:.8">אם ניסית להסיר את Guardian וההסרה לא הסתיימה: הגדרות ווינדוס > אפליקציות > Guardian > הסרת התקנה, שוב. זה ינקה את מה שנשאר.</p>
 <button onclick="location.href='http://127.0.0.1:8898/'">לנסות שוב</button></div></body></html>
 """;
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MessageBoxW(IntPtr owner, string text, string caption, uint type);
+
+    /// <summary>In Safe Mode Windows does not load the networking part the windows rely on, so they cannot open.
+    /// Says so plainly instead of showing a window that cannot connect. Protection keeps running there.</summary>
+    public static bool InSafeModeNotice()
+    {
+        if (GetSystemMetrics(67 /* SM_CLEANBOOT */) == 0) return false;
+        MessageBoxW(IntPtr.Zero, "המחשב נמצא במצב בטוח. במצב הזה ווינדוס לא טוען חלק מהרכיבים שחלונות Guardian צריכים, ולכן אי אפשר לפתוח כאן את הניהול, ההתקנה או ההסרה.\n\nהפעילו מחדש את המחשב כרגיל ונסו שוב.",
+            "Guardian", 0x40 | 0x80000 | 0x100000 /* info, right-to-left reading, right-aligned */);
+        return true;
+    }
+
     public static int App()
     {
+        if (InSafeModeNotice()) return 0;
         using var single = new Mutex(true, "Local\\Guardian.App", out var first);
         if (!first) return 0; // already open
         var shown = AppWindow.Show(new AppWindow.Options("Guardian", 1150, 820), wv =>
@@ -47,6 +63,7 @@ div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:i
 
     public static int Setup(EncryptedConfigStore store, SetupMode mode)
     {
+        if (InSafeModeNotice()) return 0;
         using var web = new SetupWeb(store, mode);
         var title = mode switch { SetupMode.Install => "התקנת Guardian", SetupMode.Update => "עדכון Guardian", _ => "הסרת Guardian" };
         var shown = AppWindow.Show(new AppWindow.Options(title, mode == SetupMode.Install ? 1150 : 560, mode == SetupMode.Install ? 820 : 520),

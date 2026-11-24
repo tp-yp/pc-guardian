@@ -186,7 +186,14 @@ public static class Setup
     /// <summary>Uninstalls with the admin or recovery password. Works even if the service is not running.</summary>
     public static (bool Ok, string Message) Uninstall(EncryptedConfigStore store, string password)
     {
-        if (!store.Exists) return (false, "Guardian is not installed.");
+        if (!store.Exists)
+        {
+            // An earlier removal stopped half-way: the settings (and with them every protection) are
+            // already gone, so the rest is cleaned up without a password.
+            if (!Uninstaller.HasLeftovers()) return (false, "Guardian is not installed.");
+            Uninstaller.RemoveServicesAndFiles([]);
+            return (true, "Guardian was removed. Leftovers of an earlier removal were cleaned up.");
+        }
         string[] services;
         try
         {

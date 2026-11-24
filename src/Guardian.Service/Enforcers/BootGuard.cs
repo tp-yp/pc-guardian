@@ -25,39 +25,89 @@ public sealed class BootGuard(ILogger<BootGuard> log, AccessLog access, IHostApp
 
     private sealed record Original(bool WinReEnabled, bool RecoveryEnabled, bool LegacyMenu);
 
+    /// <summary>What was found at the last check, shown next to the switch.</summary>
+    public sealed record BootStatus(bool Lockdown, bool? WinReOff, bool SafeModePending, string Error, DateTime? Checked);
+    public BootStatus Status { get; private set; } = new(false, null, false, "", null);
+    private bool _wasOn;
+    private DateTime _lastFailLog = DateTime.MinValue;
+
     public void Tick(GuardianConfig cfg)
     {
         _on = cfg.Boot.Lockdown;
         if (!_hooked)
         {
             // Last check while Windows shuts down: a Safe Mode request set seconds before a restart is removed too.
-            life.ApplicationStopping.Register(() => { if (_on && File.Exists(Paths.DataDir + "\\config.bin")) try { EnforceBcd(); } catch { } });
+            life.ApplicationStopping.Register(() =>
+            {
+                if (!_on || !File.Exists(Paths.DataDir + "\\config.bin")) return;
+                try
+                {
+                    EnforceBcd();
+                    // A one-time "Startup Settings" menu (F4 = Safe Mode) asked for just before the restart.
+                    Run("bcdedit.exe", "/deletevalue {current} onetimeadvancedoptions");
+                    Run("bcdedit.exe", "/deletevalue {globalsettings} advancedoptions");
+                }
+                catch { }
+            });
             _hooked = true;
         }
         if (!cfg.Boot.Lockdown)
         {
+            _wasOn = false;
             if (File.Exists(StatePath)) { Restore(); log.LogInformation("Boot lockdown turned off; original boot settings restored"); }
+            Status = new(false, null, false, "", null);
             return;
         }
         if (!File.Exists(StatePath)) SaveOriginal();
+        if (!_wasOn) { _wasOn = true; _nextWinReCheck = DateTime.MinValue; } // just turned on: check at once
         EnforceBcd();
         if (DateTime.UtcNow >= _nextWinReCheck)
         {
             _nextWinReCheck = DateTime.UtcNow.AddSeconds(60);
+            Status = EnforceRecoveryOff();
+        }
+    }
+
+    /// <summary>
+    /// The recovery environment counts as on if ReAgent.xml says so or the boot entry still points to it
+    /// (the "recoverysequence" that Advanced startup and Shift+Restart use). Both are switched off, and the
+    /// result is checked again, so a refusal by Windows shows up in the app instead of passing silently.
+    /// </summary>
+    private BootStatus EnforceRecoveryOff()
+    {
+        var error = "";
+        var current = CurrentLoader();
+        bool On() => BootState.WinReEnabled(ReadReAgent()) == true || (current != null && HasElement(current, BootState.RecoverySequence));
+        if (On())
+        {
             if (BootState.WinReEnabled(ReadReAgent()) == true)
             {
-                Run("reagentc.exe", "/disable");
-                access.Add("boot", "סביבת השחזור הופעלה ונכבתה שוב", allowed: false);
-                log.LogWarning("Recovery environment was enabled; disabled again");
+                var (code, output) = Run("reagentc.exe", "/disable");
+                if (code != 0) error = "reagentc: " + output;
             }
+            if (current != null && HasElement(current, BootState.RecoverySequence))
+            {
+                var (code, output) = Run("bcdedit.exe", "/deletevalue {current} recoverysequence");
+                if (code != 0) error += (error.Length > 0 ? " | " : "") + "bcdedit: " + output;
+            }
+            var off = !On();
+            if (off) { access.Add("boot", "סביבת השחזור הייתה פעילה ונכבתה", allowed: false); log.LogWarning("Recovery environment was on; switched off"); }
+            else if (DateTime.UtcNow - _lastFailLog > TimeSpan.FromHours(1))
+            {
+                _lastFailLog = DateTime.UtcNow;
+                access.Add("boot", "לא הצלחתי לכבות את סביבת השחזור: " + error, allowed: true);
+                log.LogError("Could not switch off the recovery environment: {Error}", error);
+            }
+            return new(true, off, current != null && HasElement(current, BootState.SafeBoot), off ? "" : error, DateTime.Now);
         }
+        return new(true, true, current != null && HasElement(current, BootState.SafeBoot), "", DateTime.Now);
     }
 
     private void SaveOriginal()
     {
         var current = CurrentLoader();
         var o = new Original(
-            WinReEnabled: BootState.WinReEnabled(ReadReAgent()) == true,
+            WinReEnabled: BootState.WinReEnabled(ReadReAgent()) == true || (current != null && HasElement(current, BootState.RecoverySequence)),
             RecoveryEnabled: current is null || ReadBool(current, BootState.AutoRecoveryEnabled) != false,
             LegacyMenu: current != null && ReadInt(current, BootState.BootMenuPolicy) == 0);
         File.WriteAllText(StatePath, JsonSerializer.Serialize(o));
@@ -127,11 +177,12 @@ public sealed class BootGuard(ILogger<BootGuard> log, AccessLog access, IHostApp
         try { return File.ReadAllText(ReAgentXml); } catch { return null; }
     }
 
-    private static void Run(string exe, string args)
+    private static (int Code, string Output) Run(string exe, string args)
     {
         using var p = Process.Start(new ProcessStartInfo(exe, args)
             { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true })!;
-        p.StandardOutput.ReadToEnd(); p.StandardError.ReadToEnd();
+        var output = (p.StandardOutput.ReadToEnd() + " " + p.StandardError.ReadToEnd()).Trim();
         p.WaitForExit(30_000);
+        return (p.HasExited ? p.ExitCode : -1, output.Length > 300 ? output[..300] : output);
     }
 }

@@ -51,7 +51,7 @@ public static class ConfigEditing
     }
 
     public static readonly string[] Toggles =
-        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked"];
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked", "vpn.block"];
 
     /// <summary>Turns one feature on or off.</summary>
     public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
@@ -83,6 +83,10 @@ public static class ConfigEditing
                 if (value) cfg.IspFilter.Providers.Add(provider);
                 return true;
             }
+            case "vpn.block":
+                cfg.Vpn.Block = value;
+                if (value) cfg.Network.Enabled = true; // VPN sites are refused by the DNS filter, ports by the firewall
+                return true;
             case "clock.locked":
                 cfg.Clock.Locked = value;
                 // The time zone in effect now is the one kept (changing it is another way to move the clock).

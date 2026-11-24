@@ -54,6 +54,58 @@ internal static class SystemProxySettings
         Run("netsh.exe", $"winhttp set proxy proxy-server=\"{Server}\" bypass-list=\"{Bypass}\"");
     }
 
+    /// <summary>"Block VPN and proxies" without full-URL filtering: no proxy for anyone, and the setting locked,
+    /// so a proxy cannot be set by hand to get around the DNS filter.</summary>
+    public static bool IsDirectApplied()
+    {
+        using var k = Registry.LocalMachine.OpenSubKey(InetSettings);
+        using var p = Registry.LocalMachine.OpenSubKey(InetPolicy);
+        using var l = Registry.LocalMachine.OpenSubKey(IeLock);
+        return Equals(p?.GetValue("ProxySettingsPerUser"), 0) && Equals(k?.GetValue("ProxyEnable"), 0) && k?.GetValue("ProxyServer") is null
+               && Equals(l?.GetValue("Proxy"), 1);
+    }
+
+    public static void ApplyDirect()
+    {
+        using (var p = Registry.LocalMachine.CreateSubKey(InetPolicy)) p.SetValue("ProxySettingsPerUser", 0, RegistryValueKind.DWord);
+        using (var k = Registry.LocalMachine.CreateSubKey(InetSettings))
+        {
+            k.SetValue("ProxyEnable", 0, RegistryValueKind.DWord);
+            k.DeleteValue("ProxyServer", false);
+            k.DeleteValue("ProxyOverride", false);
+            k.DeleteValue("AutoConfigURL", false);
+        }
+        using (var c = Registry.LocalMachine.CreateSubKey(InetSettings + @"\Connections"))
+        {
+            var blob = DirectBlob();
+            c.SetValue("DefaultConnectionSettings", blob, RegistryValueKind.Binary);
+            c.SetValue("SavedLegacySettings", blob, RegistryValueKind.Binary);
+        }
+        using (var l = Registry.LocalMachine.CreateSubKey(IeLock))
+        {
+            l.SetValue("Proxy", 1, RegistryValueKind.DWord);
+            l.SetValue("AutoConfig", 1, RegistryValueKind.DWord);
+        }
+        using (var f = Registry.LocalMachine.CreateSubKey(Firefox + @"\Proxy"))
+        {
+            f.SetValue("Mode", "system");
+            f.SetValue("Locked", 1, RegistryValueKind.DWord);
+        }
+        Run("netsh.exe", "winhttp reset proxy");
+    }
+
+    private static byte[] DirectBlob()
+    {
+        using var ms = new MemoryStream();
+        using var w = new BinaryWriter(ms);
+        w.Write(0x46);
+        w.Write(Environment.TickCount & 0x7FFFFFFF);
+        w.Write(0x01); // direct connection only
+        w.Write(0); w.Write(0); w.Write(0);
+        w.Write(new byte[32]);
+        return ms.ToArray();
+    }
+
     public static void Remove()
     {
         using (var p = Registry.LocalMachine.OpenSubKey(InetPolicy, true)) p?.DeleteValue("ProxySettingsPerUser", false);

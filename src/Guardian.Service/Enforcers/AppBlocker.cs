@@ -99,6 +99,9 @@ public sealed class AppBlocker : IDisposable
         var nameNeeded = rules.Rules.Any(r => r.Action == RuleAction.Block && (!string.IsNullOrEmpty(r.FileName) || !string.IsNullOrEmpty(r.OriginalName)));
         var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null, nameNeeded ? OriginalName(path) : null);
         var decision = AppPolicyEvaluator.Evaluate(rules, info, _clock.LocalNow, rules.TrustProgramFiles ? _trusted : _trustedSelf);
+        // "Block VPN and proxies" (whole computer): known VPN / proxy programs, also when renamed.
+        if (decision.Action == RuleAction.Allow && cfg.Vpn.Block && Guardian.Core.Network.VpnLists.IsVpnProgram(path, info.OriginalName ?? OriginalName(path)))
+            decision = new AppDecision(RuleAction.Block, "VPN / proxy program");
         if (decision.Action == RuleAction.Allow) return;
 
         try

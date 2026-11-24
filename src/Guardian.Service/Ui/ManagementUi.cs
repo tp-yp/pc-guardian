@@ -20,7 +20,7 @@ namespace Guardian.Service.Ui;
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
 public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
-    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock)
+    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot)
     : BackgroundService
 {
     public const int Port = 8898;
@@ -83,7 +83,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.")) who = null;
 
             switch (path, req.HttpMethod)
             {
@@ -235,7 +235,8 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                         computer = new
                         {
                             network = cfg.Network.Enabled, urlFiltering = cfg.Network.UrlFiltering, boot = cfg.Boot.Lockdown,
-                            clock = cfg.Clock.Locked, isp = ispNow,
+                            clock = cfg.Clock.Locked, vpn = cfg.Vpn.Block, isp = ispNow,
+                            otherFirewalls = SecurityProducts.ActiveThirdPartyFirewalls(),
                         },
                         general = UserScopes.Summarize(cfg, null),
                         users = accounts.Select(a =>
@@ -281,6 +282,9 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     await SendJson(res, 200, new { ok = true });
                     break;
                 }
+                case ("/api/boot", "GET"):
+                    await SendJson(res, 200, boot.Status);
+                    break;
                 case ("/api/isp", "GET"):
                     await SendJson(res, 200, IspState(store.Load()));
                     break;
@@ -412,6 +416,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["isp.netfree"] = c.IspFilter.Providers.Contains("NetFree", StringComparer.OrdinalIgnoreCase),
             ["isp.etrog"] = c.IspFilter.Providers.Contains("Etrog", StringComparer.OrdinalIgnoreCase),
             ["clock.locked"] = c.Clock.Locked,
+            ["vpn.block"] = c.Vpn.Block,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>

@@ -47,7 +47,8 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         EnsureFirewallOn(cfg.Network.UrlFiltering || isolated);
         EnsureRules(cfg, isolated);
         if (cfg.Network.UrlFiltering) { if (!SystemProxySettings.IsApplied()) SystemProxySettings.Apply(); }
-        else if (SystemProxySettings.IsApplied()) SystemProxySettings.Remove();
+        else if (cfg.Vpn.Block) { if (!SystemProxySettings.IsDirectApplied()) SystemProxySettings.ApplyDirect(); }
+        else if (SystemProxySettings.IsApplied() || SystemProxySettings.IsDirectApplied()) SystemProxySettings.Remove();
         EnsureLocalDns();
         EnsureBrowserDohOff();
     }
@@ -92,6 +93,14 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
             var sddl = UsersSddl(users);
             if (sddl is null) continue;
             wanted.Add(($"Guardian app {ShortHash(path + sddl)}", r => { r.ApplicationName = path; r.LocalUserAuthorizedList = sddl; }));
+        }
+        if (cfg.Vpn.Block)
+        {
+            // VPN protocols: IKEv2/IPsec (500, 4500), L2TP (1701), PPTP (1723 + GRE), OpenVPN (1194), WireGuard (51820).
+            // SSTP uses 443 like any website and cannot be told apart here; the VPN programs themselves are blocked by name.
+            wanted.Add(("Guardian VPN UDP", r => { r.Protocol = 17; r.RemotePorts = "500,4500,1701,1194,51820"; r.RemoteAddresses = NonLoopback; }));
+            wanted.Add(("Guardian VPN TCP", r => { r.Protocol = 6; r.RemotePorts = "1723,1194"; r.RemoteAddresses = NonLoopback; }));
+            wanted.Add(("Guardian VPN GRE", r => { r.Protocol = 47; r.RemoteAddresses = NonLoopback; }));
         }
         if (isolated)
         {
