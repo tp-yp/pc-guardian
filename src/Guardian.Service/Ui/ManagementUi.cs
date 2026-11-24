@@ -293,6 +293,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["apps.trustProgramFiles"] = c.Apps.TrustProgramFiles,
             ["network.enabled"] = c.Network.Enabled,
             ["network.urlFiltering"] = c.Network.UrlFiltering,
+            ["boot.lockdown"] = c.Boot.Lockdown,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>

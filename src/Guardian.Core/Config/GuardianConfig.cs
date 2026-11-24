@@ -21,6 +21,8 @@ public sealed class GuardianConfig
     public NetworkPolicy Network { get; set; } = new();
     /// <summary>Accounts with their own program and website rules (see <see cref="Policy.UserScopes"/>).</summary>
     public List<UserPolicy> UserPolicies { get; set; } = new();
+    /// <summary>Hardening of the boot path (Safe Mode, recovery environment). Off by default.</summary>
+    public BootPolicy Boot { get; set; } = new();
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
@@ -48,6 +50,17 @@ public sealed class UserPolicy
     public string UserName { get; set; } = "";
     public AppPolicy Apps { get; set; } = new();
     public NetworkPolicy Network { get; set; } = new();
+}
+
+/// <summary>
+/// "Boot lockdown": keeps the recovery environment (WinRE) disabled, removes any request to restart
+/// into Safe Mode, turns off automatic repair and the F8 menu. Only turned on after the owner
+/// explicitly confirms; everything is put back when it is turned off or Guardian is removed.
+/// Booting from an external disk is not blocked (that needs a BIOS/UEFI password).
+/// </summary>
+public sealed class BootPolicy
+{
+    public bool Lockdown { get; set; }
 }
 
 /// <summary>While the schedule is active the user is signed out and cannot sign in.</summary>
