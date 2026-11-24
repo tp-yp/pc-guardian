@@ -28,12 +28,12 @@ switch (cmd)
         Setup.HideOwnConsole();
         if (Setup.IsInstalled() && !Setup.IsDifferentBuildThanInstalled()) return Gui.App();
         if (!Setup.IsElevated()) { Setup.RelaunchElevated(["setup"]); return 0; }
-        return Gui.Setup(store, Setup.IsInstalled() ? Guardian.Service.Ui.SetupMode.Update : Guardian.Service.Ui.SetupMode.Install);
+        return Gui.Setup(store, Setup.IsInstalled() || Setup.HasPendingUpdate(store) ? Guardian.Service.Ui.SetupMode.Update : Guardian.Service.Ui.SetupMode.Install);
     }
 
     case "setup":
         Setup.HideOwnConsole();
-        return Gui.Setup(store, Setup.IsInstalled() ? Guardian.Service.Ui.SetupMode.Update : Guardian.Service.Ui.SetupMode.Install);
+        return Gui.Setup(store, Setup.IsInstalled() || Setup.HasPendingUpdate(store) ? Guardian.Service.Ui.SetupMode.Update : Guardian.Service.Ui.SetupMode.Install);
 
     case "app":
         Setup.HideOwnConsole();

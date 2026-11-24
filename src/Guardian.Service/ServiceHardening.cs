@@ -21,16 +21,94 @@ public static class ServiceHardening
     public const string DefaultSddl =
         "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
 
-    public static void Install(string name, string exePath, string mode = "run")
+    /// <summary>Creates the service (not yet hardened, so it can still be removed if it fails to start).</summary>
+    public static void Create(string name, string exePath, string mode = "run")
     {
         Sc($"create {name} binPath= \"\\\"{exePath}\\\" {mode}\" start= auto obj= LocalSystem DisplayName= \"{name}\"");
         Sc($"description {name} \"Local policy host\"");
         // Restart after 5s on every failure; reset the failure counter daily.
         Sc($"failure {name} reset= 86400 actions= restart/5000/restart/5000/restart/5000");
         Sc($"failureflag {name} 1");
+    }
+
+    /// <summary>Starts the service; throws <see cref="BlockedByWindowsException"/> if Windows application control refuses it.</summary>
+    public static void Start(string name)
+    {
+        try { Sc($"start {name}"); }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("1056")) { /* already running (started by the other service) */ }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("4551") || ex.Message.Contains("1260") || ex.Message.Contains("225"))
+        { throw new BlockedByWindowsException(ex.Message); }
+    }
+
+    /// <summary>Locks the service DACL and registers it for Safe Mode. Only after it started fine.</summary>
+    public static void Harden(string name)
+    {
         Sc($"sdset {name} {HardenedSddl}");
         EnableInSafeMode(name);
-        Sc($"start {name}");
+    }
+
+    /// <summary>Removes a not-yet-hardened service (rollback of a failed install).</summary>
+    public static void RemoveUnhardened(string name)
+    {
+        Sc($"stop {name}", throwOnError: false);
+        Sc($"delete {name}", throwOnError: false);
+        DisableInSafeMode(name);
+    }
+
+    /// <summary>
+    /// Services from earlier failed installs: they point into the install folder but are not the
+    /// current ones. They may be hardened, so they are removed by a one-shot SYSTEM task that only
+    /// runs Windows' own sc.exe.
+    /// </summary>
+    public static void RemoveLeftovers(IEnumerable<string> keep)
+    {
+        var keepSet = new HashSet<string>(keep.Where(k => k.Length > 0), StringComparer.OrdinalIgnoreCase);
+        var leftovers = new List<string>();
+        using (var services = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services"))
+        {
+            foreach (var n in services?.GetSubKeyNames() ?? [])
+            {
+                if (keepSet.Contains(n)) continue;
+                try
+                {
+                    using var k = services!.OpenSubKey(n);
+                    if (k?.GetValue("ImagePath") is string img && img.Contains(Paths.InstallDir, StringComparison.OrdinalIgnoreCase))
+                        leftovers.Add(n);
+                }
+                catch (System.Security.SecurityException) { }
+            }
+        }
+        if (leftovers.Count == 0) return;
+        var dir = Path.Combine(Path.GetTempPath(), "GuardianCleanup-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(dir);
+        var script = Path.Combine(dir, "cleanup.cmd");
+        File.WriteAllLines(script, leftovers.SelectMany(n => new[]
+        {
+            $"sc.exe sdset {n} \"{DefaultSddl}\"",
+            $"sc.exe failure {n} reset= 0 actions= \"\"",
+            $"sc.exe stop {n}",
+            $"sc.exe delete {n}",
+        }).Append($"echo ok> \"{Path.Combine(dir, "done")}\""));
+        const string task = "GuardianCleanupOnce";
+        try
+        {
+            Run("schtasks.exe", $"/Create /F /TN {task} /RU SYSTEM /RL HIGHEST /SC ONCE /ST 00:00 /TR \"cmd.exe /c \\\"{script}\\\"\"");
+            Run("schtasks.exe", $"/Run /TN {task}");
+            for (var i = 0; i < 40 && !File.Exists(Path.Combine(dir, "done")); i++) Thread.Sleep(250);
+        }
+        finally
+        {
+            Run("schtasks.exe", $"/Delete /F /TN {task}");
+            foreach (var n in leftovers) try { DisableInSafeMode(n); } catch { }
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    private static void Run(string exe, string args)
+    {
+        using var p = Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true })!;
+        p.StandardOutput.ReadToEnd(); p.StandardError.ReadToEnd();
+        p.WaitForExit();
     }
 
     /// <summary>Lets the service start in Safe Mode too (Minimal and Network), so booting into
@@ -97,3 +175,6 @@ public static class ServiceHardening
             throw new InvalidOperationException($"sc {args.Split(' ')[0]} failed ({p.ExitCode}): {output.Trim()}");
     }
 }
+
+/// <summary>Windows application control (Smart App Control / WDAC) or the antivirus refused to start the service.</summary>
+public sealed class BlockedByWindowsException(string detail) : Exception("Blocked by Windows: " + detail);

@@ -86,7 +86,7 @@ internal sealed class SetupWeb : IDisposable
         }
         catch (Exception ex)
         {
-            try { await SendJson(ctx, 500, new { ok = false, message = ex.Message }); } catch { /* gone */ }
+            try { await SendJson(ctx, 500, new { ok = false, message = Hebrew(ex.Message) }); } catch { /* gone */ }
         }
     }
 
@@ -101,6 +101,8 @@ internal sealed class SetupWeb : IDisposable
         "Passwords must be at least 8 characters." => "כל סיסמה צריכה להיות באורך 8 תווים לפחות.",
         "Updated. All settings were kept." => "עודכן. כל ההגדרות נשמרו.",
         _ when m.StartsWith("Guardian was removed") => "Guardian הוסר, וכל מה שהוא שינה הוחזר.",
+        _ when m.StartsWith("Blocked by Windows") => "ווינדוס סירב להפעיל את Guardian כשירות רקע (Smart App Control או האנטי-וירוס חסמו את הקובץ). שום דבר לא הותקן ושום דבר לא נשאר מאחור. פרטים: " + m["Blocked by Windows: ".Length..],
+        _ when m.StartsWith("Install step failed") => "שלב ההתקנה נכשל. ההגדרות שלך נשמרו, הפעל את הקובץ שוב כדי להשלים את העדכון. פרטים: " + m,
         _ when m.StartsWith("The service did not answer") => "השירות לא ענה וגם הדרך החלופית נכשלה. הפעל מחדש את המחשב ונסה שוב.",
         _ => m,
     };

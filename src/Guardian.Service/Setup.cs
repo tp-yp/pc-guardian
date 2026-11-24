@@ -42,19 +42,42 @@ public static class Setup
         return name;
     }
 
-    /// <summary>Copies this exe into place, writes the config, and creates both protected services.</summary>
-    private static void InstallWithConfig(EncryptedConfigStore store, GuardianConfig cfg)
+    /// <summary>
+    /// Copies this exe into place, writes the config, and creates both services. The services are
+    /// started before they are hardened: if Windows refuses to run them, everything is rolled back
+    /// (the config is kept when <paramref name="keepConfigOnFailure"/>, so an update can be retried).
+    /// </summary>
+    private static void InstallWithConfig(EncryptedConfigStore store, GuardianConfig cfg, bool keepConfigOnFailure = false)
     {
+        try { ServiceHardening.RemoveLeftovers([cfg.ServiceName, cfg.WatchdogServiceName]); } catch { /* best effort */ }
         Directory.CreateDirectory(Paths.InstallDir);
         var exe = Path.Combine(Paths.InstallDir, cfg.ServiceName + ".exe");
         File.Copy(Environment.ProcessPath!, exe, overwrite: true);
         store.Save(cfg);
         DataDirSecurity.Lock(Paths.DataDir);
-        ServiceHardening.Install(cfg.ServiceName, exe);
-        ServiceHardening.Install(cfg.WatchdogServiceName, exe, "watchdog");
+        try
+        {
+            ServiceHardening.Create(cfg.ServiceName, exe);
+            ServiceHardening.Create(cfg.WatchdogServiceName, exe, "watchdog");
+            ServiceHardening.Start(cfg.ServiceName);
+            ServiceHardening.Start(cfg.WatchdogServiceName);
+        }
+        catch
+        {
+            foreach (var n in new[] { cfg.ServiceName, cfg.WatchdogServiceName }) try { ServiceHardening.RemoveUnhardened(n); } catch { }
+            Thread.Sleep(1000);
+            try { File.Delete(exe); } catch { }
+            if (!keepConfigOnFailure) try { Directory.Delete(Paths.DataDir, true); } catch { }
+            throw;
+        }
+        ServiceHardening.Harden(cfg.ServiceName);
+        ServiceHardening.Harden(cfg.WatchdogServiceName);
         Uninstaller.RegisterInWindows(exe);
         DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true);
     }
+
+    /// <summary>A config left by an update whose install step failed: setup offers to finish it.</summary>
+    public static bool HasPendingUpdate(EncryptedConfigStore store) => !IsInstalled() && store.Exists;
 
     /// <summary>Installed? Read from "Installed apps" so it also works without admin rights.</summary>
     public static bool IsInstalled() => InstalledExe() != null;
@@ -87,11 +110,15 @@ public static class Setup
         if (saved.UiIdleLockMinutes == 0) saved.UiIdleLockMinutes = 5;
         var auth = new AdminGate().Authenticate(saved, password);
         if (auth is not (AuthResult.Admin or AuthResult.Recovery)) return (false, "Wrong password.");
-        var (ok, message) = Uninstall(store, password);
-        if (!ok) return (false, message);
-        Thread.Sleep(2000);
-        try { InstallWithConfig(store, saved); }
-        catch (Exception ex) { return (false, "Removed the old version but installing the new one failed: " + ex.Message + " Run the file again to install."); }
+        if (IsInstalled())
+        {
+            var (ok, message) = Uninstall(store, password);
+            if (!ok) return (false, message);
+            Thread.Sleep(2000);
+        }
+        try { InstallWithConfig(store, saved, keepConfigOnFailure: true); }
+        catch (BlockedByWindowsException ex) { return (false, ex.Message); }
+        catch (Exception ex) { return (false, "Install step failed: " + ex.Message + " Your settings are kept; run the file again to finish the update."); }
         return (true, "Updated. All settings were kept.");
     }
 
