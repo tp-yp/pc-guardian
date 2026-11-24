@@ -25,7 +25,7 @@ public static class UserScopes
         return new GuardianConfig
         {
             ServiceName = cfg.ServiceName, WatchdogServiceName = cfg.WatchdogServiceName,
-            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn,
+            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi,
             Apps = Merge(cfg.Apps, p.Apps),
             Network = Merge(cfg.Network, p.Network),
         };
@@ -52,7 +52,7 @@ public static class UserScopes
         p.Network.UrlFiltering = cfg.Network.UrlFiltering;
         p.Network.NoDecryptDomains = cfg.Network.NoDecryptDomains;
         p.Network.AllowDirectApps = cfg.Network.AllowDirectApps;
-        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn };
+        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi };
     }
 
     /// <summary>Copies shared switches changed through a user view back to the general settings.</summary>
@@ -103,7 +103,9 @@ public static class UserScopes
             NoInternetApps: e.Network.BlockedAppPaths.Count,
             SitesOn: e.Network.Enabled, Allowlist: e.Network.Mode == UrlMode.Allowlist,
             Sites: e.Network.Domains.Count, Exceptions: e.Network.Exceptions.Count,
-            Schedule: cfg.UserLockouts.Any(l => user != null && LockoutPlanner.SameUser(l.UserName, user) && l.LockedDuring.Windows.Count > 0));
+            Schedule: cfg.UserLockouts.Any(l => user != null && LockoutPlanner.SameUser(l.UserName, user) && l.LockedDuring.Windows.Count > 0),
+            BreakEvery: cfg.UserLockouts.FirstOrDefault(l => user != null && LockoutPlanner.SameUser(l.UserName, user))?.BreakEveryMinutes ?? 0,
+            TimedApps: e.Apps.Rules.Count(r => r.Action == RuleAction.Block && r.When.Windows.Count > 0));
     }
 
     private static List<AppRule> Copy(List<AppRule> rules) =>
@@ -153,4 +155,4 @@ public static class UserScopes
 
 /// <summary>One dashboard panel: which protections are on for an account (or the general rules).</summary>
 public sealed record ScopeSummary(bool AppsEnabled, bool DefaultDeny, int LockedApps, int NoInternetApps,
-    bool SitesOn, bool Allowlist, int Sites, int Exceptions, bool Schedule);
+    bool SitesOn, bool Allowlist, int Sites, int Exceptions, bool Schedule, int BreakEvery = 0, int TimedApps = 0);

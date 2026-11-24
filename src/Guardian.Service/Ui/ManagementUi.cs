@@ -83,7 +83,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.")) who = null;
 
             switch (path, req.HttpMethod)
             {
@@ -114,6 +114,38 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
+                    break;
+                }
+                case ("/api/catalog/hours", "POST"):
+                {
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    var exe = body.GetValueOrDefault("path") ?? "";
+                    List<Guardian.Core.Scheduling.TimeWindow> windows;
+                    try { windows = JsonSerializer.Deserialize<List<Guardian.Core.Scheduling.TimeWindow>>(body.GetValueOrDefault("windows") ?? "[]", Json) ?? []; }
+                    catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
+                    var orig = windows.Count > 0 && File.Exists(exe) ? AppBlocker.ReadOriginalName(exe) : null;
+                    if (!AppCatalog.TrySetHours(view, exe, windows, out var err, orig)) { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
+                    store.Save(cfg);
+                    log.LogInformation("UI: blocked hours for {Exe}: {N} ranges", exe, windows.Count);
+                    await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
+                    break;
+                }
+                case ("/api/wifi", "GET"):
+                {
+                    var cfg = store.Load();
+                    var saved = WifiGuard.SavedNetworks();
+                    await SendJson(res, 200, new { on = cfg.Wifi.KnownOnly, allowed = cfg.Wifi.Allowed, saved, hasWifi = saved != null });
+                    break;
+                }
+                case ("/api/wifi/list", "POST"):
+                {
+                    var cfg = store.Load();
+                    if (!ConfigEditing.TryEditWifiList(cfg, body.GetValueOrDefault("action") ?? "", body.GetValueOrDefault("value") ?? "", out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    await SendJson(res, 200, new { ok = true });
                     break;
                 }
                 case ("/api/apps/allow", "POST"):
@@ -179,7 +211,8 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     try { windows = JsonSerializer.Deserialize<List<Guardian.Core.Scheduling.TimeWindow>>(body.GetValueOrDefault("windows") ?? "[]", Json) ?? []; }
                     catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
                     int.TryParse(body.GetValueOrDefault("warning"), out var warn);
-                    if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    int.TryParse(body.GetValueOrDefault("breakEvery"), out var breakEvery);
+                    if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err, breakEvery)) { await SendJson(res, 400, new { error = err }); break; }
                     store.Save(cfg);
                     await SendJson(res, 200, new { ok = true });
                     break;
@@ -235,7 +268,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                         computer = new
                         {
                             network = cfg.Network.Enabled, urlFiltering = cfg.Network.UrlFiltering, boot = cfg.Boot.Lockdown,
-                            clock = cfg.Clock.Locked, vpn = cfg.Vpn.Block, isp = ispNow,
+                            clock = cfg.Clock.Locked, vpn = cfg.Vpn.Block, wifi = cfg.Wifi.KnownOnly, isp = ispNow,
                             otherFirewalls = SecurityProducts.ActiveThirdPartyFirewalls(),
                         },
                         general = UserScopes.Summarize(cfg, null),
@@ -315,7 +348,17 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 {
                     var cfg = store.Load();
                     var view = UserScopes.View(cfg, who);
-                    if (!ConfigEditing.TrySetToggle(view, body.GetValueOrDefault("key") ?? "", body.GetValueOrDefault("value") == "true", out var err))
+                    var key = body.GetValueOrDefault("key") ?? "";
+                    var turningOn = body.GetValueOrDefault("value") == "true";
+                    if (key == "wifi.knownOnly" && turningOn)
+                    {
+                        // The networks saved on this computer right now become the allowed ones.
+                        var saved = WifiGuard.SavedNetworks();
+                        if (saved is null) { await SendJson(res, 400, new { error = "לא נמצא במחשב חיבור Wi-Fi." }); break; }
+                        foreach (var s in saved) if (!cfg.Wifi.Allowed.Contains(s)) cfg.Wifi.Allowed.Add(s);
+                        if (cfg.Wifi.Allowed.Count == 0) { await SendJson(res, 400, new { error = "אין במחשב רשתות Wi-Fi שמורות. התחברו קודם לרשת הבית, ואז הפעילו." }); break; }
+                    }
+                    if (!ConfigEditing.TrySetToggle(view, key, turningOn, out var err))
                     { await SendJson(res, 400, new { error = err }); break; }
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
@@ -417,6 +460,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["isp.etrog"] = c.IspFilter.Providers.Contains("Etrog", StringComparer.OrdinalIgnoreCase),
             ["clock.locked"] = c.Clock.Locked,
             ["vpn.block"] = c.Vpn.Block,
+            ["wifi.knownOnly"] = c.Wifi.KnownOnly,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>

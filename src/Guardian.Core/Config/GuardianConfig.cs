@@ -27,6 +27,7 @@ public sealed class GuardianConfig
     public IspFilterPolicy IspFilter { get; set; } = new();
     public ClockPolicy Clock { get; set; } = new();
     public VpnPolicy Vpn { get; set; } = new();
+    public WifiPolicy Wifi { get; set; } = new();
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
@@ -73,6 +74,14 @@ public sealed class BootPolicy
 /// who signed them. If it is not the filter, all internet traffic is blocked until the filter is back.
 /// </summary>
 /// <summary>Blocks VPN programs, VPN connections and proxies, which would get around the filtering.</summary>
+/// <summary>Wi-Fi: only networks already known to this computer may be joined (Windows' own network filters).</summary>
+public sealed class WifiPolicy
+{
+    public bool KnownOnly { get; set; }
+    /// <summary>Network names (SSIDs) that stay allowed; filled from the saved Wi-Fi networks when the switch is turned on.</summary>
+    public List<string> Allowed { get; set; } = new();
+}
+
 public sealed class VpnPolicy
 {
     public bool Block { get; set; }
@@ -106,6 +115,8 @@ public sealed class UserLockoutRule
     public string UserName { get; set; } = "";
     public WeeklySchedule LockedDuring { get; set; } = new();
     public int WarningMinutes { get; set; } = 5;
+    /// <summary>"Addiction prevention": sign the user out after this many minutes of continuous use (0 = off). Signing in again is allowed.</summary>
+    public int BreakEveryMinutes { get; set; }
 }
 
 public enum RuleAction { Allow, Block }

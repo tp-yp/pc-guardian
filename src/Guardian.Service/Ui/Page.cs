@@ -158,6 +158,13 @@ body[data-ctx=user] .machine{display:none!important}
 <div><h3>תוכנות של ספק הסינון</h3><p class="hint">רק אם ספק הסינון דורש תוכנה במחשב שרצה כשירות: היא תוכל להתחבר גם כשהאינטרנט חסום. נתיב מלא לקובץ.</p>
 <form class="row add" data-list="ispApps"><input required style="flex:1" placeholder="C:\Program Files\Filter\client.exe"><button>הוספה</button></form><ul id="ispApps"></ul></div>
 </div></details></section>
+<section class="wide machine" id="wifiSec"><h2>רשתות Wi-Fi מותרות</h2>
+<p class="hint">כש"רק רשתות Wi-Fi מוכרות" דולק, המחשב מתחבר רק לרשתות שברשימה הזו. ההגנה משתמשת במסנני הרשת של ווינדוס עצמו, וחלה על כל המשתמשים. Guardian מחזיר את המסננים אם מישהו מוחק אותם. כיבוי או הסרה של Guardian מחזירים הכול כמו שהיה.<br>
+<b>מה זה לא חוסם:</b> חיבור בכבל רשת וחיבור טלפון בכבל USB (שיתוף אינטרנט ב-USB). את אלה עוצר "אינטרנט רק דרך הסינון".</p>
+<ul id="wifiAllowed"></ul>
+<div class="row" style="margin-top:8px"><select id="wifiSaved"></select><button class="ghost" id="wifiAdd">הוספה לרשימה</button></div>
+<div class="hint" id="wifiNote" style="margin-top:6px"></div>
+</section>
 <section class="wide machine"><h2>אנטי-וירוס עם חומת אש משלו</h2>
 <p class="hint">Guardian משתמש בחומת האש של ווינדוס כדי לחסום אינטרנט: לתוכנות שסימנתם "בלי אינטרנט", כשאין חיבור דרך הסינון, ולתוכנות שלא עוברות בסינון לפי כתובת מלאה. יש אנטי-וירוסים (למשל ESET, Kaspersky, Norton, Bitdefender) שמביאים חומת אש משלהם ומכבים את זו של ווינדוס. במצב כזה:</p>
 <ul class="hint steps" style="line-height:1.8;margin:0;padding-inline-start:22px">
@@ -188,10 +195,11 @@ body[data-ctx=user] .machine{display:none!important}
 <p class="hint">הרשימה נאספת מתפריט התחל, מ"אפליקציות מותקנות" בהגדרות ומהחנות של Microsoft. לכל תוכנה אפשר לבחור:<br>
 <b>נעולה</b> – התוכנה תיסגר מיד בכל פעם שמישהו ינסה לפתוח אותה, ויופיע מסך חסימה.<br>
 <b>בלי אינטרנט</b> – התוכנה תיפתח כרגיל, אבל לא תוכל להתחבר לאינטרנט.<br>
+<b>שעות</b> – התוכנה תיחסם רק בשעות שתקבעו (למשל משחק שמותר רק אחרי הצהריים). מחוץ לשעות האלה היא עובדת כרגיל, ואם היא פתוחה כשהשעה מגיעה, היא נסגרת.<br>
 <b>גישה ישירה</b> – רלוונטי רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תתחבר לאינטרנט בלי לעבור בסינון. מתאים למשחקים, Steam, Spotify ותוכנות שמפסיקות לעבוד כשהסינון דולק.</p>
 <div class="row"><input id="q" placeholder="חיפוש תוכנה…" style="flex:1;min-width:180px"><label><input type="checkbox" id="onlySet"> רק תוכנות עם הגבלה</label><button class="ghost" id="refresh">רענון הרשימה</button></div>
 <div id="catNote" class="hint" style="margin-top:8px"></div>
-<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th></tr></thead><tbody id="catalog"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th><th>שעות חסימה</th></tr></thead><tbody id="catalog"></tbody></table></div>
 </section>
 <section class="wide"><details><summary><b>הוספה ידנית (לתוכנות שלא מופיעות ברשימה, למשל קבצים ניידים)</b></summary>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px">
@@ -254,6 +262,7 @@ body[data-ctx=user] .machine{display:none!important}
 <!-- ===== משתמשים ===== -->
 <div class="page" data-page="users" hidden>
 <section class="wide"><h2>שעות כניסה למשתמשים</h2>
+<p class="hint"><b>מניעת התמכרות:</b> אחרי זמן השימוש הרציף שתבחרו, המשתמש מקבל התראה ואז יוצא מהחשבון. הוא יכול להיכנס שוב מיד, והספירה מתחילה מחדש. זה יוצר הפסקה קטנה ורגע של מחשבה, בלי לחסום לגמרי.</p>
 <p class="hint">לכל משתמש במחשב אפשר לקבוע שעות שבהן אסור לו להיות מחובר. כשמגיעה השעה, המשתמש מקבל הודעה כמה דקות לפני, ואז הוא מנותק והמחשב חוזר למסך הכניסה. בזמן הזה הוא גם לא יכול להיכנס.<br>
 טווח שעות שעובר חצות (למשל 23:00 עד 07:00) נחשב ליום שבו הוא מתחיל. כדי לחסום יום שלם, בחרו אותה שעה בהתחלה ובסוף.</p>
 <div id="allLocked" class="warn" hidden>שימו לב: לכל המשתמשים במחשב יש שעות נעילה. אם יש שעה שבה כולם נעולים, אף אחד לא יוכל להיכנס למחשב בזמן הזה, גם לא כדי לשנות הגדרות. כדאי להשאיר לפחות משתמש מנהל אחד בלי נעילה.</div>
@@ -323,7 +332,7 @@ setInterval(()=>{if(!$('app').hidden&&Date.now()-lastAct>idleMin*60000){post('/a
 function openTab(name){if(name==='settings'&&scope)name='features';
  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));document.querySelectorAll('[data-page]').forEach(m=>m.hidden=m.dataset.page!==name);
  $('scopebar').hidden=name==='home';if(name==='home')loadDash();
- if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings')loadHealth();if(name==='features')loadIsp()}
+ if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings')loadHealth();if(name==='features'){loadIsp();if(!scope)loadWifi()}}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
 document.querySelectorAll('#netsub button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#netsub button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('[data-sub-page]').forEach(m=>m.hidden=m.dataset.subPage!==b.dataset.sub);if(b.dataset.sub==='netapps')loadDirect()});
 
@@ -335,6 +344,7 @@ const TOGGLES=[
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
  ['isp.required','אינטרנט רק דרך הסינון','חוסם את כל האינטרנט כשהמחשב לא מחובר דרך ספק סינון (נטפרי, אתרוג או נטספארק). הזיהוי לפי תעודת האבטחה, והסבר מלא בהמשך העמוד. ההפעלה דורשת אישור, וכיבוי מחזיר את האינטרנט מיד.'],
  ['vpn.block','חסימת VPN ופרוקסי','חוסם תוכנות VPN ופרוקסי מוכרות (גם אם שינו להן את השם), את אתרי ההורדה שלהן ואתרי פרוקסי מוכרים, את החיבורים של ה-VPN המובנה בווינדוס, ואת האפשרות להגדיר פרוקסי ידנית. ה-VPN המובנה מסוג SSTP משתמש באותו חיבור כמו אתרים רגילים ולא נחסם כאן, וגם תוכנה שלא ברשימה לא תיחסם לפי השם. לכן כדאי להפעיל גם "סינון לפי כתובת מלאה" או "חסימת כל תוכנה לא מוכרת".'],
+ ['wifi.knownOnly','רק רשתות Wi-Fi מוכרות','המחשב יוכל להתחבר רק לרשתות Wi-Fi שכבר שמורות בו עכשיו. רשתות חדשות, כמו נקודה חמה מטלפון או רשת של שכנים, לא יופיעו ולא יהיה אפשר להתחבר אליהן. הרשימה המלאה ואפשרות להוסיף רשת נמצאות בהמשך העמוד.'],
  ['clock.locked','נעילת השעון','Guardian לוקח את השעה הנכונה מהאינטרנט וסופר אותה בעצמו, כך ששינוי השעה או אזור הזמן במחשב לא עוקף את שעות הנעילה ואת התוכנות שחסומות לפי שעות. אם מישהו משנה את השעון, הוא חוזר לשעה הנכונה תוך כמה שניות.'],
  ['boot.lockdown','חסימת מצב בטוח וסביבת השחזור','מונע עקיפה של Guardian דרך מצב בטוח, "הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש) וסביבת השחזור של ווינדוס. תיקון אוטומטי ותפריט F8 מכובים גם הם. ההפעלה דורשת אישור, והכיבוי או ההסרה מחזירים הכול כמו שהיה.'],
  ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Guardian מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
@@ -383,7 +393,15 @@ setInterval(()=>{if(!$('app').hidden&&!document.querySelector('[data-page=featur
 const ASK={'boot.lockdown':askBoot,'isp.required':askIsp};
 function renderToggles(s){$('toggles').replaceChildren(...TOGGLES.filter(([k])=>!scope||PER_USER.includes(k)).map(([k,t,d,w])=>{const txt=el('div',{},el('b',{},t),el('small',{},d));
  txt.append(el('small',{class:'badge',style:'display:inline-block;margin-top:4px'},PER_USER.includes(k)?(scope?'חל רק על '+scope:'ברירת מחדל: חל על משתמשים בלי הגדרות נפרדות'):'חל על כל המחשב'));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
- return el('div',{class:'toggle'},txt,sw(s[k],i=>(ASK[k]&&i.checked)?(i.checked=false,ASK[k]()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);if(k==='isp.required')loadIsp();if(k==='boot.lockdown')loadBoot();toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
+ return el('div',{class:'toggle'},txt,sw(s[k],i=>(ASK[k]&&i.checked)?(i.checked=false,ASK[k]()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);if(k==='isp.required')loadIsp();if(k==='boot.lockdown')loadBoot();if(k==='wifi.knownOnly')loadWifi();toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
+
+// Wi-Fi networks
+function loadWifi(){api('/api/wifi',{},false).then(w=>{
+ $('wifiAllowed').replaceChildren(...(w.allowed.length?w.allowed.map(n=>el('li',{},el('span',{},n),el('button',{class:'link',onclick:()=>post('/api/wifi/list',{action:'remove',value:n}).then(()=>{toast('הרשת '+n+' הוסרה מהרשימה');loadWifi()}).catch(fail)},'הסרה'))):[el('li',{class:'muted'},w.on?'הרשימה ריקה':'הרשימה תתמלא ברשתות השמורות במחשב כשתדליקו את היכולת')]));
+ const extra=(w.saved||[]).filter(n=>!w.allowed.includes(n));
+ $('wifiSaved').replaceChildren(...(extra.length?extra.map(n=>el('option',{value:n},n)):[el('option',{value:''},'אין רשתות שמורות נוספות')]));$('wifiAdd').disabled=!extra.length;
+ $('wifiNote').textContent=!w.hasWifi?'לא נמצא במחשב כרטיס Wi-Fi.':'כדי להוסיף רשת חדשה: מכבים את היכולת, מתחברים לרשת, ומדליקים שוב. הרשת תתווסף לרשימה אוטומטית.'}).catch(()=>{})}
+$('wifiAdd').onclick=()=>{const n=$('wifiSaved').value;if(n)post('/api/wifi/list',{action:'add',value:n}).then(()=>{toast('הרשת '+n+' נוספה');loadWifi()}).catch(fail)};
 
 // Lists
 const APP_LISTS=['allowApps','blockApps'];
@@ -406,7 +424,7 @@ function setScope(u,tab){scope=u||'';catalog=null;return api(q('/api/state')).th
 // Dashboard
 const stLine=(on,text)=>el('div',{class:'st '+(on?'on':'off')},el('span',{class:'i'},on?'✓':'–'),text);
 function scopeLines(m){return[
- stLine(m.appsEnabled,m.appsEnabled?'נעילת תוכנות פועלת'+(m.lockedApps?' ('+m.lockedApps+' נעולות)':''):'נעילת תוכנות כבויה'),
+ stLine(m.appsEnabled,m.appsEnabled?'נעילת תוכנות פועלת'+(m.lockedApps?' ('+m.lockedApps+' נעולות)':'')+(m.timedApps?', '+m.timedApps+' לפי שעות':''):'נעילת תוכנות כבויה'),
  stLine(m.defaultDeny,m.defaultDeny?'תוכנות לא מוכרות נחסמות':'תוכנות לא מוכרות מותרות'),
  stLine(m.sitesOn,!m.sitesOn?'סינון אתרים כבוי':m.allowlist?'רשימה לבנה: '+m.sites+' אתרים מותרים':m.sites?m.sites+' אתרים חסומים':'אין אתרים חסומים'),
  stLine(m.noInternetApps>0,m.noInternetApps?m.noInternetApps+' תוכנות בלי אינטרנט':'אין תוכנות בלי אינטרנט')]}
@@ -418,6 +436,7 @@ function renderDash(d){const c=d.computer;
   stLine(c.isp.required,c.isp.required?'אינטרנט רק דרך הסינון: '+(c.isp.blocked?'האינטרנט חסום עכשיו':ISPDASH[c.isp.status]||''):'אינטרנט רק דרך הסינון כבוי'),
   stLine(c.clock,c.clock?'השעון נעול':'השעון לא נעול'),
   stLine(c.vpn,c.vpn?'VPN ופרוקסי חסומים':'VPN ופרוקסי לא חסומים'),
+  stLine(c.wifi,c.wifi?'רק רשתות Wi-Fi מוכרות':'אפשר להתחבר לכל רשת Wi-Fi'),
   stLine(c.boot,c.boot?'מצב בטוח וסביבת השחזור חסומים':'מצב בטוח וסביבת השחזור פתוחים'),
   (c.otherFirewalls||[]).length?el('div',{class:'warn'},'חומת אש של '+c.otherFirewalls.join(', ')+' פועלת במחשב. חלק מהחסימות של Guardian לא יעבדו (פירוט בלשונית "יכולות").'):'',
   el('small',{class:'muted',style:'margin-top:4px'},'ברירת מחדל למשתמשים בלי הגדרות נפרדות:'),...scopeLines(d.general),
@@ -428,6 +447,7 @@ function renderDash(d){const c=d.computer;
   const b=el('button',{class:'card'},el('h3',{},u.name,...badges),
    el('small',{class:'muted'},u.own?'הגדרות נפרדות':'עדיין לפי ברירת המחדל'),...scopeLines(u.summary),
    stLine(u.summary.schedule,u.summary.schedule?'יש שעות נעילה':'אין שעות נעילה'),
+   stLine(u.summary.breakEvery>0,u.summary.breakEvery>0?'מניעת התמכרות: הפסקה כל '+u.summary.breakEvery+' דקות':'בלי מניעת התמכרות'),
    el('span',{class:'go'},'לניהול של '+u.name+' ←'));
   b.onclick=()=>enterUser(u);return b});
  $('cards').replaceChildren(...users,pc)}
@@ -448,10 +468,18 @@ $('refresh').onclick=()=>loadCatalog(true);$('q').oninput=()=>renderCatalog();$(
 function setApp(a,kind,i){post('/api/catalog/set',{path:a.exePath,kind,value:String(i.checked)}).then(c=>{catalog=c;load();
  const msg={lock:['ננעלה','שוחררה מנעילה'],internet:['לא תוכל להתחבר לאינטרנט','יכולה שוב להתחבר לאינטרנט'],direct:['קיבלה גישה ישירה לאינטרנט','תעבור שוב דרך הסינון']}[kind];toast(a.name+' '+(i.checked?msg[0]:msg[1])+(kind==='direct'?'':(scope?' (עבור '+scope+')':'')))}).catch(x=>{fail(x);i.checked=!i.checked})}
 function renderCatalog(){if(!catalog)return;const q=$('q').value.trim().toLowerCase(),only=$('onlySet').checked,direct=state&&state.settings['network.urlFiltering'];
- const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet));
+ const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length));
  $('catNote').textContent=catalog.length+' תוכנות נמצאו'+(q||only?', מוצגות '+rows.length:'')+'.'+(state&&!state.settings['apps.enabled']&&catalog.some(a=>a.locked)?' שימו לב: "נעילת תוכנות" כבויה בלשונית "יכולות", ולכן הנעילות לא נאכפות.':'');
  $('catalog').replaceChildren(...rows.map(a=>el('tr',{},el('td',{},el('b',{},a.name),el('div',{class:'hint ltr',style:'margin:0;font-size:11px'},a.exePath)),el('td',{},el('span',{class:'badge'},SRCN[a.source]||a.source)),
-  el('td',{},sw(a.locked,i=>setApp(a,'lock',i),'נעולה')),el('td',{},sw(a.internetBlocked,i=>setApp(a,'internet',i),'בלי אינטרנט')),el('td',{},sw(a.directInternet,i=>setApp(a,'direct',i),'גישה ישירה',!direct&&!a.directInternet)))))}
+  el('td',{},sw(a.locked,i=>setApp(a,'lock',i),'נעולה')),el('td',{},sw(a.internetBlocked,i=>setApp(a,'internet',i),'בלי אינטרנט')),el('td',{},sw(a.directInternet,i=>setApp(a,'direct',i),'גישה ישירה',!direct&&!a.directInternet)),
+  el('td',{},el('button',{class:'link',onclick:e=>appHours(a,e.target.closest('tr'))},(a.hours||[]).length?'חסומה לפי שעות':'+ שעות')))))}
+// Blocked hours for one program, edited in a row under it.
+function appHours(a,tr){const open=tr.nextElementSibling;if(open&&open.classList.contains('hrs')){open.remove();return}
+ const box=el('div');(a.hours||[]).forEach(w=>box.append(winRow(w)));
+ const save=()=>post('/api/catalog/hours',{path:a.exePath,windows:JSON.stringify(readWins(box))}).then(c=>{catalog=c;load();renderCatalog();
+  toast(readWins(box).length?a.name+' תיחסם בשעות שנקבעו'+(scope?' (עבור '+scope+')':''):'הוסרו שעות החסימה של '+a.name)}).catch(fail);
+ tr.after(el('tr',{class:'hrs'},el('td',{colspan:6},el('div',{class:'hint',style:'margin:0'},'השעות שבהן '+a.name+' חסומה'+(scope?' עבור '+scope:'')+'. בשאר הזמן היא עובדת כרגיל (אלא אם היא מסומנת "נעולה").'),box,
+  el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.map(d=>d[0]),start:'22:00',end:'07:00'}))},'+ טווח שעות'),el('button',{onclick:save},'שמירה')))))}
 
 // Direct-connection attempts
 function loadDirect(){api('/api/direct',{},false).then(rows=>{$('direct').replaceChildren(...rows.map(d=>el('tr',{},el('td',{class:'l'},d.appPath),el('td',{},String(d.count)),el('td',{},new Date(d.last).toLocaleString('he-IL')),
@@ -473,20 +501,23 @@ function ownRow(a){const r=el('div',{class:'row',style:'margin-top:8px'});
 function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyoneLocked;$('users').replaceChildren(...u.accounts.filter(a=>!scope||a.name.toLowerCase()===scope.toLowerCase()).map(a=>{
  const wins=a.rule?a.rule.lockedDuring.windows:[];const box=el('div');wins.forEach(w=>box.append(winRow(w)));
  const warn=el('input',{type:'number',min:0,max:60,value:a.rule?a.rule.warningMinutes:5,style:'width:70px'});
- const status=a.unlockedUntil?el('span',{class:'badge ok'},'שוחרר זמנית עד '+new Date(a.unlockedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})):wins.length?el('span',{class:'badge'},'יש שעות נעילה'):el('span',{class:'badge'},'ללא הגבלה');
- const save=()=>post('/api/users/set',{user:a.name,windows:JSON.stringify(readWins(box)),warning:warn.value}).then(()=>{toast(readWins(box).length?'שעות הנעילה של '+a.name+' נשמרו':'הנעילה של '+a.name+' בוטלה');load();loadUsers()}).catch(fail);
+ const BR=[0,20,30,45,60,90,120,180];const cur=a.rule?a.rule.breakEveryMinutes||0:0;if(!BR.includes(cur))BR.push(cur);
+ const brk=el('select',{},...BR.sort((x,y)=>x-y).map(m=>el('option',{value:m,selected:m===cur},m?(m<60||m%60?m+' דקות':(m/60===1?'שעה':m/60+' שעות')):'כבוי')));
+ const status=a.unlockedUntil?el('span',{class:'badge ok'},'שוחרר זמנית עד '+new Date(a.unlockedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})):wins.length?el('span',{class:'badge'},'יש שעות נעילה'):cur?el('span',{class:'badge'},'הפסקה כל '+cur+' דקות'):el('span',{class:'badge'},'ללא הגבלה');
+ const save=()=>post('/api/users/set',{user:a.name,windows:JSON.stringify(readWins(box)),warning:warn.value,breakEvery:brk.value}).then(()=>{toast(readWins(box).length||+brk.value?'ההגדרות של '+a.name+' נשמרו':'הנעילה של '+a.name+' בוטלה');load();loadUsers()}).catch(fail);
  const mins=el('select',{},...[15,30,60,120,240].map(m=>el('option',{value:m},m<60?m+' דקות':(m/60)+' שעות')));
  const unlock=el('div',{class:'row',style:'margin-top:8px'},el('span',{class:'muted'},'שחרור זמני:'),mins,
   el('button',{class:'ghost',onclick:()=>post('/api/users/unlock',{user:a.name,minutes:mins.value}).then(()=>{toast(a.name+' יכול להשתמש במחשב גם בשעות הנעילה, למשך '+mins.selectedOptions[0].textContent);loadUsers()}).catch(fail)},'לשחרר'),
   a.unlockedUntil?el('button',{class:'link',onclick:()=>post('/api/users/unlock',{user:a.name,minutes:'0'}).then(()=>{toast('השחרור הזמני בוטל');loadUsers()}).catch(fail)},'ביטול השחרור'):null);
  return el('div',{class:'user'},el('div',{class:'row'},el('b',{},a.name),status),
   ownRow(a),
+  el('div',{class:'row',style:'margin-top:8px'},el('span',{},'מניעת התמכרות: יציאה אחרי'),brk,el('span',{class:'muted'},'של שימוש רציף')),
   el('div',{class:'hint',style:'margin:6px 0 0'},'שעות שבהן '+a.name+' לא יכול להיות מחובר:'),box,
   el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.slice(0,5).map(d=>d[0]),start:'23:00',end:'07:00'}))},'+ טווח שעות'),
    el('label',{},'התראה ',warn,' דקות לפני הניתוק'),el('button',{onclick:save},'שמירה')),wins.length?unlock:null)}))}).catch(fail)}
 
 // Activity
-const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר',boot:'אתחול',isp:'סינון'};
+const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר',boot:'אתחול',isp:'סינון',wifi:'Wi-Fi'};
 const hostOf=t=>{try{return new URL(/^[a-z]+:\/\//i.test(t)?t:'http://'+t).hostname}catch{return t}};
 const isFullUrl=t=>/^[a-z]+:\/\/[^/]+\/./i.test(t)||(/^[^:/]+\/./.test(t));
 // A row is changed in the rules of the account it came from (its own rules, or the general ones).

@@ -74,6 +74,7 @@ switch (cmd)
         builder.Services.AddSingleton<NetworkEnforcer>();
         builder.Services.AddSingleton<DirectConnectionWatcher>();
         builder.Services.AddSingleton<BootGuard>();
+        builder.Services.AddSingleton<WifiGuard>();
         builder.Services.AddSingleton<IspFilterMonitor>();
         builder.Services.AddSingleton<TrustedClock>();
         builder.Services.AddSingleton<AppCatalogScanner>();
