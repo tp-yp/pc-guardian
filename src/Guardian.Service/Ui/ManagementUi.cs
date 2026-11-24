@@ -20,7 +20,7 @@ namespace Guardian.Service.Ui;
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
 public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
-    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock)
+    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot)
     : BackgroundService
 {
     public const int Port = 8898;
@@ -83,7 +83,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.")) who = null;
 
             switch (path, req.HttpMethod)
             {
@@ -222,6 +222,40 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                         dnsLastError = dns.LastUpstreamError,
                     });
                     break;
+                case ("/api/dashboard", "GET"):
+                {
+                    var cfg = store.Load();
+                    var accounts = AppCatalogScanner.LocalAccounts();
+                    List<string> online;
+                    try { online = Native.Wts.UserSessions().Select(x => x.UserName).ToList(); } catch (Exception) { online = []; }
+                    var now = clock.LocalNow;
+                    var ispNow = IspState(cfg);
+                    await SendJson(res, 200, new
+                    {
+                        computer = new
+                        {
+                            network = cfg.Network.Enabled, urlFiltering = cfg.Network.UrlFiltering, boot = cfg.Boot.Lockdown,
+                            clock = cfg.Clock.Locked, vpn = cfg.Vpn.Block, isp = ispNow,
+                            otherFirewalls = SecurityProducts.ActiveThirdPartyFirewalls(),
+                        },
+                        general = UserScopes.Summarize(cfg, null),
+                        users = accounts.Select(a =>
+                        {
+                            var rule = cfg.UserLockouts.FirstOrDefault(r => Guardian.Core.Lockout.LockoutPlanner.SameUser(r.UserName, a));
+                            var until = exemptions.Until.TryGetValue(a, out var u) && u > now ? u : (DateTime?)null;
+                            return new
+                            {
+                                name = a,
+                                own = UserScopes.Find(cfg, a) != null,
+                                online = online.Any(o => Guardian.Core.Lockout.LockoutPlanner.SameUser(o, a)),
+                                lockedNow = until == null && rule != null && rule.LockedDuring.Windows.Count > 0 && rule.LockedDuring.Windows.Any(w => w.Contains(now)),
+                                unlockedUntil = until,
+                                summary = UserScopes.Summarize(cfg, a),
+                            };
+                        }),
+                    });
+                    break;
+                }
                 case ("/api/network/msupdates", "POST"):
                 {
                     var cfg = store.Load();
@@ -248,6 +282,9 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     await SendJson(res, 200, new { ok = true });
                     break;
                 }
+                case ("/api/boot", "GET"):
+                    await SendJson(res, 200, boot.Status);
+                    break;
                 case ("/api/isp", "GET"):
                     await SendJson(res, 200, IspState(store.Load()));
                     break;
@@ -379,6 +416,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["isp.netfree"] = c.IspFilter.Providers.Contains("NetFree", StringComparer.OrdinalIgnoreCase),
             ["isp.etrog"] = c.IspFilter.Providers.Contains("Etrog", StringComparer.OrdinalIgnoreCase),
             ["clock.locked"] = c.Clock.Locked,
+            ["vpn.block"] = c.Vpn.Block,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>

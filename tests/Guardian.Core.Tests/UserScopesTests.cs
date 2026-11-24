@@ -50,23 +50,44 @@ public class UserScopesTests
     }
 
     [Fact]
-    public void Shared_switches_and_lists_edited_through_a_user_go_to_general()
+    public void Program_switches_are_per_user_and_computer_lists_go_to_general()
     {
         var c = Cfg();
+        var generalEnabled = c.Apps.Enabled;
         UserScopes.TrySetOwnRules(c, "kid", true, out _);
         var view = UserScopes.View(c, "kid");
-        ConfigEditing.TrySetToggle(view, "apps.enabled", false, out _);
+        ConfigEditing.TrySetToggle(view, "apps.enabled", !generalEnabled, out _);
         ConfigEditing.TrySetToggle(view, "apps.defaultDeny", true, out _);
+        ConfigEditing.TrySetToggle(view, "network.urlFiltering", true, out _);
         AppCatalog.TrySet(view, @"C:\Epic\epic.exe", "direct", true, out _);
         UserScopes.Commit(c, view);
         c = RoundTrip(c);
 
-        Assert.False(c.Apps.Enabled);
-        Assert.False(c.Apps.DefaultDeny);                       // per-user switch stayed with the user
+        Assert.Equal(generalEnabled, c.Apps.Enabled);            // program switches stay with the user
+        Assert.Equal(!generalEnabled, UserScopes.Effective(c, "kid").Apps.Enabled);
+        Assert.False(c.Apps.DefaultDeny);
         Assert.True(UserScopes.Effective(c, "kid").Apps.DefaultDeny);
+        Assert.True(c.Network.UrlFiltering);                     // computer-wide switch
         Assert.Contains(@"C:\Epic\epic.exe", c.Network.AllowDirectApps);
         Assert.Empty(UserScopes.Find(c, "kid")!.Network.AllowDirectApps);
-        Assert.False(UserScopes.Effective(c, "kid").Apps.Enabled); // shared switch applies to the user too
+        Assert.True(UserScopes.AnyAppBlocking(c));
+    }
+
+    [Fact]
+    public void Dashboard_summary_reflects_each_scope()
+    {
+        var c = Cfg();
+        UserScopes.TrySetOwnRules(c, "kid", true, out _);
+        var view = UserScopes.View(c, "kid");
+        AppCatalog.TrySet(view, @"C:\Games\g.exe", "lock", true, out _);
+        AppCatalog.TrySet(view, @"C:\Games\g.exe", "internet", true, out _);
+        UserScopes.Commit(c, view);
+        var kid = UserScopes.Summarize(c, "kid");
+        var general = UserScopes.Summarize(c, null);
+        Assert.True(kid.AppsEnabled);
+        Assert.Equal(general.LockedApps + 1, kid.LockedApps);
+        Assert.Equal(general.NoInternetApps + 1, kid.NoInternetApps);
+        Assert.False(general.Schedule);
     }
 
     [Fact]

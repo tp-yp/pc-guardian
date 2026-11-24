@@ -24,7 +24,8 @@ public static class BootState
     public const string SafeBoot = "25000080";               // safeboot Minimal/Network/DsRepair
     public const string SafeBootAlternateShell = "26000081";  // safebootalternateshell
     public const string AutoRecoveryEnabled = "16000009";     // recoveryenabled
-    public const string BootMenuPolicy = "250000c2";          // 0 = Legacy (F8 works), 1 = Standard
+    public const string BootMenuPolicy = "250000c2";
+    public const string RecoverySequence = "14000008";       // {current} -> recovery environment loader (Advanced startup uses it)          // 0 = Legacy (F8 works), 1 = Standard
     public const string BootMgrDefault = "23000003";          // {bootmgr} default -> {current} id
     public const string BootMgrId = "{9dea862c-5cdd-4e70-acc1-f32b344d4795}";
 

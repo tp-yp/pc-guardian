@@ -26,6 +26,7 @@ public sealed class GuardianConfig
     /// <summary>Require the internet connection to go through an ISP content filter (NetFree, Etrog/NetSpark).</summary>
     public IspFilterPolicy IspFilter { get; set; } = new();
     public ClockPolicy Clock { get; set; } = new();
+    public VpnPolicy Vpn { get; set; } = new();
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
@@ -71,6 +72,12 @@ public sealed class BootPolicy
 /// their own root certificate. Guardian regularly opens TLS connections to well-known sites and checks
 /// who signed them. If it is not the filter, all internet traffic is blocked until the filter is back.
 /// </summary>
+/// <summary>Blocks VPN programs, VPN connections and proxies, which would get around the filtering.</summary>
+public sealed class VpnPolicy
+{
+    public bool Block { get; set; }
+}
+
 /// <summary>Keeps the computer's clock honest so schedules cannot be dodged by changing the time.</summary>
 public sealed class ClockPolicy
 {

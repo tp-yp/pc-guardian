@@ -8,8 +8,9 @@ namespace Guardian.Core.Policy;
 
 /// <summary>
 /// General rules plus optional per-account rules. A user without settings of their own follows the
-/// general rules. Feature switches (apps on/off, filtering on/off, trust Program Files, full-URL
-/// filtering) and the no-decrypt / direct-access lists are always shared.
+/// general rules. Program rules (including the program switches) and website lists are per account.
+/// What works for the whole computer stays shared: the network layer and full-URL filtering switches,
+/// the no-decrypt / direct-access lists, boot lockdown, the filtered-line check and the clock lock.
 /// </summary>
 public static class UserScopes
 {
@@ -24,17 +25,13 @@ public static class UserScopes
         return new GuardianConfig
         {
             ServiceName = cfg.ServiceName, WatchdogServiceName = cfg.WatchdogServiceName,
-            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock,
+            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn,
             Apps = Merge(cfg.Apps, p.Apps),
             Network = Merge(cfg.Network, p.Network),
         };
     }
 
-    private static AppPolicy Merge(AppPolicy g, AppPolicy u) => new()
-    {
-        Enabled = g.Enabled, TrustProgramFiles = g.TrustProgramFiles,
-        DefaultDeny = u.DefaultDeny, Rules = u.Rules,
-    };
+    private static AppPolicy Merge(AppPolicy g, AppPolicy u) => u;
 
     private static NetworkPolicy Merge(NetworkPolicy g, NetworkPolicy u) => new()
     {
@@ -51,21 +48,17 @@ public static class UserScopes
     {
         var p = Find(cfg, user);
         if (p is null) return cfg;
-        p.Apps.Enabled = cfg.Apps.Enabled;
-        p.Apps.TrustProgramFiles = cfg.Apps.TrustProgramFiles;
         p.Network.Enabled = cfg.Network.Enabled;
         p.Network.UrlFiltering = cfg.Network.UrlFiltering;
         p.Network.NoDecryptDomains = cfg.Network.NoDecryptDomains;
         p.Network.AllowDirectApps = cfg.Network.AllowDirectApps;
-        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock };
+        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn };
     }
 
     /// <summary>Copies shared switches changed through a user view back to the general settings.</summary>
     public static void Commit(GuardianConfig cfg, GuardianConfig view)
     {
         if (ReferenceEquals(cfg, view)) return;
-        cfg.Apps.Enabled = view.Apps.Enabled;
-        cfg.Apps.TrustProgramFiles = view.Apps.TrustProgramFiles;
         cfg.Network.Enabled = view.Network.Enabled;
         cfg.Network.UrlFiltering = view.Network.UrlFiltering;
         // Shared lists were edited in place (same list objects); keep the saved user entry lean.
@@ -86,7 +79,7 @@ public static class UserScopes
         cfg.UserPolicies.Add(new UserPolicy
         {
             UserName = user,
-            Apps = new AppPolicy { DefaultDeny = cfg.Apps.DefaultDeny, Rules = Copy(cfg.Apps.Rules) },
+            Apps = new AppPolicy { Enabled = cfg.Apps.Enabled, TrustProgramFiles = cfg.Apps.TrustProgramFiles, DefaultDeny = cfg.Apps.DefaultDeny, Rules = Copy(cfg.Apps.Rules) },
             Network = new NetworkPolicy
             {
                 Mode = cfg.Network.Mode, Domains = [.. cfg.Network.Domains], Exceptions = [.. cfg.Network.Exceptions],
@@ -94,6 +87,23 @@ public static class UserScopes
             },
         });
         return true;
+    }
+
+    /// <summary>True if program blocking is on for anyone (the general rules or any account).</summary>
+    public static bool AnyAppBlocking(GuardianConfig cfg) => cfg.Apps.Enabled || cfg.Vpn.Block || cfg.UserPolicies.Any(p => p.Apps.Enabled);
+
+    /// <summary>What is on for one scope, for the dashboard.</summary>
+    public static ScopeSummary Summarize(GuardianConfig cfg, string? user)
+    {
+        var e = Effective(cfg, user);
+        var simple = e.Apps.Rules.Where(r => r.When.Windows.Count == 0).ToList();
+        return new ScopeSummary(
+            AppsEnabled: e.Apps.Enabled, DefaultDeny: e.Apps.Enabled && e.Apps.DefaultDeny,
+            LockedApps: simple.Count(r => r.Action == RuleAction.Block),
+            NoInternetApps: e.Network.BlockedAppPaths.Count,
+            SitesOn: e.Network.Enabled, Allowlist: e.Network.Mode == UrlMode.Allowlist,
+            Sites: e.Network.Domains.Count, Exceptions: e.Network.Exceptions.Count,
+            Schedule: cfg.UserLockouts.Any(l => user != null && LockoutPlanner.SameUser(l.UserName, user) && l.LockedDuring.Windows.Count > 0));
     }
 
     private static List<AppRule> Copy(List<AppRule> rules) =>
@@ -105,8 +115,8 @@ public static class UserScopes
     /// enforced by the full-URL filter, which knows the program (and so the account) behind each request.
     /// </summary>
     public static bool DnsAllows(GuardianConfig cfg, string host) =>
-        DnsFilter.IsAllowed(cfg.Network, host) ||
-        cfg.UserPolicies.Any(p => DnsFilter.IsAllowed(Effective(cfg, p.UserName).Network, host));
+        !(cfg.Vpn.Block && VpnLists.IsVpnSite(host)) && (DnsFilter.IsAllowed(cfg.Network, host) ||
+        cfg.UserPolicies.Any(p => DnsFilter.IsAllowed(Effective(cfg, p.UserName).Network, host)));
 
     /// <summary>
     /// Firewall "no internet" rules. Returns each program with the accounts it is blocked for,
@@ -140,3 +150,7 @@ public static class UserScopes
     public static bool AnyHashRules(GuardianConfig cfg) =>
         cfg.Apps.Rules.Concat(cfg.UserPolicies.SelectMany(p => p.Apps.Rules)).Any(r => !string.IsNullOrEmpty(r.Sha256));
 }
+
+/// <summary>One dashboard panel: which protections are on for an account (or the general rules).</summary>
+public sealed record ScopeSummary(bool AppsEnabled, bool DefaultDeny, int LockedApps, int NoInternetApps,
+    bool SitesOn, bool Allowlist, int Sites, int Exceptions, bool Schedule);

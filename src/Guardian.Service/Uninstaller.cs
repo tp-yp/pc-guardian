@@ -40,17 +40,89 @@ public static class Uninstaller
         return services;
     }
 
-    /// <summary>Runs as the (admin) user after protections are lifted.</summary>
+    /// <summary>
+    /// Runs as the (admin) user after protections are lifted. Waits until the services have really
+    /// stopped, closes any Guardian window still open, and retries deleting the files; whatever is
+    /// still locked is deleted at the next restart, so nothing is left half-removed.
+    /// </summary>
     public static void RemoveServicesAndFiles(IEnumerable<string> services)
     {
-        foreach (var svc in services) Try(() => ServiceHardening.StopAndDelete(svc));
-        Thread.Sleep(1500);
+        foreach (var svc in services)
+        {
+            Try(() => Run("sc.exe", $"stop {svc}"));
+            Try(() =>
+            {
+                using var sc = new System.ServiceProcess.ServiceController(svc);
+                sc.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(20));
+            });
+            Try(() => Run("sc.exe", $"delete {svc}"));
+        }
+        Try(() => ServiceHardening.RemoveLeftovers([]));
+        Try(CloseOtherGuardianProcesses);
         Try(() => Registry.LocalMachine.DeleteSubKeyTree(ArpKey, false));
         Try(() => File.Delete(StartMenuLink));
         Try(() => File.Delete(OldStartMenuLink));
-        Try(() => Directory.Delete(Paths.InstallDir, recursive: true));
-        Try(() => Directory.Delete(Paths.DataDir, recursive: true));
+        foreach (var dir in new[] { Paths.InstallDir, Paths.DataDir }) DeleteOrScheduleDelete(dir);
     }
+
+    /// <summary>True if something of an earlier install is still there (files, services or the "Installed apps" entry).</summary>
+    public static bool HasLeftovers()
+    {
+        using var arp = Registry.LocalMachine.OpenSubKey(ArpKey);
+        return arp != null || Directory.Exists(Paths.InstallDir) || File.Exists(StartMenuLink);
+    }
+
+    private static void CloseOtherGuardianProcesses()
+    {
+        foreach (var p in Process.GetProcesses())
+        {
+            using (p)
+            {
+                if (p.Id == Environment.ProcessId) continue;
+                var path = Native.ProcessPath.Get(p.Id);
+                if (path != null && path.StartsWith(Paths.InstallDir, StringComparison.OrdinalIgnoreCase))
+                    Try(() => { p.Kill(entireProcessTree: true); p.WaitForExit(5000); });
+            }
+        }
+    }
+
+    private static void DeleteOrScheduleDelete(string dir)
+    {
+        for (var i = 0; i < 10 && Directory.Exists(dir); i++)
+        {
+            try { Directory.Delete(dir, recursive: true); }
+            catch (Exception) { Thread.Sleep(500); }
+        }
+        if (!Directory.Exists(dir)) return;
+        // Still locked: remove the rest when Windows restarts.
+        foreach (var f in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)) MoveFileEx(f, null, 4);
+        foreach (var d in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories).OrderByDescending(x => x.Length)) MoveFileEx(d, null, 4);
+        MoveFileEx(dir, null, 4); // MOVEFILE_DELAY_UNTIL_REBOOT
+    }
+
+    /// <summary>Removes pending "delete at restart" entries for Guardian's folders (left by an earlier removal).</summary>
+    public static void CancelScheduledDeletes()
+    {
+        using var k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager", writable: true);
+        if (k?.GetValue("PendingFileRenameOperations") is not string[] ops || ops.Length < 2) return;
+        static bool Ours(string p)
+        {
+            var path = p.StartsWith(@"\??\") ? p[4..] : p.TrimStart('!');
+            if (path.StartsWith(@"\??\")) path = path[4..];
+            return new[] { Paths.InstallDir, Paths.DataDir }.Any(d =>
+                path.Equals(d, StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith(d.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
+        }
+        var kept = new List<string>();
+        for (var i = 0; i + 1 < ops.Length; i += 2)
+            if (!(ops[i + 1].Length == 0 && Ours(ops[i]))) { kept.Add(ops[i]); kept.Add(ops[i + 1]); }
+        if (kept.Count == ops.Length) return;
+        if (kept.Count == 0) k.DeleteValue("PendingFileRenameOperations", false);
+        else k.SetValue("PendingFileRenameOperations", kept.ToArray(), RegistryValueKind.MultiString);
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool MoveFileEx(string existing, string? replacement, int flags);
 
     /// <summary>Adds Guardian to "Installed apps" and a Start-menu link to the management page.</summary>
     public static void RegisterInWindows(string exe)
