@@ -16,7 +16,7 @@ public sealed record ControlResponse(bool Ok, string Message);
 /// goes through the service, which runs as SYSTEM and checks the admin/recovery password.
 /// The pipe is reachable by local interactive users only; the password is the real gate.
 /// </summary>
-public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedConfigStore store, IHostApplicationLifetime life,
+public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedConfigStore store, IHostApplicationLifetime life, Enforcers.TrustedClock clock,
     Guardian.Service.Enforcers.LockoutExemptions exemptions, Guardian.Service.Enforcers.NetworkEnforcer network, AdminGate gate)
     : BackgroundService
 {
@@ -78,8 +78,8 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
             case "unlock":
                 if (string.IsNullOrWhiteSpace(req.Arg) || !int.TryParse(req.Payload, out var mins) || mins is < 1 or > 1440)
                     return new(false, "usage: unlock USER MINUTES");
-                exemptions.Until[req.Arg] = DateTime.Now.AddMinutes(mins);
-                return new(true, $"{req.Arg} unlocked until {DateTime.Now.AddMinutes(mins):HH:mm}.");
+                exemptions.Until[req.Arg] = clock.LocalNow.AddMinutes(mins);
+                return new(true, $"{req.Arg} unlocked until {clock.LocalNow.AddMinutes(mins):HH:mm}.");
             case "uninstall":
             {
                 // Running as SYSTEM: lift every protection and undo system changes;

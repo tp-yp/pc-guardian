@@ -19,18 +19,22 @@ public sealed class AppBlocker : IDisposable
 {
     private readonly ILogger<AppBlocker> _log;
     private readonly ConcurrentDictionary<string, (long Size, DateTime Mtime, string Hash)> _hashCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, (long Size, DateTime Mtime, string? Name)> _nameCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly string WindowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
     private readonly ConcurrentDictionary<string, DateTime> _lastNotified = new(StringComparer.OrdinalIgnoreCase);
     private readonly ManagementEventWatcher? _watcher;
     private volatile GuardianConfig? _cfg;
     private List<string> _trusted = [];
 
     private readonly AccessLog _access;
+    private readonly TrustedClock _clock;
     private readonly Lazy<string?> _selfHash = new(() => HashFile(Environment.ProcessPath!));
 
-    public AppBlocker(ILogger<AppBlocker> log, AccessLog access)
+    public AppBlocker(ILogger<AppBlocker> log, AccessLog access, TrustedClock clock)
     {
         _log = log;
         _access = access;
+        _clock = clock;
         try
         {
             _watcher = new ManagementEventWatcher(new WqlEventQuery("SELECT ProcessID FROM Win32_ProcessStartTrace"));
@@ -82,13 +86,16 @@ public sealed class AppBlocker : IDisposable
         // identified by identical file contents, not by name.
         if (Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) &&
             _selfHash.Value is { } self && Hash(path) == self) return;
+        // Essential parts of Windows (and Guardian's folder) are never closed, whatever the rules say.
+        if (ProtectedApps.IsProtected(path, WindowsDir, Paths.InstallDir)) return;
 
         // Each Windows account may have its own rules; unknown accounts follow the general ones.
         var user = cfg.UserPolicies.Count > 0 ? ProcessUser.Of(pid) : null;
         var rules = UserScopes.Effective(cfg, user).Apps;
         var hashNeeded = rules.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
-        var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null);
-        var decision = AppPolicyEvaluator.Evaluate(rules, info, DateTime.Now, _trusted);
+        var nameNeeded = rules.Rules.Any(r => r.Action == RuleAction.Block && (!string.IsNullOrEmpty(r.FileName) || !string.IsNullOrEmpty(r.OriginalName)));
+        var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null, nameNeeded ? OriginalName(path) : null);
+        var decision = AppPolicyEvaluator.Evaluate(rules, info, _clock.LocalNow, _trusted);
         if (decision.Action == RuleAction.Allow) return;
 
         try
@@ -126,6 +133,32 @@ public sealed class AppBlocker : IDisposable
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>The original file name written inside the program, which renaming the file does not change.</summary>
+    private string? OriginalName(string path)
+    {
+        try
+        {
+            var fi = new FileInfo(path);
+            if (_nameCache.TryGetValue(path, out var c) && c.Size == fi.Length && c.Mtime == fi.LastWriteTimeUtc) return c.Name;
+            var name = ReadOriginalName(path);
+            _nameCache[path] = (fi.Length, fi.LastWriteTimeUtc, name);
+            return name;
+        }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+    }
+
+    public static string? ReadOriginalName(string path)
+    {
+        try
+        {
+            var v = FileVersionInfo.GetVersionInfo(path);
+            var n = !string.IsNullOrWhiteSpace(v.OriginalFilename) ? v.OriginalFilename : v.InternalName;
+            return string.IsNullOrWhiteSpace(n) ? null : n.Trim();
+        }
+        catch (Exception) { return null; }
     }
 
     private static string DisplayName(string path)

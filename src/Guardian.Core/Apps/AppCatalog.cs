@@ -30,8 +30,9 @@ public static class AppCatalog
         return byPath.Values.OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
+    /// <summary>Protected parts of Windows (File Explorer and the like) are not listed: they cannot be restricted.</summary>
     public static List<CatalogEntry> WithState(IEnumerable<CatalogApp> apps, GuardianConfig cfg) =>
-        apps.Select(a => new CatalogEntry(a.Name, a.ExePath, a.Source,
+        apps.Where(a => !Policy.ProtectedApps.IsProtected(a.ExePath)).Select(a => new CatalogEntry(a.Name, a.ExePath, a.Source,
             Locked: IsLocked(cfg, a.ExePath),
             InternetBlocked: cfg.Network.BlockedAppPaths.Contains(a.ExePath, StringComparer.OrdinalIgnoreCase),
             DirectInternet: cfg.Network.AllowDirectApps.Contains(a.ExePath, StringComparer.OrdinalIgnoreCase))).ToList();
@@ -41,17 +42,23 @@ public static class AppCatalog
                                 string.Equals(r.PathPrefix, exe, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Applies one switch of the Programs screen. Locking also turns app blocking on.</summary>
-    public static bool TrySet(GuardianConfig cfg, string exe, string kind, bool on, out string error)
+    /// <param name="originalName">The name written inside the program, stored with a lock so renaming does not undo it.</param>
+    public static bool TrySet(GuardianConfig cfg, string exe, string kind, bool on, out string error, string? originalName = null)
     {
         error = "";
         if (!exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || exe.Any(char.IsControl) || exe.Length > 500)
         { error = "Invalid program."; return false; }
+        if (on && kind is "lock" or "internet" && Policy.ProtectedApps.IsProtected(exe)) { error = Config.ConfigEditing.ProtectedError; return false; }
         switch (kind)
         {
             case "lock":
                 cfg.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Block && r.When.Windows.Count == 0 &&
                                               string.Equals(r.PathPrefix, exe, StringComparison.OrdinalIgnoreCase));
-                if (on) { cfg.Apps.Rules.Add(new AppRule { Action = RuleAction.Block, PathPrefix = exe }); cfg.Apps.Enabled = true; }
+                if (on)
+                {
+                    cfg.Apps.Rules.Add(new AppRule { Action = RuleAction.Block, PathPrefix = exe, OriginalName = string.IsNullOrWhiteSpace(originalName) ? null : originalName.Trim() });
+                    cfg.Apps.Enabled = true;
+                }
                 return true;
             case "internet":
                 SetIn(cfg.Network.BlockedAppPaths, exe, on);

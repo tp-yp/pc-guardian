@@ -9,7 +9,7 @@ namespace Guardian.Service;
 /// </summary>
 public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
     NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy,
-    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp) : BackgroundService
+    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp, TrustedClock clock) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -36,6 +36,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
                 Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
                 log.LogInformation("Policy reloaded.");
             }
+            Run("clock", () => clock.Tick(cfg));
             Run("lockout", () => lockout.Tick(cfg));
             Run("apps", () => apps.Tick(cfg));
             var ispChanged = false;

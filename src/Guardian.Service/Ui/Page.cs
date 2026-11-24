@@ -106,13 +106,15 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 </div></section>
 <section class="wide" id="ispSec"><h2>אינטרנט רק דרך הסינון (נטפרי / אתרוג / נטספארק)</h2>
 <p class="hint">ספקי סינון כמו נטפרי ואתרוג חותמים על האתרים המוצפנים בתעודת אבטחה משלהם. Guardian מתחבר כל דקה לכמה אתרים מוכרים ובודק מי חתם על התעודה. אם החתימה של ספק הסינון, האינטרנט פתוח. אם לא (למשל חיבור לרשת אחרת, נקודה חמה מהטלפון או רשת אורחים), וכשהמתג "אינטרנט רק דרך הסינון" דולק, Guardian חוסם את כל האינטרנט במחשב עד שהחיבור חוזר לעבור דרך הסינון.</p>
+<div class="row" style="margin-top:6px"><b>הספק שלי:</b><label><input type="checkbox" id="ispNetfree"> נטפרי</label><label><input type="checkbox" id="ispEtrog"> אתרוג (מבוסס נטספארק)</label></div>
+<div id="ispNoProvider" class="warn" hidden>לא נבחר אף ספק ואין תעודה שסומכים עליה, לכן הסינון לעולם לא יזוהה.</div>
 <div id="ispStatus" style="margin:8px 0"></div>
 <div class="row"><button class="ghost" id="ispCheck">בדיקה עכשיו</button><button class="ghost" id="ispTrust">זה הסינון שלי, לסמוך על התעודה הזו</button></div>
 <div id="ispTrustNote" class="warn" hidden>לסמוך רק אם השם שמופיע למעלה הוא של ספק הסינון שלכם. אם תסמכו על תעודה של אתר רגיל, Guardian יחשוב שכל חיבור מסונן. <button id="ispTrustGo">כן, זה הסינון שלי</button> <button class="ghost" id="ispTrustCancel">ביטול</button></div>
 <details style="margin-top:10px"><summary><b>הגדרות מתקדמות: איך מזהים את הסינון</b></summary>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:10px">
-<div><h3>שמות של ספקי סינון</h3><p class="hint">אם אחד השמות האלה מופיע בשם של מי שחתם על התעודה, החיבור נחשב מסונן.</p>
-<form class="row add" data-list="ispNames"><input required style="flex:1" placeholder="NetFree"><button>הוספה</button></form><ul id="ispNames"></ul></div>
+<div><h3>שמות של ספקי סינון</h3><p class="hint">שמות נוספים, מעבר לספקים שסומנו למעלה. אם אחד מהם מופיע בשם של מי שחתם על התעודה, החיבור נחשב מסונן.</p>
+<form class="row add" data-list="ispNames"><input required style="flex:1" placeholder="שם של ספק אחר"><button>הוספה</button></form><ul id="ispNames"></ul></div>
 <div><h3>תעודות שסומכים עליהן</h3><p class="hint">טביעות אצבע (Thumbprint) של תעודות הסינון. נוסף כאן אוטומטית כשלוחצים "זה הסינון שלי". זו הדרך המדויקת ביותר.</p>
 <form class="row add" data-list="ispThumbprints"><input required style="flex:1;direction:ltr" placeholder="A1B2C3…"><button>הוספה</button></form><ul id="ispThumbprints"></ul></div>
 <div><h3>תוכנות של ספק הסינון</h3><p class="hint">רק אם ספק הסינון דורש תוכנה במחשב שרצה כשירות: היא תוכל להתחבר גם כשהאינטרנט חסום. נתיב מלא לקובץ.</p>
@@ -160,6 +162,7 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <section class="wide"><h2>איך לחסום אתרים</h2>
 <div class="row" style="margin-bottom:8px"><select id="mode"><option value="Blocklist">רשימה שחורה – הכול מותר, חוץ ממה שברשימה</option><option value="Allowlist">רשימה לבנה – הכול חסום, חוץ ממה שברשימה</option></select></div>
 <p class="hint" id="modeHint"></p>
+<div class="row" style="margin:8px 0"><button class="ghost" id="msUpdates">להתיר עדכוני ווינדוס ואופיס</button><span class="hint">פותח את כתובות העדכונים של Microsoft (גם ברשימה לבנה) ונותן גישה ישירה לתוכנת העדכון של Office.</span></div>
 <div id="netOff" class="warn" hidden>היכולת "סינון אתרים וחומת אש" כבויה כרגע, ולכן הרשימות כאן לא נאכפות. אפשר להדליק אותה בלשונית "יכולות".</div>
 <div id="urlOff" class="warn" hidden>"סינון לפי כתובת מלאה" כבוי, לכן כתובות עם נתיב (למשל youtube.com/shorts) לא נאכפות. רק אתרים שלמים נחסמים.</div>
 </section>
@@ -225,6 +228,14 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <section><h2>נעילת הממשק</h2>
 <p class="hint">אם לא נוגעים בחלון הזה במשך הזמן שנבחר, הוא ננעל ושוב צריך סיסמה. כך אף אחד לא יכול לשנות הגדרות אם שכחתם את החלון פתוח.</p>
 <div class="row"><label>לנעול אחרי <select id="idle"></select> דקות ללא פעילות</label></div></section>
+<section><h2>שינוי סיסמה</h2>
+<p class="hint">את סיסמת הניהול אפשר לשנות עם סיסמת הניהול או סיסמת ההצלה. את סיסמת ההצלה אפשר לשנות רק עם סיסמת ההצלה עצמה. לפחות 8 תווים, ושתי הסיסמאות צריכות להיות שונות.</p>
+<form id="pwf" style="display:grid;gap:8px">
+<select id="pwWhich"><option value="admin">סיסמת הניהול</option><option value="recovery">סיסמת ההצלה</option></select>
+<input type="password" id="pwCur" required placeholder="הסיסמה הנוכחית" autocomplete="current-password">
+<input type="password" id="pwNew" required minlength="8" placeholder="סיסמה חדשה" autocomplete="new-password">
+<input type="password" id="pwNew2" required minlength="8" placeholder="הסיסמה החדשה שוב" autocomplete="new-password">
+<div><button>שינוי הסיסמה</button></div></form></section>
 <section><h2>מצב החיבור</h2>
 <p class="hint">כאן רואים אם Guardian מצליח לברר כתובות אתרים. אם יש "מחובר, אין אינטרנט", הסתכלו כאן קודם.</p>
 <div id="health" class="hint"></div><button class="ghost" id="healthBtn">בדיקה</button></section>
@@ -240,12 +251,12 @@ input:disabled+.slider{opacity:.4;cursor:not-allowed}
 <script>
 const $=id=>document.getElementById(id);
 const el=(tag,props={},...kids)=>{const e=document.createElement(tag);for(const[k,v]of Object.entries(props)){if(k==='class')e.className=v;else if(k.startsWith('on'))e[k]=v;else if(k in e)e[k]=v;else e.setAttribute(k,v)}e.append(...kids.filter(x=>x!=null));return e};
-const HE={'Wrong password.':'הסיסמה שגויה.','Too many attempts. Try again later.':'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.','Login required.':'צריך להיכנס שוב.','Invalid value.':'הערך לא תקין.','Not in list.':'לא נמצא ברשימה.','Invalid program.':'התוכנה לא נמצאה.','Invalid user name.':'שם המשתמש לא תקין.','Pick at least one day for each time range.':'צריך לבחור לפחות יום אחד בכל טווח שעות.','Warning must be 0-60 minutes.':'זמן ההתראה צריך להיות בין 0 ל-60 דקות.','Internal error.':'שגיאה פנימית. נסו שוב.'};
+const HE={'Wrong password.':'הסיסמה שגויה.','Too many attempts. Try again later.':'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות.','Login required.':'צריך להיכנס שוב.','Invalid value.':'הערך לא תקין.','Not in list.':'לא נמצא ברשימה.','Invalid program.':'התוכנה לא נמצאה.','Invalid user name.':'שם המשתמש לא תקין.','Pick at least one day for each time range.':'צריך לבחור לפחות יום אחד בכל טווח שעות.','Warning must be 0-60 minutes.':'זמן ההתראה צריך להיות בין 0 ל-60 דקות.','Internal error.':'שגיאה פנימית. נסו שוב.','Password must be at least 8 characters.':'הסיסמה צריכה להיות באורך 8 תווים לפחות.','Must differ from the recovery password.':'סיסמת הניהול צריכה להיות שונה מסיסמת ההצלה.','Must differ from the admin password.':'סיסמת ההצלה צריכה להיות שונה מסיסמת הניהול.','Only the recovery password can change the recovery password.':'את סיסמת ההצלה אפשר לשנות רק עם סיסמת ההצלה הנוכחית.'};
 let idleMin=5,lastAct=Date.now(),lastPing=Date.now(),state=null;
 function toast(msg,bad){const t=$('toast');t.textContent=msg;t.className=bad?'bad':'';t.hidden=false;clearTimeout(t._t);t._t=setTimeout(()=>t.hidden=true,4500)}
 function api(p,o={},active=true){const h={'X-Guardian':'1','Content-Type':'application/json'};if(active)h['X-Active']='1';
  return fetch(p,{...o,headers:h,credentials:'same-origin'}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401&&p!=='/api/login'){show(false)}if(!r.ok)throw new Error(HE[j.error]||j.error||('שגיאה '+r.status));return j})}
-let scope='';const SCOPED=['/api/settings','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow'];
+let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow'];
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(SCOPED.includes(p)&&!('user' in b)?{...b,user:scope}:b)});
 const q=(p,extra)=>p+'?user='+encodeURIComponent(scope)+(extra||'');
 const short=u=>u?String(u).split('\\').pop():'';
@@ -273,6 +284,7 @@ const TOGGLES=[
  ['apps.trustProgramFiles','לסמוך על תוכנות שהותקנו כרגיל','תוכנות שהותקנו לתיקיית Program Files (התקנה רגילה שדורשת אישור מנהל) נחשבות מוכרות ולא נחסמות. מומלץ להשאיר דולק.'],
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
  ['isp.required','אינטרנט רק דרך הסינון','חוסם את כל האינטרנט כשהמחשב לא מחובר דרך ספק סינון (נטפרי, אתרוג או נטספארק). הזיהוי לפי תעודת האבטחה, והסבר מלא בהמשך העמוד. ההפעלה דורשת אישור, וכיבוי מחזיר את האינטרנט מיד.'],
+ ['clock.locked','נעילת השעון','Guardian לוקח את השעה הנכונה מהאינטרנט וסופר אותה בעצמו, כך ששינוי השעה או אזור הזמן במחשב לא עוקף את שעות הנעילה ואת התוכנות שחסומות לפי שעות. אם מישהו משנה את השעון, הוא חוזר לשעה הנכונה תוך כמה שניות.'],
  ['boot.lockdown','חסימת מצב בטוח וסביבת השחזור','מונע עקיפה של Guardian דרך מצב בטוח, "הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש) וסביבת השחזור של ווינדוס. תיקון אוטומטי ותפריט F8 מכובים גם הם. ההפעלה דורשת אישור, והכיבוי או ההסרה מחזירים הכול כמו שהיה.'],
  ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Guardian מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
 ];
@@ -296,6 +308,12 @@ function renderIspNow(i){const n=$('ispNow');n.replaceChildren(ispLine(i));
 function loadIsp(){return api('/api/isp',{},false).then(renderIsp).catch(()=>{})}
 function checkIsp(){$('ispStatus').replaceChildren(el('span',{class:'muted'},'בודק…'));return post('/api/isp/check',{}).then(renderIsp).catch(fail)}
 $('ispCheck').onclick=checkIsp;
+[['ispNetfree','isp.netfree'],['ispEtrog','isp.etrog']].forEach(([id,k])=>$(id).onchange=e=>post('/api/settings',{key:k,value:String(e.target.checked)}).then(st=>{render(st);loadIsp();toast('הספקים עודכנו')}).catch(x=>{fail(x);e.target.checked=!e.target.checked}));
+function renderProviders(st){$('ispNetfree').checked=st.settings['isp.netfree'];$('ispEtrog').checked=st.settings['isp.etrog'];
+ $('ispNoProvider').hidden=st.settings['isp.netfree']||st.settings['isp.etrog']||(st.lists.ispNames||[]).length>0||(st.lists.ispThumbprints||[]).length>0}
+$('msUpdates').onclick=()=>post('/api/network/msupdates',{}).then(st=>{render(st);toast('עדכוני ווינדוס ואופיס הותרו')}).catch(fail);
+$('pwf').onsubmit=e=>{e.preventDefault();if($('pwNew').value!==$('pwNew2').value){toast('שתי הסיסמאות החדשות לא זהות',true);return}
+ post('/api/password',{which:$('pwWhich').value,current:$('pwCur').value,next:$('pwNew').value}).then(()=>{['pwCur','pwNew','pwNew2'].forEach(i=>$(i).value='');toast('הסיסמה שונתה. שמרו אותה במקום בטוח.')}).catch(fail)};
 $('ispTrust').onclick=()=>$('ispTrustNote').hidden=false;
 $('ispTrustCancel').onclick=()=>$('ispTrustNote').hidden=true;
 $('ispTrustGo').onclick=()=>post('/api/isp/trust',{}).then(i=>{$('ispTrustNote').hidden=true;renderIsp(i);load();toast('התעודה נוספה לתעודות שסומכים עליהן')}).catch(fail);
@@ -327,7 +345,7 @@ function renderScope(st){const bar=$('scopebar');bar.hidden=!st.scopes.length&&!
  $('scopeUrlWarn').hidden=!(st.scopes.length&&!st.settings['network.urlFiltering'])}
 $('scope').onchange=e=>setScope(e.target.value);
 function setScope(u){scope=u||'';catalog=null;api(q('/api/state')).then(st=>{render(st);if(!document.querySelector('[data-page=programs]').hidden)loadCatalog(false);toast(scope?'עכשיו עורכים את ההגדרות הנפרדות של '+scope:'עכשיו עורכים את ההגדרות הכלליות')}).catch(fail)}
-function render(st){state=st;scope=st.scope||'';renderScope(st);idleMin=st.idleMinutes||5;renderToggles(st.settings);renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
+function render(st){state=st;scope=st.scope||'';renderScope(st);renderProviders(st);idleMin=st.idleMinutes||5;renderToggles(st.settings);renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
  $('idle').replaceChildren(...st.idleChoices.map(m=>el('option',{value:m,selected:m===idleMin},String(m))));if(catalog)renderCatalog()}
 function load(){api(q('/api/state')).then(render).catch(fail)}
 $('idle').onchange=e=>post('/api/settings/idle',{minutes:e.target.value}).then(st=>{render(st);toast('הממשק יינעל אחרי '+e.target.value+' דקות ללא פעילות')}).catch(fail);
@@ -404,7 +422,8 @@ $('pause').onchange=()=>tick();
 // Settings
 function loadHealth(){api('/api/health').then(h=>{$('health').replaceChildren(
  h.dnsLastSuccess?el('div',{class:'ok'},'בירור כתובות עובד. הצלחה אחרונה: '+new Date(h.dnsLastSuccess).toLocaleTimeString('he-IL')):el('div',{class:'muted'},'עדיין לא היו בירורי כתובות (סינון האתרים כבוי או שהשירות רק התחיל).'),
- h.dnsLastError?el('div',{class:'bad'},'שגיאה אחרונה: '+h.dnsLastError):null)}).catch(fail)}
+ h.dnsLastError?el('div',{class:'bad'},'שגיאה אחרונה: '+h.dnsLastError):'',
+ h.clockSynced?el('div',{class:'ok'},'השעה אומתה מול האינטרנט ב-'+new Date(h.clockLastSync).toLocaleTimeString('he-IL')+'. השעה הנכונה לפי Guardian: '+new Date(h.clockTrusted).toLocaleTimeString('he-IL')):el('div',{class:'muted'},'השעה עדיין לא אומתה מול האינטרנט.'))}).catch(fail)}
 $('healthBtn').onclick=loadHealth;
 $('uninstall').onclick=()=>{if(window.chrome&&chrome.webview){chrome.webview.postMessage('uninstall')}else{$('uninstallNote').hidden=false}};
 

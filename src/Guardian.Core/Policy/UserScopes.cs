@@ -24,7 +24,7 @@ public static class UserScopes
         return new GuardianConfig
         {
             ServiceName = cfg.ServiceName, WatchdogServiceName = cfg.WatchdogServiceName,
-            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter,
+            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock,
             Apps = Merge(cfg.Apps, p.Apps),
             Network = Merge(cfg.Network, p.Network),
         };
@@ -57,7 +57,7 @@ public static class UserScopes
         p.Network.UrlFiltering = cfg.Network.UrlFiltering;
         p.Network.NoDecryptDomains = cfg.Network.NoDecryptDomains;
         p.Network.AllowDirectApps = cfg.Network.AllowDirectApps;
-        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter };
+        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock };
     }
 
     /// <summary>Copies shared switches changed through a user view back to the general settings.</summary>
@@ -118,12 +118,12 @@ public static class UserScopes
         var cmp = StringComparer.OrdinalIgnoreCase;
         if (cfg.UserPolicies.Count == 0)
         {
-            foreach (var path in cfg.Network.BlockedAppPaths.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(cmp)) result.Add((path, null));
+            foreach (var path in cfg.Network.BlockedAppPaths.Where(x => !string.IsNullOrWhiteSpace(x) && !ProtectedApps.IsProtected(x)).Distinct(cmp)) result.Add((path, null));
             return result;
         }
         var general = accounts.Where(a => Find(cfg, a) is null).ToList();
         var all = cfg.Network.BlockedAppPaths.Concat(cfg.UserPolicies.SelectMany(p => p.Network.BlockedAppPaths))
-            .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(cmp);
+            .Where(x => !string.IsNullOrWhiteSpace(x) && !ProtectedApps.IsProtected(x)).Distinct(cmp);
         foreach (var path in all)
         {
             var users = new List<string>();
