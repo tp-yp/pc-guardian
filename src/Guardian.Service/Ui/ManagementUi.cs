@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Guardian.Core.Apps;
 using Guardian.Core.Config;
+using Guardian.Core.Network;
 using Guardian.Core.Policy;
 using Guardian.Core.Security;
 using Guardian.Core.Storage;
@@ -19,7 +20,7 @@ namespace Guardian.Service.Ui;
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
 public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
-    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns)
+    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp)
     : BackgroundService
 {
     public const int Port = 8898;
@@ -80,6 +81,9 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             // Which rules a request reads or edits: the general ones (no user) or one account's own rules.
             var who = body.GetValueOrDefault("user") ?? req.QueryString["user"];
             if (string.IsNullOrWhiteSpace(who)) who = null;
+            var shownWho = who;
+            // The filtered-line settings are for the whole computer, never one account.
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp")) who = null;
 
             switch (path, req.HttpMethod)
             {
@@ -213,6 +217,29 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                         dnsLastError = dns.LastUpstreamError,
                     });
                     break;
+                case ("/api/isp", "GET"):
+                    await SendJson(res, 200, IspState(store.Load()));
+                    break;
+                case ("/api/isp/check", "POST"):
+                {
+                    var cfg = store.Load();
+                    await isp.CheckAsync(cfg.IspFilter);
+                    await SendJson(res, 200, IspState(cfg));
+                    break;
+                }
+                case ("/api/isp/trust", "POST"):
+                {
+                    // "This is my filter": pin the top certificate of the chain seen right now.
+                    var cfg = store.Load();
+                    var chain = isp.Last.Chain;
+                    if (chain.Count == 0) { await SendJson(res, 400, new { error = "עדיין לא נמצאה תעודה. לחצו קודם על \"בדיקה עכשיו\"." }); break; }
+                    var thumb = IspFilterCheck.Normalize(chain[^1].Thumbprint);
+                    if (!cfg.IspFilter.Thumbprints.Any(t => IspFilterCheck.Normalize(t) == thumb)) cfg.IspFilter.Thumbprints.Add(thumb);
+                    store.Save(cfg);
+                    log.LogInformation("UI: trusted filter certificate {Thumb}", thumb);
+                    await SendJson(res, 200, IspState(cfg));
+                    break;
+                }
                 case ("/api/state", "GET"):
                     await SendJson(res, 200, State(store.Load(), who));
                     break;
@@ -276,6 +303,28 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         }
     }
 
+    private object IspState(GuardianConfig cfg)
+    {
+        var r = isp.Last;
+        // Shown against the saved settings, so a just-trusted certificate counts at once.
+        var status = r.Chain.Count > 0 && r.Status != IspFilterStatus.NoNetwork
+            ? (IspFilterCheck.IsFilterChain(cfg.IspFilter, r.Chain) ? IspFilterStatus.Filtered : IspFilterStatus.NotFiltered)
+            : r.Status;
+        return new
+        {
+            required = cfg.IspFilter.Required,
+            status = status.ToString(),
+            blocked = cfg.IspFilter.Required && status != IspFilterStatus.Filtered,
+            time = r.Status == IspFilterStatus.Unknown ? (DateTime?)null : r.Time,
+            detail = r.Detail,
+            signer = IspFilterCheck.Signer(r.Chain),
+            chain = r.Chain.Select(c => new { name = IspFilterCheck.ShortName(c.Subject), issuer = IspFilterCheck.ShortName(c.Issuer), thumbprint = c.Thumbprint }),
+            names = cfg.IspFilter.IssuerNames,
+            thumbprints = cfg.IspFilter.Thumbprints,
+            apps = cfg.IspFilter.ClientApps,
+        };
+    }
+
     private static object State(GuardianConfig cfg, string? who)
     {
         var c = UserScopes.View(cfg, who);
@@ -294,6 +343,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["network.enabled"] = c.Network.Enabled,
             ["network.urlFiltering"] = c.Network.UrlFiltering,
             ["boot.lockdown"] = c.Boot.Lockdown,
+            ["isp.required"] = c.IspFilter.Required,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>
@@ -305,6 +355,9 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["directApps"] = c.Network.AllowDirectApps,
             ["allowApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Allow),
             ["blockApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Block),
+            ["ispNames"] = c.IspFilter.IssuerNames,
+            ["ispThumbprints"] = c.IspFilter.Thumbprints,
+            ["ispApps"] = c.IspFilter.ClientApps,
         },
         lockouts = c.UserLockouts.Count,
         idleMinutes = c.UiIdleLockMinutes > 0 ? c.UiIdleLockMinutes : 5,

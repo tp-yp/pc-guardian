@@ -51,7 +51,7 @@ public static class ConfigEditing
     }
 
     public static readonly string[] Toggles =
-        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown"];
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required"];
 
     /// <summary>Turns one feature on or off.</summary>
     public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
@@ -71,6 +71,10 @@ public static class ConfigEditing
                 if (value) cfg.Network.Enabled = true; // the proxy relies on the network layer
                 return true;
             case "boot.lockdown": cfg.Boot.Lockdown = value; return true;
+            case "isp.required":
+                cfg.IspFilter.Required = value;
+                if (value) cfg.Network.Enabled = true; // the firewall part lives in the network layer
+                return true;
             default: error = "Unknown setting."; return false;
         }
     }
@@ -199,6 +203,9 @@ public static class ConfigEditing
             "exceptions" => cfg.Network.Exceptions,
             "blockedApps" => cfg.Network.BlockedAppPaths,
             "directApps" => cfg.Network.AllowDirectApps,
+            "ispNames" => cfg.IspFilter.IssuerNames,
+            "ispThumbprints" => cfg.IspFilter.Thumbprints,
+            "ispApps" => cfg.IspFilter.ClientApps,
             _ => null,
         };
         if (target is null) { error = "Unknown list."; return false; }
