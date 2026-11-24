@@ -1,6 +1,6 @@
 name: release
 # Create a release on GitHub (Releases > Draft a new release > Publish) and this workflow
-# builds guardian.exe and attaches it to that release as guardian-win-x64.zip.
+# builds guardian.exe and attaches it to that release as guardian-<tag>.exe (e.g. guardian-v0.9.0.exe).
 on:
   release:
     types: [published]
@@ -24,7 +24,7 @@ jobs:
       - run: dotnet test
       - run: dotnet publish src/Guardian.Service -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
       - shell: pwsh
-        run: Compress-Archive -Path publish/guardian.exe -DestinationPath guardian-win-x64.zip
+        run: Copy-Item publish/guardian.exe "guardian-$env:TAG.exe"
       - shell: pwsh
         env: { GH_TOKEN: '${{ github.token }}' }
-        run: gh release upload "$env:TAG" guardian-win-x64.zip --clobber --repo "${{ github.repository }}"
+        run: gh release upload "$env:TAG" "guardian-$env:TAG.exe" --clobber --repo "${{ github.repository }}"
