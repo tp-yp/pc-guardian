@@ -25,27 +25,80 @@ public static class Setup
         catch (System.ComponentModel.Win32Exception) { return false; }
     }
 
-    public static string Install(EncryptedConfigStore store, string adminPassword, string recoveryPassword, string? name = null)
+    public static string Install(EncryptedConfigStore store, string adminPassword, string recoveryPassword, string? name = null, int idleLockMinutes = 5)
     {
         name ??= ServiceNameGenerator.Generate();
         if (!ServiceNameGenerator.IsValid(name)) throw new ArgumentException("Invalid service name (letters/digits only).");
         if (adminPassword.Length < 8 || recoveryPassword.Length < 8) throw new ArgumentException("Passwords must be at least 8 characters.");
         if (adminPassword == recoveryPassword) throw new ArgumentException("The recovery password must differ from the admin password.");
 
-        Directory.CreateDirectory(Paths.InstallDir);
-        var exe = Path.Combine(Paths.InstallDir, name + ".exe");
-        File.Copy(Environment.ProcessPath!, exe, overwrite: true);
+        if (!GuardianConfig.IdleLockChoices.Contains(idleLockMinutes)) throw new ArgumentException("Choose when the settings lock themselves.");
 
         var watchdogName = ServiceNameGenerator.Generate();
         while (watchdogName == name) watchdogName = ServiceNameGenerator.Generate();
-        store.Save(GuardianConfig.CreateInitial(name, watchdogName,
-            PasswordHasher.Hash(adminPassword), PasswordHasher.Hash(recoveryPassword)));
-        DataDirSecurity.Lock(Paths.DataDir);
-        ServiceHardening.Install(name, exe);
-        ServiceHardening.Install(watchdogName, exe, "watchdog");
-        Uninstaller.RegisterInWindows(exe);
-        DataDirSecurity.Lock(Paths.InstallDir);
+        var cfg = GuardianConfig.CreateInitial(name, watchdogName, PasswordHasher.Hash(adminPassword), PasswordHasher.Hash(recoveryPassword));
+        cfg.UiIdleLockMinutes = idleLockMinutes;
+        InstallWithConfig(store, cfg);
         return name;
+    }
+
+    /// <summary>Copies this exe into place, writes the config, and creates both protected services.</summary>
+    private static void InstallWithConfig(EncryptedConfigStore store, GuardianConfig cfg)
+    {
+        Directory.CreateDirectory(Paths.InstallDir);
+        var exe = Path.Combine(Paths.InstallDir, cfg.ServiceName + ".exe");
+        File.Copy(Environment.ProcessPath!, exe, overwrite: true);
+        store.Save(cfg);
+        DataDirSecurity.Lock(Paths.DataDir);
+        ServiceHardening.Install(cfg.ServiceName, exe);
+        ServiceHardening.Install(cfg.WatchdogServiceName, exe, "watchdog");
+        Uninstaller.RegisterInWindows(exe);
+        DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true);
+    }
+
+    /// <summary>Installed? Read from "Installed apps" so it also works without admin rights.</summary>
+    public static bool IsInstalled() => InstalledExe() != null;
+
+    /// <summary>The installed exe, if any (from the "Installed apps" entry, readable by everyone).</summary>
+    public static string? InstalledExe()
+    {
+        using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(Uninstaller.ArpKey);
+        var p = k?.GetValue("DisplayIcon") as string;
+        return p != null && File.Exists(p) ? p : null;
+    }
+
+    /// <summary>True when this exe is a different build from the installed one.</summary>
+    public static bool IsDifferentBuildThanInstalled()
+    {
+        var installed = InstalledExe();
+        if (installed is null) return false;
+        if (string.Equals(Path.GetFullPath(installed), Path.GetFullPath(Environment.ProcessPath!), StringComparison.OrdinalIgnoreCase)) return false;
+        return HashFile(installed) != HashFile(Environment.ProcessPath!);
+    }
+
+    /// <summary>
+    /// Update to this build, keeping every setting and both passwords: a clean uninstall
+    /// (which works with any older version) followed by an install with the saved config.
+    /// </summary>
+    public static (bool Ok, string Message) Upgrade(EncryptedConfigStore store, string password)
+    {
+        if (!store.Exists) return (false, "Guardian is not installed.");
+        var saved = store.Load();
+        if (saved.UiIdleLockMinutes == 0) saved.UiIdleLockMinutes = 5;
+        var auth = new AdminGate().Authenticate(saved, password);
+        if (auth is not (AuthResult.Admin or AuthResult.Recovery)) return (false, "Wrong password.");
+        var (ok, message) = Uninstall(store, password);
+        if (!ok) return (false, message);
+        Thread.Sleep(2000);
+        try { InstallWithConfig(store, saved); }
+        catch (Exception ex) { return (false, "Removed the old version but installing the new one failed: " + ex.Message + " Run the file again to install."); }
+        return (true, "Updated. All settings were kept.");
+    }
+
+    private static string HashFile(string path)
+    {
+        using var fs = File.OpenRead(path);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fs));
     }
 
     /// <summary>Uninstalls with the admin or recovery password. Works even if the service is not running.</summary>

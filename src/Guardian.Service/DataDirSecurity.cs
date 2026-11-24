@@ -7,7 +7,9 @@ namespace Guardian.Service;
 /// Changes therefore have to go through the password-checked service.</summary>
 public static class DataDirSecurity
 {
-    public static void Lock(string dir)
+    /// <param name="usersCanRun">Program folder: every user may read and run the exe (the app window,
+    /// the uninstaller started from Settings). Config folder: no access for normal users.</param>
+    public static void Lock(string dir, bool usersCanRun = false)
     {
         var sec = new DirectorySecurity();
         sec.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
@@ -16,6 +18,9 @@ public static class DataDirSecurity
             FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
         sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
             FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
+        if (usersCanRun)
+            sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
         new DirectoryInfo(dir).SetAccessControl(sec);
     }
 

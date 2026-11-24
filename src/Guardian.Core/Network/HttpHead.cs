@@ -88,9 +88,10 @@ public sealed class HttpHead
             : (s.ToLowerInvariant(), defaultPort);
     }
 
-    public static byte[] BlockedResponse(string url)
+    public static byte[] BlockedResponse(string url, Func<string, string>? page = null)
     {
-        var body = $"<!doctype html><meta charset=utf-8><title>Blocked</title>" +
+        var body = page?.Invoke(url) ??
+                   $"<!doctype html><meta charset=utf-8><title>Blocked</title>" +
                    $"<body style=\"font-family:sans-serif;text-align:center;padding-top:15vh\">" +
                    $"<h1>&#128683; Blocked</h1><p>{System.Net.WebUtility.HtmlEncode(url)}</p></body>";
         var bytes = Encoding.UTF8.GetBytes(body);

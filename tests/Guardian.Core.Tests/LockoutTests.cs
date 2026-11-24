@@ -76,4 +76,22 @@ public class LockoutTests
         var bits = LogonHours.Compute(s, TimeZoneInfo.Utc, Mon);
         Assert.True(LogonHours.IsAllowed(bits, 24 + 22));
     }
+
+    [Fact]
+    public void Editing_a_users_schedule()
+    {
+        var cfg = GuardianConfig.CreateInitial("A1", "B2", "h", "h2");
+        var night = new TimeWindow([DayOfWeek.Sunday, DayOfWeek.Monday], new(22, 0), new(7, 0));
+        Assert.True(ConfigEditing.TrySetLockout(cfg, "Kid", [night], 5, out _));
+        Assert.True(ConfigEditing.TrySetLockout(cfg, "kid", [night, new([DayOfWeek.Friday], new(14, 0), new(23, 0))], 10, out _));
+        var rule = Assert.Single(cfg.UserLockouts);
+        Assert.Equal(2, rule.LockedDuring.Windows.Count);
+        Assert.Equal(10, rule.WarningMinutes);
+        Assert.False(ConfigEditing.EveryAccountHasLockout(cfg, ["Kid", "Parent"]));
+        Assert.True(ConfigEditing.EveryAccountHasLockout(cfg, ["Kid"]));
+        Assert.False(ConfigEditing.TrySetLockout(cfg, "bad\\name", [night], 5, out _));
+        Assert.False(ConfigEditing.TrySetLockout(cfg, "Kid", [new([], new(1, 0), new(2, 0))], 5, out _));
+        Assert.True(ConfigEditing.TrySetLockout(cfg, "KID", [], 5, out _));
+        Assert.Empty(cfg.UserLockouts);
+    }
 }

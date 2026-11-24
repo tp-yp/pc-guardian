@@ -26,33 +26,51 @@ async function post(data){const r=await fetch(location.pathname,{method:'POST',h
 
     public const string Install = Head + """
 <h1>התקנת Guardian</h1>
-<p>בוחרים שתי סיסמאות וזהו. אחרי ההתקנה <b>שום חסימה לא פעילה</b> – מדליקים כל יכולת בנפרד במסך הניהול.</p>
+<p>שלושה דברים קצרים וזהו. אחרי ההתקנה <b>שום דבר עוד לא נחסם</b> – בוחרים מה לחסום במסך הניהול, צעד אחרי צעד.</p>
 <form id="f">
-<label for="a1">סיסמת ניהול (8 תווים לפחות)</label><input id="a1" type="password" autocomplete="new-password" required minlength="8">
+<label for="a1">סיסמת ניהול – בה נכנסים למסך הניהול (8 תווים לפחות)</label><input id="a1" type="password" autocomplete="new-password" required minlength="8">
 <label for="a2">סיסמת ניהול – שוב</label><input id="a2" type="password" autocomplete="new-password" required>
-<label for="r1">סיסמה מצילה – פותחת הכול, כולל הסרה</label><input id="r1" type="password" autocomplete="new-password" required minlength="8">
+<label for="r1">סיסמה מצילה – "מפתח רזרבי" שפותח הכול, גם אם שוכחים את סיסמת הניהול</label><input id="r1" type="password" autocomplete="new-password" required minlength="8">
 <label for="r2">סיסמה מצילה – שוב</label><input id="r2" type="password" autocomplete="new-password" required>
-<div class="check"><input id="saved" type="checkbox"><label for="saved" style="margin:0">שמרתי את הסיסמה המצילה במקום בטוח (נייר, כספת, אדם אחר)</label></div>
+<label for="idle">מסך הניהול יינעל לבד אחרי כמה זמן בלי שימוש?</label>
+<select id="idle" required style="width:100%;font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text)">
+<option value="" selected disabled>בחר…</option><option value="1">דקה</option><option value="3">3 דקות</option><option value="5">5 דקות</option><option value="10">10 דקות</option><option value="15">15 דקות</option><option value="30">30 דקות</option></select>
+<div class="check"><input id="saved" type="checkbox"><label for="saved" style="margin:0">רשמתי את הסיסמה המצילה במקום בטוח (נייר, כספת, או אצל אדם אחר)</label></div>
 <button id="go">התקנה</button><div id="msg"></div></form>
-<div id="ok" class="done" hidden>✓ Guardian הותקן. מעבירים אותך למסך הניהול…<br>אפשר לפתוח אותו תמיד מתפריט התחל: <b>Guardian</b>.</div>
+<div id="ok" class="done" hidden>✓ Guardian הותקן. עוד רגע נפתח מסך הניהול…<br>אפשר לפתוח אותו תמיד מתפריט התחל: <b>Guardian</b>.</div>
 """ + Script + """
 <script>
 $('f').onsubmit=async e=>{e.preventDefault();const a=$('a1').value,r=$('r1').value;let m='';
-if(a.length<8||r.length<8)m='כל סיסמה צריכה להיות באורך 8 תווים לפחות.';else if(a!==$('a2').value)m='סיסמאות הניהול לא תואמות.';
-else if(r!==$('r2').value)m='הסיסמאות המצילות לא תואמות.';else if(a===r)m='הסיסמה המצילה חייבת להיות שונה מסיסמת הניהול.';
-else if(!$('saved').checked)m='סמן שהסיסמה המצילה שמורה – בלעדיה אי אפשר להסיר אם שוכחים את סיסמת הניהול.';
-$('msg').textContent=m;if(m)return;$('go').disabled=true;$('go').textContent='מתקין…';
-const res=await post({admin:a,recovery:r});
-if(res.ok){$('f').hidden=true;$('ok').hidden=false;setTimeout(()=>location.href=res.ui,4000)}else{$('msg').textContent=res.message||'ההתקנה נכשלה';$('go').disabled=false;$('go').textContent='התקנה'}};
+if(a.length<8||r.length<8)m='כל סיסמה צריכה להיות באורך 8 תווים לפחות.';else if(a!==$('a2').value)m='שתי סיסמאות הניהול לא זהות.';
+else if(r!==$('r2').value)m='שתי הסיסמאות המצילות לא זהות.';else if(a===r)m='הסיסמה המצילה חייבת להיות שונה מסיסמת הניהול.';
+else if(!$('idle').value)m='בחר אחרי כמה זמן מסך הניהול יינעל.';
+else if(!$('saved').checked)m='סמן שרשמת את הסיסמה המצילה – בלעדיה אי אפשר להסיר את התוכנה אם שוכחים את סיסמת הניהול.';
+$('msg').textContent=m;if(m)return;$('go').disabled=true;$('go').textContent='מתקין… (עד חצי דקה)';
+const res=await post({admin:a,recovery:r,idle:$('idle').value});
+if(res.ok){$('f').hidden=true;$('ok').hidden=false;setTimeout(()=>location.href=res.ui,6000)}else{$('msg').textContent=res.message||'ההתקנה נכשלה';$('go').disabled=false;$('go').textContent='התקנה'}};
+</script></div></body></html>
+""";
+
+    public const string Update = Head + """
+<h1>עדכון Guardian</h1>
+<p>נמצאה גרסה מותקנת. העדכון שומר את כל ההגדרות ואת הסיסמאות. במשך כמה שניות החסימות לא יפעלו.</p>
+<form id="f"><label for="p">סיסמת ניהול או סיסמה מצילה</label><input id="p" type="password" required autofocus>
+<button id="go">עדכון</button><div id="msg"></div></form>
+<div id="ok" class="done" hidden>✓ עודכן. עוד רגע נפתח מסך הניהול…</div>
+""" + Script + """
+<script>
+$('f').onsubmit=async e=>{e.preventDefault();$('go').disabled=true;$('go').textContent='מעדכן… (עד דקה)';
+const res=await post({password:$('p').value});
+if(res.ok){$('f').hidden=true;$('ok').hidden=false;setTimeout(()=>location.href=res.ui,8000)}else{$('msg').textContent=res.message||'העדכון נכשל';$('go').disabled=false;$('go').textContent='עדכון'}};
 </script></div></body></html>
 """;
 
     public const string Uninstall = Head + """
 <h1>הסרת Guardian</h1>
-<p>ההסרה מחזירה את המחשב למצבו הקודם: רשת, חשבונות, תעודות והגדרות.</p>
+<p>ההסרה מחזירה את המחשב בדיוק למצב שלפני ההתקנה: אינטרנט, חשבונות, תוכנות והגדרות.</p>
 <form id="f"><label for="p">סיסמת ניהול או סיסמה מצילה</label><input id="p" type="password" required autofocus>
 <button id="go">הסרה</button><div id="msg"></div></form>
-<div id="ok" class="done" hidden>✓ Guardian הוסר. אפשר לסגור את הדף.</div>
+<div id="ok" class="done" hidden>✓ Guardian הוסר. אפשר לסגור את החלון.<br><button onclick="chrome.webview&&chrome.webview.postMessage('close')" style="margin-top:10px">סגירה</button></div>
 """ + Script + """
 <script>
 $('f').onsubmit=async e=>{e.preventDefault();$('go').disabled=true;$('go').textContent='מסיר… (עד דקה)';

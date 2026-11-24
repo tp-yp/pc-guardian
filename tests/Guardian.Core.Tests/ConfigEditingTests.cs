@@ -68,6 +68,36 @@ public class ConfigEditingTests
     }
 
     [Fact]
+    public void Allowing_a_blocked_exe_from_the_activity_list_unblocks_it()
+    {
+        var c = Cfg();
+        c.Apps.Enabled = true;
+        const string exe = @"C:\Users\me\Downloads\tool.exe";
+        var now = new DateTime(2026, 11, 24, 10, 0, 0);
+        Assert.Equal(RuleAction.Block, Guardian.Core.Policy.AppPolicyEvaluator.Evaluate(c.Apps, new(exe, null), now).Action);
+        Assert.True(ConfigEditing.TryEditAppList(c, "allowApps", "add", exe, out _));
+        Assert.Equal(RuleAction.Allow, Guardian.Core.Policy.AppPolicyEvaluator.Evaluate(c.Apps, new(exe, null), now).Action);
+    }
+
+    [Fact]
+    public void Allowing_an_app_folder_covers_its_helpers_and_new_versions()
+    {
+        const string exe = @"C:\Users\me\AppData\Local\Discord\app-1.0.9\Discord.exe";
+        Assert.Equal(@"C:\Users\me\AppData\Local\Discord\", ConfigEditing.AppFolderOf(exe));
+        Assert.Equal(@"D:\Tools\", ConfigEditing.AppFolderOf(@"D:\Tools\x.exe"));
+        Assert.Equal(@"C:\Apps\Zoom\", ConfigEditing.AppFolderOf(@"C:\Apps\Zoom\bin\Zoom.exe"));
+
+        var c = Cfg();
+        c.Apps.Enabled = true;
+        ConfigEditing.TryEditAppList(c, "allowApps", "add", ConfigEditing.AppFolderOf(exe), out _);
+        var now = new DateTime(2026, 11, 24, 10, 0, 0);
+        Assert.Equal(RuleAction.Allow, Guardian.Core.Policy.AppPolicyEvaluator.Evaluate(c.Apps,
+            new(@"C:\Users\me\AppData\Local\Discord\Update.exe", null), now).Action);
+        Assert.Equal(RuleAction.Allow, Guardian.Core.Policy.AppPolicyEvaluator.Evaluate(c.Apps,
+            new(@"C:\Users\me\AppData\Local\Discord\app-1.0.10\Discord.exe", null), now).Action);
+    }
+
+    [Fact]
     public void App_list_editing()
     {
         var c = Cfg();

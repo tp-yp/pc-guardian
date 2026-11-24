@@ -48,8 +48,10 @@ public static class UrlPolicy
     public static bool IsUrlAllowed(NetworkPolicy policy, string host, string path)
     {
         if (!policy.Enabled) return true;
+        var blocklist = policy.Mode == UrlMode.Blocklist;
+        if (policy.Exceptions.Any(d => UrlMatches(d, host, path))) return blocklist;
         var listed = policy.Domains.Any(d => UrlMatches(d, host, path));
-        return policy.Mode == UrlMode.Blocklist ? !listed : listed;
+        return blocklist ? !listed : listed;
     }
 
     /// <summary>
@@ -59,9 +61,15 @@ public static class UrlPolicy
     public static bool IsHostAllowed(NetworkPolicy policy, string host)
     {
         if (!policy.Enabled) return true;
-        return policy.Mode == UrlMode.Blocklist
-            ? !policy.Domains.Any(d => ParseEntry(d) is { Path: "" } e && HostMatches(host, e.Host))
-            : policy.Domains.Any(d => HostMatches(host, ParseEntry(d).Host));
+        bool WholeHost(string d) => ParseEntry(d) is { Path: "" } e && HostMatches(host, e.Host);
+        if (policy.Mode == UrlMode.Blocklist)
+        {
+            // A blocked domain still resolves if some page on it is an exception (the proxy filters the rest).
+            if (policy.Exceptions.Any(d => HostMatches(host, ParseEntry(d).Host))) return true;
+            return !policy.Domains.Any(WholeHost);
+        }
+        if (policy.Exceptions.Any(WholeHost)) return false;
+        return policy.Domains.Any(d => HostMatches(host, ParseEntry(d).Host));
     }
 
     /// <summary>Accepts "host", "host/path" or a full URL.</summary>

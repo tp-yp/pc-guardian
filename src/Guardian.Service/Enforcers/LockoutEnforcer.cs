@@ -30,7 +30,7 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
             if (a.Kind == LockoutKind.Warn)
             {
                 log.LogInformation("Warning {User}: locking in {M} min", a.Session.UserName, a.MinutesLeft);
-                Wts.Notify(a.Session.SessionId, "Time limit", $"You will be signed out in {a.MinutesLeft} minute(s). Save your work.");
+                Wts.Notify(a.Session.SessionId, "Guardian", $"החשבון ייסגר בעוד {a.MinutesLeft} דקות לפי לוח הזמנים. כדאי לשמור את העבודה עכשיו.");
             }
             else
             {

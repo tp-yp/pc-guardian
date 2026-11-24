@@ -8,7 +8,8 @@ namespace Guardian.Service;
 /// One failing enforcer never stops the others.
 /// </summary>
 public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
-    NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy) : BackgroundService
+    NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy,
+    DirectConnectionWatcher direct) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -17,6 +18,8 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
         log.LogInformation("Policy host started as {Name}. Lockout rules: {L}, app rules: {A}, domains: {D}",
             cfg.ServiceName, cfg.UserLockouts.Count, cfg.Apps.Rules.Count, cfg.Network.Domains.Count);
 
+        // Older versions locked the program folder against normal users; fix that on every start.
+        Run("acl", () => DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true));
         dns.Update(cfg);
         proxy.Update(cfg);
         Run("network", () => network.Tick(cfg, force: true));
@@ -36,6 +39,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
             Run("lockout", () => lockout.Tick(cfg));
             Run("apps", () => apps.Tick(cfg));
             Run("network", () => network.Tick(cfg));
+            Run("direct", () => direct.SetActive(cfg.Network.Enabled && cfg.Network.UrlFiltering));
             Run("watchdog", () =>
             {
                 if (cfg.WatchdogServiceName.Length > 0 && ServiceHardening.EnsureRunning(cfg.WatchdogServiceName))
