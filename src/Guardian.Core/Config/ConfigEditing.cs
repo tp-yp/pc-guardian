@@ -199,7 +199,7 @@ public static class ConfigEditing
         var list = windows.ToList();
         if (list.Any(w => w.Days.Length == 0)) { error = "Pick at least one day for each time range."; return false; }
         if (warningMinutes is < 0 or > 60) { error = "Warning must be 0-60 minutes."; return false; }
-        if (breakEveryMinutes != 0 && breakEveryMinutes is < 10 or > 600) { error = "זמן השימוש הרציף צריך להיות בין 10 ל-600 דקות."; return false; }
+        if (breakEveryMinutes != 0 && breakEveryMinutes is < 5 or > 600) { error = "זמן השימוש הרציף צריך להיות בין 5 ל-600 דקות."; return false; }
         cfg.UserLockouts.RemoveAll(r => Lockout.LockoutPlanner.SameUser(r.UserName, user));
         if (list.Count > 0 || breakEveryMinutes > 0)
             cfg.UserLockouts.Add(new UserLockoutRule

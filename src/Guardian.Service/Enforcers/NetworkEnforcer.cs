@@ -150,8 +150,41 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         log.LogInformation("Firewall rules applied ({N})", wanted.Count);
     }
 
-    private static void EnsureFirewallOn(bool blockOutboundByDefault)
+    private static readonly string[] FirewallPolicyProfiles = ["DomainProfile", "StandardProfile", "PublicProfile", "PrivateProfile"];
+
+    /// <summary>
+    /// Turning the firewall off by policy (gpedit / registry) or disabling its service would silently drop
+    /// every Guardian rule; both are undone here, and the change is logged.
+    /// </summary>
+    private void EnsureFirewallService()
     {
+        foreach (var p in FirewallPolicyProfiles)
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SOFTWARE\Policies\Microsoft\WindowsFirewall\{p}", writable: true);
+            if (k?.GetValue("EnableFirewall") is int v && v == 0)
+            {
+                k.DeleteValue("EnableFirewall", false);
+                log.LogWarning("Firewall was switched off by policy ({Profile}); policy removed", p);
+            }
+        }
+        using (var svc = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\MpsSvc", writable: true))
+            if (svc?.GetValue("Start") is int start && start != 2)
+            {
+                svc.SetValue("Start", 2, Microsoft.Win32.RegistryValueKind.DWord);
+                log.LogWarning("Firewall service start type was {Start}; set back to automatic", start);
+            }
+        using var sc = new System.ServiceProcess.ServiceController("MpsSvc");
+        if (sc.Status == System.ServiceProcess.ServiceControllerStatus.Stopped)
+        {
+            sc.Start();
+            sc.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
+            log.LogWarning("Firewall service was stopped; started again");
+        }
+    }
+
+    private void EnsureFirewallOn(bool blockOutboundByDefault)
+    {
+        try { EnsureFirewallService(); } catch (Exception ex) { log.LogWarning(ex, "Could not check the firewall service"); }
         var fw = Fw();
         var wantedAction = blockOutboundByDefault ? 0 : 1; // NET_FW_ACTION_BLOCK / ALLOW
         foreach (var profile in new[] { 1, 2, 4 }) // domain, private, public
