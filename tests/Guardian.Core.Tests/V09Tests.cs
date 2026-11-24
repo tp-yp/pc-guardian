@@ -126,3 +126,30 @@ public class WifiTests
         Assert.Empty(cfg.Wifi.Allowed);
     }
 }
+
+public class AdminToolsTests
+{
+    [Theory]
+    [InlineData(@"C:\Windows\System32\cmd.exe", null, true)]
+    [InlineData(@"C:\Windows\WinSxS\amd64_x\powershell.exe", null, true)]
+    [InlineData(@"C:\Users\kid\Downloads\notes.exe", "Cmd.Exe", true)] // renamed copy
+    [InlineData(@"C:\Windows\System32\regedit.exe", null, true)]
+    [InlineData(@"C:\Windows\System32\taskmgr.exe", null, false)]
+    [InlineData(@"C:\Program Files\App\app.exe", "app.exe", false)]
+    public void Recognises_tools_by_name_and_inner_name(string path, string? orig, bool expected) =>
+        Assert.Equal(expected, AdminTools.Is(path, orig));
+
+    [Fact]
+    public void Switch_is_per_user_and_turns_on_blocking()
+    {
+        var cfg = new GuardianConfig();
+        cfg.Apps.Enabled = false;
+        UserScopes.TrySetOwnRules(cfg, "kid", true, out _);
+        var view = UserScopes.View(cfg, "kid");
+        Assert.True(ConfigEditing.TrySetToggle(view, "apps.blockAdminTools", true, out _));
+        UserScopes.Commit(cfg, view);
+        Assert.True(UserScopes.Effective(cfg, "kid").Apps.BlockAdminTools);
+        Assert.False(cfg.Apps.BlockAdminTools);
+        Assert.True(UserScopes.AnyAppBlocking(cfg));
+    }
+}

@@ -313,7 +313,7 @@ let idleMin=5,lastAct=Date.now(),lastPing=Date.now(),state=null;
 function toast(msg,bad){const t=$('toast');t.textContent=msg;t.className=bad?'bad':'';t.hidden=false;clearTimeout(t._t);t._t=setTimeout(()=>t.hidden=true,4500)}
 function api(p,o={},active=true){const h={'X-Guardian':'1','Content-Type':'application/json'};if(active)h['X-Active']='1';
  return fetch(p,{...o,headers:h,credentials:'same-origin'}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401&&p!=='/api/login'){show(false)}if(!r.ok)throw new Error(HE[j.error]||j.error||('שגיאה '+r.status));return j})}
-let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow'];
+let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow','/api/tools/unlock','/api/catalog/hours'];
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(SCOPED.includes(p)&&!('user' in b)?{...b,user:scope}:b)});
 const q=(p,extra)=>p+'?user='+encodeURIComponent(scope)+(extra||'');
 const short=u=>u?String(u).split('\\').pop():'';
@@ -341,6 +341,7 @@ const TOGGLES=[
  ['apps.enabled','נעילת תוכנות','תוכנות שסימנתם כ"נעולות" בלשונית "תוכנות" ייסגרו מיד כשמישהו פותח אותן, ויופיע מסך חסימה. בלי היכולת הזו, הסימונים לא נאכפים.'],
  ['apps.defaultDeny','חסימת כל תוכנה לא מוכרת','כל תוכנה שלא הותקנה כרגיל תיחסם: קבצים שהורדו, תוכנות ניידות, דיסק און קי ותוכנות שמתקינות את עצמן בלי אישור מנהל. כדי לאפשר אחת מהן, התירו אותה מלשונית "פעילות" או הוסיפו אותה ב"תוכנות" > "הוספה ידנית".','לפני שמדליקים: כדאי להדליק קודם את "נעילת תוכנות", לעבוד יום רגיל, ולראות בלשונית "פעילות" מה היה נחסם.'],
  ['apps.trustProgramFiles','לסמוך על תוכנות שהותקנו כרגיל','תוכנות שהותקנו לתיקיית Program Files (התקנה רגילה שדורשת אישור מנהל) נחשבות מוכרות ולא נחסמות. מומלץ להשאיר דולק.'],
+ ['apps.blockAdminTools','חסימת כלי מנהל','חוסם את שורת הפקודה, PowerShell, עורך הרישום, מסופי הניהול (שירותים, מתזמן משימות, מדיניות קבוצתית), פקודות הרשאות ושירותים, שחזור מערכת ואיפוס המחשב. כמעט כל הוראה לעקיפת Guardian עוברת דרך הכלים האלה, ולכן זו אחת ההגנות החזקות. גם עותק או שינוי שם של הכלי ייחסמו. מנהל המשימות וההגדרות נשארים פתוחים. כשצריך את הכלים, משחררים אותם לזמן קצוב מתחת למתג הזה.','לפני שמדליקים לחשבון שלכם: ודאו שאתם זוכרים את סיסמת Guardian, כי בלעדיה לא תוכלו לשחרר את הכלים.'],
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
  ['isp.required','אינטרנט רק דרך הסינון','חוסם את כל האינטרנט כשהמחשב לא מחובר דרך ספק סינון (נטפרי, אתרוג או נטספארק). הזיהוי לפי תעודת האבטחה, והסבר מלא בהמשך העמוד. ההפעלה דורשת אישור, וכיבוי מחזיר את האינטרנט מיד.'],
  ['vpn.block','חסימת VPN ופרוקסי','חוסם תוכנות VPN ופרוקסי מוכרות (גם אם שינו להן את השם), את אתרי ההורדה שלהן ואתרי פרוקסי מוכרים, את החיבורים של ה-VPN המובנה בווינדוס, ואת האפשרות להגדיר פרוקסי ידנית. ה-VPN המובנה מסוג SSTP משתמש באותו חיבור כמו אתרים רגילים ולא נחסם כאן, וגם תוכנה שלא ברשימה לא תיחסם לפי השם. לכן כדאי להפעיל גם "סינון לפי כתובת מלאה" או "חסימת כל תוכנה לא מוכרת".'],
@@ -350,7 +351,7 @@ const TOGGLES=[
  ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Guardian מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
 ];
 function sw(checked,onchange,label,disabled){const i=el('input',{type:'checkbox',checked,disabled:!!disabled});i.setAttribute('aria-label',label);i.onchange=()=>onchange(i);return el('label',{class:'switch',title:label},i,el('span',{class:'slider'}))}
-const PER_USER=['apps.enabled','apps.defaultDeny','apps.trustProgramFiles'];
+const PER_USER=['apps.enabled','apps.defaultDeny','apps.trustProgramFiles','apps.blockAdminTools'];
 function askBoot(){$('bootConfirm').hidden=false;$('bootAgree').checked=false;$('bootGo').disabled=true;$('bootConfirm').scrollIntoView({behavior:'smooth',block:'center'})}
 $('bootAgree').onchange=()=>$('bootGo').disabled=!$('bootAgree').checked;
 $('bootCancel').onclick=()=>$('bootConfirm').hidden=true;
@@ -391,7 +392,12 @@ $('ispCancel').onclick=()=>$('ispConfirm').hidden=true;
 $('ispGo').onclick=()=>post('/api/settings',{key:'isp.required',value:'true'}).then(st=>{$('ispConfirm').hidden=true;render(st);loadIsp();toast('"אינטרנט רק דרך הסינון" הופעל')}).catch(fail);
 setInterval(()=>{if(!$('app').hidden&&!document.querySelector('[data-page=features]').hidden)loadIsp()},30000);
 const ASK={'boot.lockdown':askBoot,'isp.required':askIsp};
+function toolsUnlock(){const m=el('select',{},...[15,30,60,120].map(x=>el('option',{value:x},x<60?x+' דקות':(x/60===1?'שעה':'שעתיים'))));
+ return el('div',{class:'row',style:'margin-top:6px'},el('small',{},'שחרור זמני'+(scope?' עבור '+scope:'')+':'),m,
+  el('button',{class:'ghost',onclick:()=>post('/api/tools/unlock',{minutes:m.value}).then(r=>toast('כלי המנהל משוחררים עד '+new Date(r.until).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}))).catch(fail)},'לשחרר'),
+  el('button',{class:'link',onclick:()=>post('/api/tools/unlock',{minutes:'0'}).then(()=>toast('כלי המנהל חסומים שוב')).catch(fail)},'לחסום שוב עכשיו'))}
 function renderToggles(s){$('toggles').replaceChildren(...TOGGLES.filter(([k])=>!scope||PER_USER.includes(k)).map(([k,t,d,w])=>{const txt=el('div',{},el('b',{},t),el('small',{},d));
+ if(k==='apps.blockAdminTools'&&s[k])txt.append(toolsUnlock());
  txt.append(el('small',{class:'badge',style:'display:inline-block;margin-top:4px'},PER_USER.includes(k)?(scope?'חל רק על '+scope:'ברירת מחדל: חל על משתמשים בלי הגדרות נפרדות'):'חל על כל המחשב'));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
  return el('div',{class:'toggle'},txt,sw(s[k],i=>(ASK[k]&&i.checked)?(i.checked=false,ASK[k]()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);if(k==='isp.required')loadIsp();if(k==='boot.lockdown')loadBoot();if(k==='wifi.knownOnly')loadWifi();toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
 
@@ -427,6 +433,7 @@ function scopeLines(m){return[
  stLine(m.appsEnabled,m.appsEnabled?'נעילת תוכנות פועלת'+(m.lockedApps?' ('+m.lockedApps+' נעולות)':'')+(m.timedApps?', '+m.timedApps+' לפי שעות':''):'נעילת תוכנות כבויה'),
  stLine(m.defaultDeny,m.defaultDeny?'תוכנות לא מוכרות נחסמות':'תוכנות לא מוכרות מותרות'),
  stLine(m.sitesOn,!m.sitesOn?'סינון אתרים כבוי':m.allowlist?'רשימה לבנה: '+m.sites+' אתרים מותרים':m.sites?m.sites+' אתרים חסומים':'אין אתרים חסומים'),
+ stLine(m.adminTools,m.adminTools?'כלי מנהל חסומים':'כלי מנהל פתוחים'),
  stLine(m.noInternetApps>0,m.noInternetApps?m.noInternetApps+' תוכנות בלי אינטרנט':'אין תוכנות בלי אינטרנט')]}
 const ISPDASH={Filtered:'מחובר דרך הסינון',NotFiltered:'לא מחובר דרך הסינון',NoNetwork:'אין רשת',Unknown:'עוד לא נבדק'};
 function renderDash(d){const c=d.computer;

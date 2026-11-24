@@ -51,7 +51,7 @@ public static class ConfigEditing
     }
 
     public static readonly string[] Toggles =
-        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked", "vpn.block", "wifi.knownOnly"];
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked", "vpn.block", "wifi.knownOnly", "apps.blockAdminTools"];
 
     /// <summary>Turns one feature on or off.</summary>
     public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
@@ -62,6 +62,7 @@ public static class ConfigEditing
             case "apps.enabled": cfg.Apps.Enabled = value; return true;
             case "apps.defaultDeny": cfg.Apps.DefaultDeny = value; return true;
             case "apps.trustProgramFiles": cfg.Apps.TrustProgramFiles = value; return true;
+            case "apps.blockAdminTools": cfg.Apps.BlockAdminTools = value; return true;
             case "network.enabled":
                 cfg.Network.Enabled = value;
                 if (!value) cfg.Network.UrlFiltering = false;

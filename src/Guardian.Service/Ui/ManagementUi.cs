@@ -20,7 +20,7 @@ namespace Guardian.Service.Ui;
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
 public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
-    AppCatalogScanner catalog, LockoutExemptions exemptions, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot)
+    AppCatalogScanner catalog, LockoutExemptions exemptions, AdminToolsExemptions toolsExempt, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot)
     : BackgroundService
 {
     public const int Port = 8898;
@@ -130,6 +130,17 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     store.Save(cfg);
                     log.LogInformation("UI: blocked hours for {Exe}: {N} ranges", exe, windows.Count);
                     await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
+                    break;
+                }
+                case ("/api/tools/unlock", "POST"):
+                {
+                    // Temporary release of the admin tools for the account being managed (or everyone in the general scope).
+                    if (!int.TryParse(body.GetValueOrDefault("minutes"), out var mins) || mins is < 0 or > 480)
+                    { await SendJson(res, 400, new { error = "Bad request." }); break; }
+                    var key = who ?? "*";
+                    if (mins == 0) toolsExempt.Until.TryRemove(key, out _); else toolsExempt.Until[key] = clock.LocalNow.AddMinutes(mins);
+                    log.LogInformation("UI: admin tools released for {Who} for {Min} min", key, mins);
+                    await SendJson(res, 200, new { ok = true, until = mins == 0 ? (DateTime?)null : toolsExempt.Until[key] });
                     break;
                 }
                 case ("/api/wifi", "GET"):
@@ -452,6 +463,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["apps.enabled"] = c.Apps.Enabled,
             ["apps.defaultDeny"] = c.Apps.DefaultDeny,
             ["apps.trustProgramFiles"] = c.Apps.TrustProgramFiles,
+            ["apps.blockAdminTools"] = c.Apps.BlockAdminTools,
             ["network.enabled"] = c.Network.Enabled,
             ["network.urlFiltering"] = c.Network.UrlFiltering,
             ["boot.lockdown"] = c.Boot.Lockdown,

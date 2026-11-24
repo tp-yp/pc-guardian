@@ -145,6 +145,8 @@ public sealed class AppPolicy
     /// <summary>Treat everything under Program Files as known (only admins can install there).
     /// Portable apps in Downloads, Desktop, USB drives etc. stay blocked by default.</summary>
     public bool TrustProgramFiles { get; set; } = true;
+    /// <summary>Block command line, PowerShell, registry editor and similar tools (see AdminTools).</summary>
+    public bool BlockAdminTools { get; set; }
     public List<AppRule> Rules { get; set; } = new();
 }
 

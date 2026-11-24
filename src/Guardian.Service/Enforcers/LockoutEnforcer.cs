@@ -11,6 +11,15 @@ public sealed class LockoutExemptions
     public ConcurrentDictionary<string, DateTime> Until { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
+/// <summary>Temporary release of the admin tools (password, from the management window). Key "*" = everyone.</summary>
+public sealed class AdminToolsExemptions
+{
+    public ConcurrentDictionary<string, DateTime> Until { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool IsExempt(string? user, DateTime now) =>
+        Until.Any(e => e.Value > now && (e.Key == "*" || (user != null && LockoutPlanner.SameUser(e.Key, user))));
+}
+
 /// <summary>
 /// Two layers: (1) Windows logon hours on the account, so the lock screen itself refuses sign-in
 /// for fully locked hours; (2) a 5-second loop that warns and signs out sessions minute-accurately.

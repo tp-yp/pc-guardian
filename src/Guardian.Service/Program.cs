@@ -68,6 +68,7 @@ switch (cmd)
         builder.Services.AddSingleton<AdminGate>();
         builder.Services.AddHostedService<Guardian.Service.Ui.ManagementUi>();
         builder.Services.AddSingleton<LockoutExemptions>();
+        builder.Services.AddSingleton<AdminToolsExemptions>();
         builder.Services.AddSingleton<LockoutEnforcer>();
         builder.Services.AddSingleton<AppBlocker>();
         builder.Services.AddSingleton<AccessLog>();
