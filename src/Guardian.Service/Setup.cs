@@ -49,7 +49,12 @@ public static class Setup
     /// </summary>
     private static void InstallWithConfig(EncryptedConfigStore store, GuardianConfig cfg, bool keepConfigOnFailure = false)
     {
-        try { ServiceHardening.RemoveLeftovers([cfg.ServiceName, cfg.WatchdogServiceName]); } catch { /* best effort */ }
+        // Any service still pointing into the install folder is from an earlier attempt (the old version was
+        // already uninstalled at this point), including ones with the same names that never started.
+        try { ServiceHardening.RemoveLeftovers([]); Thread.Sleep(1000); } catch { /* best effort */ }
+        // Folders may still be locked by an earlier attempt; the installer needs to write into them.
+        DataDirSecurity.ReclaimForInstall(Paths.InstallDir);
+        DataDirSecurity.ReclaimForInstall(Paths.DataDir);
         Directory.CreateDirectory(Paths.InstallDir);
         var exe = Path.Combine(Paths.InstallDir, cfg.ServiceName + ".exe");
         File.Copy(Environment.ProcessPath!, exe, overwrite: true);

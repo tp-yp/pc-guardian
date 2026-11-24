@@ -34,4 +34,20 @@ public static class DataDirSecurity
             FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
         new DirectoryInfo(dir).SetAccessControl(sec);
     }
+
+    /// <summary>
+    /// Makes a folder left locked by an earlier (failed or interrupted) install writable again for
+    /// the elevated installer. Takes ownership first if needed (administrators always may).
+    /// </summary>
+    public static void ReclaimForInstall(string dir)
+    {
+        if (!Directory.Exists(dir)) return;
+        try { Unlock(dir); return; }
+        catch (UnauthorizedAccessException) { }
+        catch (InvalidOperationException) { }
+        using (var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("takeown.exe", $"/F \"{dir}\" /R /A /D Y")
+               { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true })!)
+        { p.StandardOutput.ReadToEnd(); p.StandardError.ReadToEnd(); p.WaitForExit(); }
+        Unlock(dir);
+    }
 }
