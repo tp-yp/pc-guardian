@@ -223,6 +223,9 @@ public static class Setup
         try
         {
             var resp = ControlPipeServer.Send(new ControlRequest(forUpdate ? "uninstall-update" : "uninstall", password), timeoutMs: 5000);
+            // Versions before 0.9 do not know "uninstall-update" (and have no delay before turning off).
+            if (forUpdate && !resp.Ok && resp.Message == "Unknown command.")
+                resp = ControlPipeServer.Send(new ControlRequest("uninstall", password), timeoutMs: 5000);
             if (!resp.Ok) return (false, resp.Message);
             services = resp.Message.Split(',', StringSplitOptions.RemoveEmptyEntries);
             Thread.Sleep(1500);
