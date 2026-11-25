@@ -83,8 +83,10 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         var p = cfg.Network;
         var wanted = new List<(string Name, Action<dynamic> Setup)>
         {
-            ("Guardian DNS UDP", r => { r.Protocol = 17; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; }),
-            ("Guardian DNS TCP", r => { r.Protocol = 6; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; }),
+            // Programs people run may not ask other DNS servers. Guardian itself (a service) may: it asks the
+            // network's own DNS server for that network's internal names.
+            ("Guardian DNS UDP users", r => { r.Protocol = 17; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; r.LocalUserAuthorizedList = InteractiveSddl; }),
+            ("Guardian DNS TCP users", r => { r.Protocol = 6; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; r.LocalUserAuthorizedList = InteractiveSddl; }),
         };
         // "No internet" programs: for everyone, or (with per-account rules) only for some accounts.
         foreach (var (path, users) in Guardian.Core.Policy.UserScopes.InternetBlocks(cfg, cfg.UserPolicies.Count > 0 ? Accounts() : []))
@@ -105,7 +107,9 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         if (isolated)
         {
             // Programs people run: blocked outright (a block rule beats any allow rule Windows or an app added).
-            wanted.Add(("Guardian isolate users", r => { r.RemoteAddresses = NonLoopback; r.LocalUserAuthorizedList = InteractiveSddl; }));
+            // Home-network addresses the owner left out of the filter are not part of the block.
+            var outside = Guardian.Core.Network.LocalNetwork.Subtract(NonLoopback, p.LocalAddresses);
+            wanted.Add(($"Guardian isolate users {ShortHash(outside)}", r => { r.RemoteAddresses = outside; r.LocalUserAuthorizedList = InteractiveSddl; }));
             // Services: blocked by default; only Guardian (to keep checking), DHCP and the filter's own programs.
             var svchost = Path.Combine(Environment.SystemDirectory, "svchost.exe");
             wanted.Add(("Guardian isolate DHCP", r => { r.ApplicationName = svchost; r.Protocol = 17; r.RemotePorts = "67,547"; r.Action = 1; }));
@@ -122,6 +126,12 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
             foreach (var app in allow.Distinct(StringComparer.OrdinalIgnoreCase))
                 wanted.Add(($"Guardian allow {ShortHash(app)}", r => { r.ApplicationName = app; r.Action = 1; }));
         }
+
+        // Home-network addresses left out of the filter: any program may reach them directly
+        // (DNS to them stays blocked by the rules above, which win over this one).
+        var local = Guardian.Core.Network.LocalNetwork.FirewallList(p.LocalAddresses);
+        if (local.Length > 0 && (isolated || p.UrlFiltering))
+            wanted.Add(($"Guardian local network {ShortHash(local)}", r => { r.RemoteAddresses = local; r.Action = 1; }));
 
         var fw = Fw();
         var existing = new HashSet<string>();

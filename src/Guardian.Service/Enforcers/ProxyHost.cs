@@ -32,7 +32,9 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog, IspFi
         var cfg = _cfg;
         // Not on the filtered line: Guardian itself may still go out (it keeps checking), so the proxy
         // must refuse everything. An empty allow-list blocks every address.
-        if (isp.Isolated(cfg)) return new ProxyClient(NoFilterPolicy, "");
+        if (isp.Isolated(cfg))
+            return new ProxyClient(cfg.Network.LocalAddresses.Count == 0 ? NoFilterPolicy
+                : new NetworkPolicy { Enabled = true, Mode = UrlMode.Allowlist, LocalAddresses = cfg.Network.LocalAddresses }, "");
         var pid = Native.ProcessUser.OwnerOfLoopbackConnection(client.Port, Port, client.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6);
         var user = pid > 0 ? Native.ProcessUser.Of(pid) : null;
         return new ProxyClient(Guardian.Core.Policy.UserScopes.Effective(cfg, user).Network, user ?? "");

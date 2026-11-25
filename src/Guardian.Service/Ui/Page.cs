@@ -196,7 +196,8 @@ body[data-ctx=user] .machine{display:none!important}
 <b>נעולה</b> – התוכנה תיסגר מיד בכל פעם שמישהו ינסה לפתוח אותה, ויופיע מסך חסימה.<br>
 <b>בלי אינטרנט</b> – התוכנה תיפתח כרגיל, אבל לא תוכל להתחבר לאינטרנט.<br>
 <b>שעות</b> – התוכנה תיחסם רק בשעות שתקבעו (למשל משחק שמותר רק אחרי הצהריים). מחוץ לשעות האלה היא עובדת כרגיל, ואם היא פתוחה כשהשעה מגיעה, היא נסגרת.<br>
-<b>גישה ישירה</b> – רלוונטי רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תתחבר לאינטרנט בלי לעבור בסינון. מתאים למשחקים, Steam, Spotify ותוכנות שמפסיקות לעבוד כשהסינון דולק.</p>
+<b>גישה ישירה</b> – רלוונטי רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תתחבר לאינטרנט בלי לעבור בסינון. מתאים למשחקים, Steam, Spotify ותוכנות שמפסיקות לעבוד כשהסינון דולק.<br>
+<b>תוכנות של משתמש אחר</b> – בניהול של משתמש מופיעות רק תוכנות שמותקנות לכולם ותוכנות שהותקנו למשתמש הזה. תוכנה שנמצאת בתיקייה של משתמש אחר (למשל בהורדות שלו או ב-AppData שלו) חסומה אוטומטית לכל השאר, כל עוד "נעילת תוכנות" דולקת אצלם.</p>
 <div class="row"><input id="q" placeholder="חיפוש תוכנה…" style="flex:1;min-width:180px"><label><input type="checkbox" id="onlySet"> רק תוכנות עם הגבלה</label><button class="ghost" id="refresh">רענון הרשימה</button></div>
 <div id="catNote" class="hint" style="margin-top:8px"></div>
 <div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th><th>שעות חסימה</th></tr></thead><tbody id="catalog"></tbody></table></div>
@@ -234,6 +235,11 @@ body[data-ctx=user] .machine{display:none!important}
 <p class="hint">כדי לראות כתובת מלאה, Guardian פותח את התקשורת המוצפנת במחשב שלך (שום דבר לא יוצא מהמחשב). באתרים שברשימה הזו הוא לא עושה את זה, ובודק רק את שם האתר. מומלץ להוסיף כאן בנקים, קופות חולים ואתרים רשמיים. אם אתר מסוים מציג שגיאת אבטחה, הוסיפו אותו לכאן.</p>
 <form class="row add" data-list="noDecrypt"><input placeholder="bankhapoalim.co.il" required style="flex:1"><button>הוספה</button></form>
 <ul id="noDecrypt"></ul></section>
+<section class="wide machine"><h2>מכשירים ברשת המקומית (לא מסוננים)</h2>
+<p class="hint">כתובות במחשבים ובמכשירים שבבית, כמו שרת מקומי, מדפסת, NAS או הנתב, שהסינון לא חל עליהן: כל תוכנה יכולה להתחבר אליהן ישירות. אפשר לכתוב כתובת אחת (192.168.1.20) או טווח (192.168.1.0/24). מתקבלות רק כתובות של רשת מקומית, כך שאי אפשר לפתוח כאן את האינטרנט. חשוב: מכשיר שמוחרג כאן יכול בעצמו להעביר אינטרנט לא מסונן (למשל אם מריצים עליו שרת פרוקסי), לכן כדאי להחריג רק מכשירים שאתם סומכים עליהם.</p>
+<p class="hint">לא יודעים את הכתובת? הכפתור "כל הרשת המקומית" מחריג את כל הכתובות של רשתות מקומיות (בבית, במקום הלימודים, מדפסות). שמות של שרתים פנימיים ברשת (למשל של מאגר במקום הלימודים) Guardian שואל תמיד משרת השמות של אותה רשת, גם בלי הרשימה הזו. הרשימה נחוצה רק כש"סינון לפי כתובת מלאה" או "אינטרנט רק דרך הסינון" דולקים.</p>
+<form class="row add" data-list="localAddresses"><input required style="flex:1;direction:ltr" placeholder="192.168.1.20"><button>הוספה</button><button type="button" class="ghost" id="allLan">כל הרשת המקומית</button></form>
+<ul id="localAddresses"></ul></section>
 </div>
 
 <div class="page" data-sub-page="netapps" hidden>
@@ -423,6 +429,8 @@ $('wifiAdd').onclick=()=>{const n=$('wifiSaved').value;if(n)post('/api/wifi/list
 
 // Lists
 const APP_LISTS=['allowApps','blockApps'];
+const LAN_RANGES=['192.168.0.0/16','10.0.0.0/8','172.16.0.0/12','169.254.0.0/16','fc00::/7','fe80::/10'];
+document.addEventListener('click',e=>{if(e.target&&e.target.id==='allLan'){e.preventDefault();edit('localAddresses','add',LAN_RANGES.join(',')).then(()=>toast('כל הרשת המקומית הוחרגה מהסינון')).catch(()=>{})}});
 function renderList(id,items){$(id).replaceChildren(...(items.length?items.map(v=>el('li',{},el('span',{},v),el('button',{class:'link',onclick:()=>edit(id,'remove',v).then(()=>toast('הוסר: '+v))},'הסרה'))):[el('li',{class:'muted'},'הרשימה ריקה')]))}
 function edit(list,action,value){const url=APP_LISTS.includes(list)?'/api/apps/list':'/api/network/list';return post(url,{list,action,value}).then(render).catch(x=>{fail(x);throw x})}
 document.querySelectorAll('form.add').forEach(f=>f.onsubmit=e=>{e.preventDefault();const i=f.querySelector('input');const v=i.value.trim();edit(f.dataset.list,'add',v).then(()=>{i.value='';toast('נוסף: '+v)}).catch(()=>{})});
@@ -489,7 +497,7 @@ function setApp(a,kind,i){post('/api/catalog/set',{path:a.exePath,kind,value:Str
 function renderCatalog(){if(!catalog)return;const q=$('q').value.trim().toLowerCase(),only=$('onlySet').checked,direct=state&&state.settings['network.urlFiltering'];
  const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length));
  $('catNote').textContent=catalog.length+' תוכנות נמצאו'+(q||only?', מוצגות '+rows.length:'')+'.'+(state&&!state.settings['apps.enabled']&&catalog.some(a=>a.locked)?' שימו לב: "נעילת תוכנות" כבויה בלשונית "יכולות", ולכן הנעילות לא נאכפות.':'');
- $('catalog').replaceChildren(...rows.map(a=>el('tr',{},el('td',{},el('b',{},a.name),el('div',{class:'hint ltr',style:'margin:0;font-size:11px'},a.exePath)),el('td',{},el('span',{class:'badge'},SRCN[a.source]||a.source)),
+ $('catalog').replaceChildren(...rows.map(a=>el('tr',{},el('td',{},el('b',{},a.name),el('div',{class:'hint ltr',style:'margin:0;font-size:11px'},a.exePath)),el('td',{},el('span',{class:'badge'},SRCN[a.source]||a.source),a.owner?el('div',{class:'hint',style:'margin:2px 0 0;font-size:11px'},'של '+a.owner):''),
   el('td',{},sw(a.locked,i=>setApp(a,'lock',i),'נעולה')),el('td',{},sw(a.internetBlocked,i=>setApp(a,'internet',i),'בלי אינטרנט')),el('td',{},sw(a.directInternet,i=>setApp(a,'direct',i),'גישה ישירה',!direct&&!a.directInternet)),
   el('td',{},el('button',{class:'link',onclick:e=>appHours(a,e.target.closest('tr'))},(a.hours||[]).length?'חסומה לפי שעות':'+ שעות')))))}
 // Blocked hours for one program, edited in a row under it.

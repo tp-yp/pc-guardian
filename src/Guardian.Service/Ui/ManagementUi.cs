@@ -164,7 +164,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 case ("/api/catalog", "GET"):
                 {
                     var apps = await catalog.GetAsync(refresh: req.QueryString["refresh"] == "1");
-                    await SendJson(res, 200, AppCatalog.WithState(apps, UserScopes.View(store.Load(), who)));
+                    await SendJson(res, 200, CatalogFor(apps, store.Load(), who));
                     break;
                 }
                 case ("/api/catalog/set", "POST"):
@@ -177,7 +177,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     { await SendJson(res, 400, new { error = err }); break; }
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
-                    await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
+                    await SendJson(res, 200, CatalogFor(await catalog.GetAsync(), cfg, who));
                     break;
                 }
                 case ("/api/catalog/hours", "POST"):
@@ -193,7 +193,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     log.LogInformation("UI: blocked hours for {Exe}: {N} ranges", exe, windows.Count);
-                    await SendJson(res, 200, AppCatalog.WithState(await catalog.GetAsync(), UserScopes.View(cfg, who)));
+                    await SendJson(res, 200, CatalogFor(await catalog.GetAsync(), cfg, who));
                     break;
                 }
                 case ("/api/tools/unlock", "POST"):
@@ -549,6 +549,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["exceptions"] = c.Network.Exceptions,
             ["blockedApps"] = c.Network.BlockedAppPaths,
             ["directApps"] = c.Network.AllowDirectApps,
+            ["localAddresses"] = c.Network.LocalAddresses,
             ["allowApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Allow),
             ["blockApps"] = ConfigEditing.SimpleAppList(c, RuleAction.Block),
             // Provider names left by an older version are chosen with the provider boxes now, so they are not listed.
@@ -560,6 +561,10 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         idleMinutes = c.UiIdleLockMinutes > 0 ? c.UiIdleLockMinutes : 5,
         idleChoices = GuardianConfig.IdleLockChoices,
     };
+
+    /// <summary>The programs screen: for an account, only shared programs and its own (others' are blocked for it anyway).</summary>
+    private static List<CatalogEntry> CatalogFor(List<CatalogApp> apps, GuardianConfig cfg, string? who) =>
+        UserPrograms.ForUser(AppCatalog.WithState(apps, UserScopes.View(cfg, who)), who, Native.UserProfiles.Current());
 
     /// <summary>Carries out delayed changes whose time has come (measured on the trusted clock).</summary>
     private async Task ReplayLoop(CancellationToken ct)

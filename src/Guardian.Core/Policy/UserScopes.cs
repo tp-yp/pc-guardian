@@ -35,7 +35,7 @@ public static class UserScopes
 
     private static NetworkPolicy Merge(NetworkPolicy g, NetworkPolicy u) => new()
     {
-        Enabled = g.Enabled, UrlFiltering = g.UrlFiltering, NoDecryptDomains = g.NoDecryptDomains, AllowDirectApps = g.AllowDirectApps,
+        Enabled = g.Enabled, UrlFiltering = g.UrlFiltering, NoDecryptDomains = g.NoDecryptDomains, AllowDirectApps = g.AllowDirectApps, LocalAddresses = g.LocalAddresses,
         Mode = u.Mode, Domains = u.Domains, Exceptions = u.Exceptions, BlockedAppPaths = u.BlockedAppPaths,
     };
 
@@ -52,6 +52,7 @@ public static class UserScopes
         p.Network.UrlFiltering = cfg.Network.UrlFiltering;
         p.Network.NoDecryptDomains = cfg.Network.NoDecryptDomains;
         p.Network.AllowDirectApps = cfg.Network.AllowDirectApps;
+        p.Network.LocalAddresses = cfg.Network.LocalAddresses;
         return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi };
     }
 
@@ -64,6 +65,7 @@ public static class UserScopes
         // Shared lists were edited in place (same list objects); keep the saved user entry lean.
         view.Network.NoDecryptDomains = [];
         view.Network.AllowDirectApps = [];
+        view.Network.LocalAddresses = [];
     }
 
     /// <summary>Gives an account settings of its own, starting as a copy of the general rules.</summary>

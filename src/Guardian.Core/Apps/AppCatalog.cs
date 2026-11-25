@@ -8,8 +8,9 @@ public sealed record CatalogApp(string Name, string ExePath, AppSource Source);
 
 /// <summary>An app with its current Guardian state, as shown in the "Programs" screen.</summary>
 /// <param name="Hours">Times when the program is blocked (empty = no time limits).</param>
+/// <param name="Owner">The account the program was installed for (inside its profile folder), or null if shared.</param>
 public sealed record CatalogEntry(string Name, string ExePath, AppSource Source, bool Locked, bool InternetBlocked, bool DirectInternet,
-    List<Scheduling.TimeWindow>? Hours = null);
+    List<Scheduling.TimeWindow>? Hours = null, string? Owner = null);
 
 /// <summary>Merges apps found in the Start menu, "Installed apps" and the Store into one list.</summary>
 public static class AppCatalog

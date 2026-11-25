@@ -76,7 +76,8 @@ public sealed class FilterProxy(
 
             await clientStream.WriteAsync("HTTP/1.1 200 Connection Established\r\n\r\n"u8.ToArray(), ct);
 
-            if (p.NoDecryptDomains.Any(d => UrlPolicy.HostMatches(host, d)))
+            // Home-network addresses left out of the filter are passed through untouched (their own certificates stay).
+            if (p.NoDecryptDomains.Any(d => UrlPolicy.HostMatches(host, d)) || LocalNetwork.Contains(p.LocalAddresses, host))
             {
                 var ok = UrlPolicy.IsHostAllowed(p, host);
                 Log(who, host, host + " (tunnel)", ok);
