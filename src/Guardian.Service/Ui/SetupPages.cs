@@ -4,7 +4,7 @@ internal static class SetupPages
 {
     private const string Head = """
 <!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Guardian</title><style>
+<title>Geder</title><style>
 :root{--bg:#f6f7f9;--card:#fff;--text:#1d2330;--muted:#6b7280;--bad:#b91c1c;--accent:#2563eb;--line:#e5e7eb;--okbg:#ecfdf5}
 @media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1b2027;--text:#e6e9ee;--muted:#9aa3af;--bad:#f87171;--accent:#60a5fa;--line:#2b313a;--okbg:#12301f}}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);display:grid;place-items:center;min-height:100vh;padding:16px}
@@ -28,7 +28,7 @@ async function post(data){const r=await fetch(location.pathname,{method:'POST',h
 """;
 
     public const string Install = Head + """
-<h1>התקנת Guardian</h1>
+<h1>התקנת Geder</h1>
 <p>שלושה דברים קצרים וזהו. אחרי ההתקנה <b>שום דבר עוד לא נחסם</b> – בוחרים מה לחסום במסך הניהול, צעד אחרי צעד.</p>
 <!--SAC-->
 <form id="f">
@@ -41,7 +41,7 @@ async function post(data){const r=await fetch(location.pathname,{method:'POST',h
 <option value="" selected disabled>בחר…</option><option value="1">דקה</option><option value="3">3 דקות</option><option value="5">5 דקות</option><option value="10">10 דקות</option><option value="15">15 דקות</option><option value="30">30 דקות</option></select>
 <div class="check"><input id="saved" type="checkbox"><label for="saved" style="margin:0">רשמתי את הסיסמה המצילה במקום בטוח (נייר, כספת, או אצל אדם אחר)</label></div>
 <button id="go">התקנה</button><div id="msg"></div></form>
-<div id="ok" class="done" hidden>✓ Guardian הותקן. עוד רגע נפתח מסך הניהול…<br>אפשר לפתוח אותו תמיד מתפריט התחל: <b>Guardian</b>.</div>
+<div id="ok" class="done" hidden>✓ Geder הותקן. עוד רגע נפתח מסך הניהול…<br>אפשר לפתוח אותו תמיד מתפריט התחל: <b>Geder</b>.</div>
 """ + Script + """
 <script>
 $('f').onsubmit=async e=>{e.preventDefault();const a=$('a1').value,r=$('r1').value;let m='';
@@ -56,7 +56,7 @@ if(res.ok){$('f').hidden=true;$('ok').hidden=false;setTimeout(()=>location.href=
 """;
 
     public const string Update = Head + """
-<h1>עדכון Guardian</h1>
+<h1>עדכון Geder</h1>
 <p>נמצאה גרסה מותקנת. העדכון שומר את כל ההגדרות ואת הסיסמאות. במשך כמה שניות החסימות לא יפעלו.</p>
 <!--SAC-->
 <form id="f"><label for="p">סיסמת ניהול או סיסמה מצילה</label><input id="p" type="password" required autofocus>
@@ -71,11 +71,11 @@ if(res.ok){$('f').hidden=true;$('ok').hidden=false;setTimeout(()=>location.href=
 """;
 
     public const string Uninstall = Head + """
-<h1>הסרת Guardian</h1>
+<h1>הסרת Geder</h1>
 <p>ההסרה מחזירה את המחשב בדיוק למצב שלפני ההתקנה: אינטרנט, חשבונות, תוכנות והגדרות.</p>
 <form id="f"><label for="p">סיסמת ניהול או סיסמה מצילה</label><input id="p" type="password" required autofocus>
 <button id="go">הסרה</button><div id="msg"></div></form>
-<div id="ok" class="done" hidden>✓ Guardian הוסר. אפשר לסגור את החלון.<br><button onclick="chrome.webview&&chrome.webview.postMessage('close')" style="margin-top:10px">סגירה</button></div>
+<div id="ok" class="done" hidden>✓ Geder הוסר. אפשר לסגור את החלון.<br><button onclick="chrome.webview&&chrome.webview.postMessage('close')" style="margin-top:10px">סגירה</button></div>
 """ + Script + """
 <script>
 $('f').onsubmit=async e=>{e.preventDefault();$('go').disabled=true;$('go').textContent='מסיר… (עד דקה)';
@@ -86,8 +86,8 @@ if(res.ok){$('f').hidden=true;$('ok').hidden=false}else{$('msg').textContent=res
 
     /// <summary>Shown above the form when Smart App Control would stop Guardian from running.</summary>
     public static string SmartAppControlWarning(bool evaluation) => (evaluation
-        ? "<div class=\"sac\"><b>לפני ההתקנה: כדאי לכבות את \"בקרת אפליקציות חכמה\".</b><br>היא כרגע במצב הערכה, ווינדוס עלול להדליק אותה לבד בהמשך. אז הוא יפסיק להפעיל את Guardian, כי Guardian הוא תוכנה אישית בלי חתימה דיגיטלית מסחרית."
-        : "<div class=\"sac\"><b>צריך לכבות את \"בקרת אפליקציות חכמה\" לפני ההתקנה.</b><br>כשהיא פועלת, ווינדוס לא מאפשר להפעיל את Guardian, כי Guardian הוא תוכנה אישית בלי חתימה דיגיטלית מסחרית. ההתקנה תיכשל (בלי להשאיר שום דבר במחשב).")
+        ? "<div class=\"sac\"><b>לפני ההתקנה: כדאי לכבות את \"בקרת אפליקציות חכמה\".</b><br>היא כרגע במצב הערכה, ווינדוס עלול להדליק אותה לבד בהמשך. אז הוא יפסיק להפעיל את Geder, כי Geder הוא תוכנה אישית בלי חתימה דיגיטלית מסחרית."
+        : "<div class=\"sac\"><b>צריך לכבות את \"בקרת אפליקציות חכמה\" לפני ההתקנה.</b><br>כשהיא פועלת, ווינדוס לא מאפשר להפעיל את Geder, כי Geder הוא תוכנה אישית בלי חתימה דיגיטלית מסחרית. ההתקנה תיכשל (בלי להשאיר שום דבר במחשב).")
         + """
 <ol><li>פתח את "אבטחת Windows" (חפש בתפריט התחל).</li><li>"בקרת אפליקציות ודפדפן" > "הגדרות בקרת אפליקציות חכמה".</li><li>בחר "כבוי".</li></ol>
 האנטי-וירוס של ווינדוס ממשיך לפעול כרגיל. שים לב: בחלק מגרסאות ווינדוס אי אפשר להדליק אותה שוב בלי איפוס.<br>

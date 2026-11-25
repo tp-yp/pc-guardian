@@ -78,7 +78,7 @@ public sealed class DnsOrigins(ILogger<DnsOrigins> log) : IDisposable
             { pid = r.Pid; app = ProcessPath.Get(pid); }
             else return new(null, null);
         }
-        return new(app, ProcessUser.Of(pid));
+        return new(ProcessParent.Owner(pid, app).Path, ProcessUser.Of(pid));
     }
 
     public void Dispose() => SetActive(false);

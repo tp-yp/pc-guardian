@@ -1,6 +1,6 @@
 name: release
 # Create a release on GitHub (Releases > Draft a new release > Publish) and this workflow
-# builds guardian.exe and attaches it to that release as guardian-<tag>.exe (e.g. guardian-v0.9.0.exe).
+# builds geder.exe and attaches it to that release as geder-<tag>.exe (e.g. geder-v0.9.5.exe).
 on:
   release:
     types: [published]
@@ -24,7 +24,7 @@ jobs:
       - run: dotnet test
       - run: dotnet publish src/Guardian.Service -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
       - shell: pwsh
-        run: Copy-Item publish/guardian.exe "guardian-$env:TAG.exe"
+        run: Copy-Item publish/geder.exe "geder-$env:TAG.exe"
       - shell: pwsh
         env: { GH_TOKEN: '${{ github.token }}' }
-        run: gh release upload "$env:TAG" "guardian-$env:TAG.exe" --clobber --repo "${{ github.repository }}"
+        run: gh release upload "$env:TAG" "geder-$env:TAG.exe" --clobber --repo "${{ github.repository }}"

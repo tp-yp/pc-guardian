@@ -26,7 +26,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:3px}
 <div class="mark" aria-hidden="true"></div>
 <h1>התוכנה הזו חסומה</h1>
 <div class="what">{WebUtility.HtmlEncode(name)}</div>
-<p>Guardian לא מאפשר להפעיל אותה במחשב הזה.<br>אם צריך אותה, אפשר להתיר אותה במסך הניהול עם סיסמת הניהול.</p>
+<p>Geder לא מאפשר להפעיל אותה במחשב הזה.<br>אם צריך אותה, אפשר להתיר אותה במסך הניהול עם סיסמת הניהול.</p>
 <button onclick="chrome.webview.postMessage('close')" autofocus>הבנתי</button>
 </div></body></html>
 """;
@@ -36,7 +36,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:3px}
 <div class="mark" aria-hidden="true"></div>
 <h1>הכתובת הזו חסומה</h1>
 <div class="what">{WebUtility.HtmlEncode(url.Length > 160 ? url[..160] + "…" : url)}</div>
-<p>Guardian חוסם את הדף הזה במחשב הזה.<br>אם צריך אותו, אפשר להתיר אותו במסך הניהול ⇐ פעילות.</p>
+<p>Geder חוסם את הדף הזה במחשב הזה.<br>אם צריך אותו, אפשר להתיר אותו במסך הניהול ⇐ פעילות.</p>
 </div></body></html>
 """;
 
@@ -45,7 +45,7 @@ button:focus-visible{outline:2px solid #fff;outline-offset:3px}
 <div class="mark" aria-hidden="true"></div>
 <h1>אין חיבור דרך הסינון</h1>
 <div class="what">{WebUtility.HtmlEncode(url.Length > 160 ? url[..160] + "…" : url)}</div>
-<p>המחשב לא מחובר כרגע דרך ספק הסינון (נטפרי / אתרוג / נטספארק), ולכן Guardian חוסם את האינטרנט.<br>כשהחיבור יחזור לעבור דרך הסינון, האינטרנט ייפתח מעצמו תוך פחות מדקה.</p>
+<p>המחשב לא מחובר כרגע דרך ספק הסינון (נטפרי / אתרוג / נטספארק), ולכן Geder חוסם את האינטרנט.<br>כשהחיבור יחזור לעבור דרך הסינון, האינטרנט ייפתח מעצמו תוך פחות מדקה.</p>
 </div></body></html>
 """;
 }

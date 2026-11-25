@@ -37,7 +37,8 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog, IspFi
                 : new NetworkPolicy { Enabled = true, Mode = UrlMode.Allowlist, LocalAddresses = cfg.Network.LocalAddresses }, "");
         var pid = Native.ProcessUser.OwnerOfLoopbackConnection(client.Port, Port, client.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6);
         var user = pid > 0 ? Native.ProcessUser.Of(pid) : null;
-        return new ProxyClient(Guardian.Core.Policy.UserScopes.Effective(cfg, user).Network, user ?? "", pid > 0 ? Native.ProcessPath.Get(pid) : null);
+        var app = pid > 0 ? Native.ProcessParent.Owner(pid, Native.ProcessPath.Get(pid)).Path : null;
+        return new ProxyClient(Guardian.Core.Policy.UserScopes.Effective(cfg, user).Network, user ?? "", app);
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)

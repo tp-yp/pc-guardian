@@ -47,6 +47,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
             Run("tools", () => toolsPolicy.Tick(cfg));
             Run("direct", () => direct.SetActive(cfg.Network.Enabled && cfg.Network.UrlFiltering));
             Run("dns origins", () => dnsOrigins.SetActive(cfg.Network.Enabled));
+            Run("private browsing", () => BrowserPrivacy.Apply(cfg.Browsers.NoPrivate));
             Run("watchdog", () =>
             {
                 if (cfg.WatchdogServiceName.Length > 0 && ServiceHardening.EnsureRunning(cfg.WatchdogServiceName))

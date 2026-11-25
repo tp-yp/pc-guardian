@@ -28,6 +28,7 @@ public sealed class GuardianConfig
     public ClockPolicy Clock { get; set; } = new();
     public VpnPolicy Vpn { get; set; } = new();
     public WifiPolicy Wifi { get; set; } = new();
+    public BrowserPolicy Browsers { get; set; } = new();
     public CoolingPolicy Cooling { get; set; } = new();
 
     /// <summary>
@@ -113,6 +114,13 @@ public sealed class PendingChange
 }
 
 /// <summary>Wi-Fi: only networks already known to this computer may be joined (Windows' own network filters).</summary>
+/// <summary>Browser settings for the whole computer.</summary>
+public sealed class BrowserPolicy
+{
+    /// <summary>Private / incognito windows turned off in Edge, Chrome, Brave and Firefox (Brave's Tor windows too).</summary>
+    public bool NoPrivate { get; set; }
+}
+
 public sealed class WifiPolicy
 {
     public bool KnownOnly { get; set; }
@@ -187,6 +195,8 @@ public sealed class AppPolicy
     public bool TrustProgramFiles { get; set; } = true;
     /// <summary>Block command line, PowerShell, registry editor and similar tools (see AdminTools).</summary>
     public bool BlockAdminTools { get; set; }
+    /// <summary>Video players and programs opened with a video file are closed (see VideoFiles).</summary>
+    public bool BlockVideoFiles { get; set; }
     public List<AppRule> Rules { get; set; } = new();
 }
 

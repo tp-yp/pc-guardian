@@ -25,7 +25,7 @@ public static class UserScopes
         return new GuardianConfig
         {
             ServiceName = cfg.ServiceName, WatchdogServiceName = cfg.WatchdogServiceName,
-            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi,
+            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi, Browsers = cfg.Browsers,
             Apps = Merge(cfg.Apps, p.Apps),
             Network = Merge(cfg.Network, p.Network),
         };
@@ -53,7 +53,7 @@ public static class UserScopes
         p.Network.NoDecryptDomains = cfg.Network.NoDecryptDomains;
         p.Network.AllowDirectApps = cfg.Network.AllowDirectApps;
         p.Network.LocalAddresses = cfg.Network.LocalAddresses;
-        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi };
+        return new GuardianConfig { Apps = p.Apps, Network = p.Network, UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi, Browsers = cfg.Browsers };
     }
 
     /// <summary>Copies shared switches changed through a user view back to the general settings.</summary>
@@ -81,7 +81,7 @@ public static class UserScopes
         cfg.UserPolicies.Add(new UserPolicy
         {
             UserName = user,
-            Apps = new AppPolicy { Enabled = cfg.Apps.Enabled, TrustProgramFiles = cfg.Apps.TrustProgramFiles, BlockAdminTools = cfg.Apps.BlockAdminTools, DefaultDeny = cfg.Apps.DefaultDeny, Rules = Copy(cfg.Apps.Rules) },
+            Apps = new AppPolicy { Enabled = cfg.Apps.Enabled, TrustProgramFiles = cfg.Apps.TrustProgramFiles, BlockAdminTools = cfg.Apps.BlockAdminTools, BlockVideoFiles = cfg.Apps.BlockVideoFiles, DefaultDeny = cfg.Apps.DefaultDeny, Rules = Copy(cfg.Apps.Rules) },
             Network = new NetworkPolicy
             {
                 Mode = cfg.Network.Mode, Domains = [.. cfg.Network.Domains], Exceptions = [.. cfg.Network.Exceptions],
@@ -93,7 +93,8 @@ public static class UserScopes
     }
 
     /// <summary>True if program blocking is on for anyone (the general rules or any account).</summary>
-    public static bool AnyAppBlocking(GuardianConfig cfg) => cfg.Apps.Enabled || cfg.Apps.BlockAdminTools || cfg.Vpn.Block || cfg.UserPolicies.Any(p => p.Apps.Enabled || p.Apps.BlockAdminTools);
+    public static bool AnyAppBlocking(GuardianConfig cfg) => cfg.Apps.Enabled || cfg.Apps.BlockAdminTools || cfg.Apps.BlockVideoFiles || cfg.Vpn.Block ||
+        cfg.UserPolicies.Any(p => p.Apps.Enabled || p.Apps.BlockAdminTools || p.Apps.BlockVideoFiles);
 
     /// <summary>What is on for one scope, for the dashboard.</summary>
     public static ScopeSummary Summarize(GuardianConfig cfg, string? user)

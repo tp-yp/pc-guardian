@@ -86,7 +86,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.") || (body.GetValueOrDefault("key") ?? "").StartsWith("browser.")) who = null;
 
             // "Delay before turning off": a change that weakens protection is kept and carried out later.
             if (req.HttpMethod == "POST" && !IsReplay(req))
@@ -547,6 +547,8 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["apps.defaultDeny"] = c.Apps.DefaultDeny,
             ["apps.trustProgramFiles"] = c.Apps.TrustProgramFiles,
             ["apps.blockAdminTools"] = c.Apps.BlockAdminTools,
+            ["apps.blockVideo"] = c.Apps.BlockVideoFiles,
+            ["browser.noPrivate"] = c.Browsers.NoPrivate,
             ["network.enabled"] = c.Network.Enabled,
             ["network.urlFiltering"] = c.Network.UrlFiltering,
             ["boot.lockdown"] = c.Boot.Lockdown,

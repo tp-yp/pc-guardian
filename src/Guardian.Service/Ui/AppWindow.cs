@@ -200,5 +200,5 @@ internal sealed class AppWindow
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int MessageBoxW(IntPtr h, string text, string caption, uint type);
 
     /// <summary>Simple RTL message box (used when WebView2 is missing).</summary>
-    public static void Message(string text) => MessageBoxW(IntPtr.Zero, text, "Guardian", 0x40 | 0x00080000 | 0x00100000);
+    public static void Message(string text) => MessageBoxW(IntPtr.Zero, text, "Geder", 0x40 | 0x00080000 | 0x00100000);
 }
