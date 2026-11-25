@@ -131,7 +131,7 @@ public sealed class AppBlocker : IDisposable
         {
             proc.Kill(entireProcessTree: true);
             _log.LogInformation("Blocked {Path} (pid {Pid}): {Reason}", path, pid, reason);
-            _access.Add("app", path, allowed: false, user ?? ProcessUser.Of(pid));
+            _access.Add("app", path, allowed: false, user ?? ProcessUser.Of(pid), path);
             NotifyOnce(proc.SessionId, path);
         }
         catch (Exception ex) { _log.LogWarning(ex, "Could not terminate {Path}", path); }

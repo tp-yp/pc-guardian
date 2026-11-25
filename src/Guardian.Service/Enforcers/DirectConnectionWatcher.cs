@@ -58,7 +58,7 @@ public sealed class DirectConnectionWatcher(ILogger<DirectConnectionWatcher> log
         var now = DateTime.Now;
         var prev = _seen.TryGetValue(app, out var p) ? p : null;
         _seen[app] = new DirectAttempt(app, $"{dest}:{port}", (prev?.Count ?? 0) + 1, now);
-        if (prev is null || now - prev.Last > TimeSpan.FromMinutes(1)) accessLog.Add("direct", app, allowed: false);
+        if (prev is null || now - prev.Last > TimeSpan.FromMinutes(1)) accessLog.Add("direct", app, allowed: false, app: app);
     }
 
     /// <summary>\Device\HarddiskVolume3\Program Files\x.exe -> C:\Program Files\x.exe</summary>

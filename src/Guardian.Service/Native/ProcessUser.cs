@@ -88,5 +88,41 @@ internal static class ProcessUser
         return 0;
     }
 
+    [DllImport("iphlpapi.dll", SetLastError = true)]
+    private static extern uint GetExtendedUdpTable(IntPtr table, ref int size, bool order, int af, int tableClass, uint reserved);
+    private const int UDP_TABLE_OWNER_PID = 1;
+
+    /// <summary>PID of the local process that owns UDP port <paramref name="localPort"/>, or 0 if not found.</summary>
+    public static int OwnerOfUdpPort(int localPort, bool v6)
+    {
+        var af = v6 ? AF_INET6 : AF_INET;
+        var size = 0;
+        GetExtendedUdpTable(IntPtr.Zero, ref size, false, af, UDP_TABLE_OWNER_PID, 0);
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var buf = Marshal.AllocHGlobal(size);
+            try
+            {
+                var rc = GetExtendedUdpTable(buf, ref size, false, af, UDP_TABLE_OWNER_PID, 0);
+                if (rc == 122) continue;
+                if (rc != 0) return 0;
+                var count = Marshal.ReadInt32(buf);
+                // MIB_UDPROW_OWNER_PID: localAddr, localPort, pid (3 x DWORD)
+                // MIB_UDP6ROW_OWNER_PID: localAddr[16], localScopeId, localPort, pid
+                var rowSize = v6 ? 28 : 12;
+                for (var i = 0; i < count; i++)
+                {
+                    var row = buf + 4 + i * rowSize;
+                    var (lport, pid) = v6 ? (Port(Marshal.ReadInt32(row, 20)), Marshal.ReadInt32(row, 24))
+                                          : (Port(Marshal.ReadInt32(row, 4)), Marshal.ReadInt32(row, 8));
+                    if (lport == localPort) return pid;
+                }
+                return 0;
+            }
+            finally { Marshal.FreeHGlobal(buf); }
+        }
+        return 0;
+    }
+
     private static int Port(int raw) => (ushort)IPAddress.NetworkToHostOrder((short)(raw & 0xFFFF));
 }

@@ -236,7 +236,7 @@ public static class Setup
             var cfg = store.Load();
             var auth = new AdminGate().Authenticate(cfg, password);
             if (auth is not (AuthResult.Admin or AuthResult.Recovery)) return (false, "Access denied.");
-            if (!forUpdate && cfg.Cooling.Hours > 0 && !(cfg.Cooling.UninstallDueUtc is { } due && due <= DateTime.UtcNow))
+            if (!forUpdate && cfg.Cooling.Minutes > 0 && !(cfg.Cooling.UninstallDueUtc is { } due && due <= DateTime.UtcNow))
                 return (false, "ההסרה מושהית (השהיית כיבוי). בקשו הסרה בחלון הניהול והמתינו לזמן שנקבע.");
             services = new[] { cfg.ServiceName, cfg.WatchdogServiceName }.Where(n => n.Length > 0).ToArray();
             if (!Uninstaller.LiftProtectionsViaSystemTask(password))

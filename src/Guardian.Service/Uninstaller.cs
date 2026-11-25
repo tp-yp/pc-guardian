@@ -33,7 +33,8 @@ public static class Uninstaller
         Try(ProxyHost.RemoveCa);
         Try(BootGuard.Restore); // recovery environment, Safe Mode, F8 menu back as they were
         Try(() => WifiGuard.Restore(cfg));
-        Try(AdminToolsPolicy.RemoveAll); // command prompt / registry editor / Run policies of each account // Wi-Fi filters off: any network can be joined again
+        Try(AdminToolsPolicy.RemoveAll);
+        Try(DnsOrigins.TurnLogOff); // the DNS client log, if Guardian turned it on // command prompt / registry editor / Run policies of each account // Wi-Fi filters off: any network can be joined again
         Try(() => Run("auditpol.exe", "/set /subcategory:\"{0CCE9226-69AE-11D9-BED3-505054503030}\" /failure:disable"));
         Try(() => DataDirSecurity.Unlock(Paths.InstallDir));
         Try(() => File.Delete(Path.Combine(Paths.DataDir, "config.bin")));

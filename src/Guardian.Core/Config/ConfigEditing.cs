@@ -235,6 +235,18 @@ public static class ConfigEditing
     }
 
     /// <summary>Adds/removes one entry of a network list ("domains", "noDecrypt", "blockedApps", "directApps").</summary>
+    /// <summary>
+    /// Switches between block-list and allow-list. Each mode has its own sites and exceptions: the current ones
+    /// are kept aside and the ones saved for the other mode come back, so switching back loses nothing.
+    /// </summary>
+    public static void SetUrlMode(NetworkPolicy n, UrlMode mode)
+    {
+        if (n.Mode == mode) return;
+        (n.Domains, n.OtherDomains) = (n.OtherDomains, n.Domains);
+        (n.Exceptions, n.OtherExceptions) = (n.OtherExceptions, n.Exceptions);
+        n.Mode = mode;
+    }
+
     public static bool TryEditNetworkList(GuardianConfig cfg, string list, string action, string value, out string error)
     {
         error = "";

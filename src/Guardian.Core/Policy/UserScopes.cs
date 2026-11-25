@@ -85,6 +85,7 @@ public static class UserScopes
             Network = new NetworkPolicy
             {
                 Mode = cfg.Network.Mode, Domains = [.. cfg.Network.Domains], Exceptions = [.. cfg.Network.Exceptions],
+                OtherDomains = [.. cfg.Network.OtherDomains], OtherExceptions = [.. cfg.Network.OtherExceptions],
                 BlockedAppPaths = [.. cfg.Network.BlockedAppPaths], NoDecryptDomains = [], AllowDirectApps = [],
             },
         });

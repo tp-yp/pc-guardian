@@ -13,7 +13,7 @@ public static class Cooling
     /// <summary>Switches that weaken protection when turned on (all others weaken when turned off).</summary>
     private static readonly HashSet<string> WeakWhenOn = ["apps.trustProgramFiles", "isp.netfree", "isp.etrog"];
 
-    public static bool IsActive(GuardianConfig cfg) => cfg.Cooling.Hours > 0;
+    public static bool IsActive(GuardianConfig cfg) => cfg.Cooling.Minutes > 0;
 
     public static bool IsWeakening(GuardianConfig cfg, string? who, string path, IReadOnlyDictionary<string, string> body)
     {
@@ -25,7 +25,7 @@ public static class Cooling
             case "/api/settings":
                 return WeakWhenOn.Contains(B("key")) ? on : !on;
             case "/api/cooling/set":
-                return !int.TryParse(B("hours"), out var h) || h < cfg.Cooling.Hours;
+                return !TryMinutes(body, out var mins) || mins < cfg.Cooling.Minutes;
             case "/api/catalog/set":
                 return B("kind") == "direct" ? on : !on;
             case "/api/catalog/hours":
@@ -72,6 +72,15 @@ public static class Cooling
             default:
                 return false;
         }
+    }
+
+    /// <summary>The requested delay: "minutes", or "hours" from a change saved by an older version.</summary>
+    public static bool TryMinutes(IReadOnlyDictionary<string, string> body, out int minutes)
+    {
+        minutes = 0;
+        if (body.TryGetValue("minutes", out var m) && int.TryParse(m, out minutes)) return minutes is >= 0 and <= 100_000_000;
+        if (body.TryGetValue("hours", out var h) && int.TryParse(h, out var hours) && hours is >= 0 and <= 1_000_000) { minutes = hours * 60; return true; }
+        return false;
     }
 
     private static List<TimeWindow> Windows(string json)

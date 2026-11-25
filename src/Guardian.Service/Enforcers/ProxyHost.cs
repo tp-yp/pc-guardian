@@ -37,7 +37,7 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog, IspFi
                 : new NetworkPolicy { Enabled = true, Mode = UrlMode.Allowlist, LocalAddresses = cfg.Network.LocalAddresses }, "");
         var pid = Native.ProcessUser.OwnerOfLoopbackConnection(client.Port, Port, client.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6);
         var user = pid > 0 ? Native.ProcessUser.Of(pid) : null;
-        return new ProxyClient(Guardian.Core.Policy.UserScopes.Effective(cfg, user).Network, user ?? "");
+        return new ProxyClient(Guardian.Core.Policy.UserScopes.Effective(cfg, user).Network, user ?? "", pid > 0 ? Native.ProcessPath.Get(pid) : null);
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -52,7 +52,8 @@ public sealed class ProxyHost(ILogger<ProxyHost> log, AccessLog accessLog, IspFi
         using (ca)
         {
             var proxy = new FilterProxy(new IPEndPoint(IPAddress.Loopback, Port), ca, () => _policy,
-                (user, url, ok) => accessLog.Add("web", url, ok, user), blockPage: url => isp.Isolated(_cfg) ? Ui.BlockScreen.NoFilter(url) : Ui.BlockScreen.ForWebPage(url), identify: Identify);
+                blockPage: url => isp.Isolated(_cfg) ? Ui.BlockScreen.NoFilter(url) : Ui.BlockScreen.ForWebPage(url), identify: Identify,
+                logClient: (who, url, ok) => accessLog.Add("web", url, ok, who.User, who.App));
             try { proxy.Start(); }
             catch (Exception ex) { log.LogError(ex, "Cannot listen on port {Port}", Port); return; }
             log.LogInformation("Filtering proxy listening on 127.0.0.1:{Port}", Port);
