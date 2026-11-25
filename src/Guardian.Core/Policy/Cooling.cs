@@ -28,6 +28,10 @@ public static class Cooling
                 return !TryMinutes(body, out var mins) || mins < cfg.Cooling.Minutes;
             case "/api/catalog/set":
                 return B("kind") == "direct" ? on : !on;
+            case "/api/release":
+                return B("action") != "undo";
+            case "/api/backup/restore":
+                return true; // a backup can hold anything, so it always waits
             case "/api/catalog/sites":
             {
                 // A list limits the program: a longer list, or none at all, is weaker.

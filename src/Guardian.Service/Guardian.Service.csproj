@@ -3,10 +3,11 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
-    <Version>0.9.5</Version>
+    <Version>0.9.6</Version>
     <ApplicationIcon>..\..\assets\guardian.ico</ApplicationIcon>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>geder</AssemblyName>
+    <Product>Geder</Product>
     <!-- A Windows (not console) program: no terminal window opens with Guardian. Command-line use attaches to the calling terminal. -->
     <OutputType>WinExe</OutputType>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

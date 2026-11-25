@@ -120,6 +120,7 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 <div class="page" data-page="home">
 <section class="wide"><h2>לוח בקרה</h2>
 <p class="hint">שורה לכל משתמש במחשב, עם מספר ההגנות שפועלות עליו עכשיו. "עוד" מציג את הפירוט, ו"לניהול" פותח את הניהול שלו: תוכנות, אתרים, שעות ופעילות, בנפרד מכל השאר. "המחשב כולו", בתחתית הרשימה, מרכז את מה שחל על כל המחשב יחד, כמו נעילת סביבת השחזור, אינטרנט רק דרך הסינון ונעילת השעון.</p>
+<div id="releasedNote" class="warn" hidden style="margin-bottom:10px">כל ההגבלות משוחררות עכשיו, לכל המשתמשים. ההגדרות הקודמות שמורות. <button class="ghost" id="unrelease" style="margin-inline-start:8px">החזרת ההגבלות</button></div>
 <div id="cards" class="dlist"></div></section>
 </div>
 
@@ -332,6 +333,15 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 <ul id="coolPending"></ul>
 <div id="coolUninstall" class="row" style="margin-top:10px"></div>
 </section>
+<section class="wide machine"><h2>שחרור כל ההגבלות</h2>
+<p class="hint">מכבה בבת אחת את כל החסימות, במחשב כולו ולכל המשתמשים: נעילת תוכנות, סינון האתרים, שעות הנעילה ושאר היכולות. הרשימות נשארות כמו שהן, וההגדרות שהיו לפני השחרור נשמרות. כפתור "החזרת ההגבלות" מחזיר אותן בלחיצה אחת. אם "השהיית כיבוי" פעילה, השחרור יתבצע רק אחרי זמן ההמתנה.</p>
+<div class="row"><button class="ghost" id="releaseAll" style="color:var(--bad);border-color:var(--bad)">שחרור כל ההגבלות</button><button class="ghost" id="releaseUndo" hidden>החזרת ההגבלות</button></div></section>
+<section class="wide machine"><h2>גיבוי ושחזור הגדרות</h2>
+<p class="hint">הגיבוי הוא קובץ עם כל ההגדרות והרשימות, של המחשב כולו ושל כל משתמש. הסיסמאות לא נשמרות בו. שחזור מחליף את כל ההגדרות בהגדרות שבקובץ, ונשארות הסיסמאות הנוכחיות. אם "השהיית כיבוי" פעילה, השחזור יתבצע רק אחרי זמן ההמתנה.</p>
+<div class="row"><button class="ghost" id="backupSave">שמירת גיבוי</button><button class="ghost" id="backupLoad">שחזור מגיבוי…</button><input type="file" id="backupFile" accept=".json,application/json" hidden></div></section>
+<section class="wide"><h2>ייצוא לוגים</h2>
+<p class="hint">קובץ zip עם יומן הפעולות של Geder בשבועיים האחרונים, רשימת הפעילות האחרונה, ההגדרות (בלי סיסמאות) ופרטי ווינדוס. אם יש בעיה, שלחו את הקובץ למי שעוזר לכם בה.</p>
+<button class="ghost" id="logsExport">ייצוא לוגים</button></section>
 <section class="wide"><h2>הסרת Geder</h2>
 <p class="hint">מסיר את Geder מהמחשב ומחזיר את כל מה שהוא שינה: חומת האש, הגדרות הרשת, תעודת האבטחה ושעות הכניסה של המשתמשים. ווינדוס יבקש אישור מנהל, ואחריו צריך להקליד את סיסמת הניהול או את הסיסמה המצילה.</p>
 <button class="ghost" id="uninstall" style="color:var(--bad);border-color:var(--bad)">הסרת Geder…</button>
@@ -516,7 +526,7 @@ function loadDash(){return api('/api/dashboard',{},false).then(d=>{renderDash(d)
 function enterUser(u){(u.own?Promise.resolve():post('/api/users/own',{name:u.name,own:'true'}).then(()=>toast(u.name+' קיבל הגדרות נפרדות, שמתחילות כהעתק של ברירת המחדל.')))
  .then(()=>setScope(u.name)).catch(fail)}
 setInterval(()=>{if(!$('app').hidden&&!document.querySelector('[data-page=home]').hidden)loadDash()},15000);
-function render(st){state=st;scope=st.scope||'';renderScope(st);renderProviders(st);idleMin=st.idleMinutes||5;renderToggles();renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
+function render(st){state=st;scope=st.scope||'';$('releasedNote').hidden=!st.released;$('releaseUndo').hidden=!st.released;$('releaseAll').hidden=!!st.released;renderScope(st);renderProviders(st);idleMin=st.idleMinutes||5;renderToggles();renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
  $('idle').replaceChildren(...st.idleChoices.map(m=>el('option',{value:m,selected:m===idleMin},String(m))));if(catalog)renderCatalog()}
 function load(){api(q('/api/state')).then(render).catch(fail)}
 $('idle').onchange=e=>post('/api/settings/idle',{minutes:e.target.value}).then(st=>{render(st);toast('הממשק יינעל אחרי '+e.target.value+' דקות ללא פעילות')}).catch(fail);
@@ -628,7 +638,7 @@ $('pause').onchange=()=>tick();
 
 // Settings
 // Delay before turning off
-const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/catalog/sites':'רשימת אתרים לתוכנה','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
+const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/catalog/sites':'רשימת אתרים לתוכנה','/api/release':'שחרור כל ההגבלות','/api/backup/restore':'שחזור הגדרות מגיבוי','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
  '/api/site':'היתר לאתר','/api/network/list':'רשימת רשת','/api/network/mode':'מצב סינון האתרים','/api/users/set':'שעות ומניעת התמכרות','/api/users/unlock':'שחרור זמני של משתמש',
  '/api/tools/unlock':'שחרור זמני של כלי מנהל','/api/users/own':'חזרה לברירת המחדל','/api/wifi/list':'הוספת רשת Wi-Fi','/api/network/msupdates':'החרגת עדכוני מיקרוסופט','/api/isp/trust':'תעודת סינון','/api/cooling/set':'הקטנת ההשהיה'};
 function describePending(p){const b=p.body||{};const t=(TOGGLES.find(x=>x[0]===b.key)||[])[1];
@@ -649,6 +659,19 @@ function loadHealth(){api('/api/health').then(h=>{$('health').replaceChildren(
  h.dnsLastError?el('div',{class:'bad'},'שגיאה אחרונה: '+h.dnsLastError):'',
  h.clockSynced?el('div',{class:'ok'},'השעה אומתה מול האינטרנט ב-'+new Date(h.clockLastSync).toLocaleTimeString('he-IL')+'. השעה הנכונה לפי Geder: '+new Date(h.clockTrusted).toLocaleTimeString('he-IL')):el('div',{class:'muted'},'השעה עדיין לא אומתה מול האינטרנט.'))}).catch(fail)}
 $('healthBtn').onclick=loadHealth;
+// Release all restrictions, backup and restore, logs
+function saveFile(blob,name){const u=URL.createObjectURL(blob),a=el('a',{href:u,download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}
+const stamp=()=>new Date().toISOString().slice(0,16).replace(/[-:]/g,'').replace('T','-');
+function releaseDo(action){return post('/api/release',{action}).then(()=>{load();toast(action==='undo'?'ההגבלות חזרו כמו שהיו.':'כל ההגבלות שוחררו, לכל המשתמשים.')}).catch(fail)}
+$('releaseAll').onclick=e=>{const b=e.target;if(!b.dataset.sure){b.dataset.sure='1';b.textContent='בטוח? לחצו שוב לשחרור';setTimeout(()=>{delete b.dataset.sure;b.textContent='שחרור כל ההגבלות'},5000);return}
+ delete b.dataset.sure;b.textContent='שחרור כל ההגבלות';releaseDo('release')};
+$('releaseUndo').onclick=$('unrelease').onclick=()=>releaseDo('undo');
+$('backupSave').onclick=()=>api('/api/backup',{},true).then(j=>{saveFile(new Blob([j.file],{type:'application/json'}),'geder-settings-'+stamp()+'.json');toast('קובץ הגיבוי נשמר בתיקיית ההורדות.')}).catch(fail);
+$('backupLoad').onclick=()=>$('backupFile').click();
+$('backupFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ post('/api/backup/restore',{config:await f.text()}).then(()=>{load();toast('ההגדרות שוחזרו מהגיבוי.')}).catch(fail)};
+$('logsExport').onclick=()=>fetch('/api/logs/export',{headers:{'X-Guardian':'1','X-Active':'1'},credentials:'same-origin'}).then(r=>{if(!r.ok)throw new Error('הייצוא נכשל ('+r.status+')');return r.blob()})
+ .then(b=>{saveFile(b,'geder-logs-'+stamp()+'.zip');toast('קובץ הלוגים נשמר בתיקיית ההורדות.')}).catch(fail);
 $('uninstall').onclick=()=>{if(window.chrome&&chrome.webview){chrome.webview.postMessage('uninstall')}else{$('uninstallNote').hidden=false}};
 
 api(q('/api/state'),{},false).then(st=>{show(true);render(st)}).catch(()=>show(false));

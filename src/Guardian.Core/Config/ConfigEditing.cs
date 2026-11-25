@@ -13,19 +13,60 @@ public static class ConfigEditing
         var copy = Clone(cfg);
         copy.AdminPasswordHash = "";
         copy.RecoveryPasswordHash = "";
+        copy.ReleasedSnapshot = null;
+        copy.Cooling.Pending = [];
+        copy.Cooling.UninstallDueUtc = null;
         return JsonSerializer.Serialize(copy, EncryptedConfigStore.Json);
     }
 
-    /// <summary>Replaces the policy parts of <paramref name="current"/> with those from <paramref name="json"/>.
-    /// Password hashes and the service name are kept from the current config.</summary>
+    /// <summary>Replaces the policy parts of <paramref name="current"/> with those from <paramref name="json"/> (a backup).
+    /// Passwords, service names, waiting changes and a pending removal are kept from the current config.</summary>
     public static void Import(GuardianConfig current, string json)
     {
-        var incoming = JsonSerializer.Deserialize<GuardianConfig>(json, EncryptedConfigStore.Json)
-                       ?? throw new InvalidDataException("Empty config.");
+        GuardianConfig? incoming;
+        try { incoming = JsonSerializer.Deserialize<GuardianConfig>(json, EncryptedConfigStore.Json); }
+        catch (JsonException ex) { throw new InvalidDataException("Not a Geder settings file: " + ex.Message); }
+        if (incoming is null) throw new InvalidDataException("Empty config.");
         Validate(incoming);
         current.UserLockouts = incoming.UserLockouts;
+        current.UiIdleLockMinutes = GuardianConfig.IdleLockChoices.Contains(incoming.UiIdleLockMinutes) ? incoming.UiIdleLockMinutes : current.UiIdleLockMinutes;
         current.Apps = incoming.Apps;
         current.Network = incoming.Network;
+        current.UserPolicies = incoming.UserPolicies;
+        current.Boot = incoming.Boot;
+        current.IspFilter = incoming.IspFilter;
+        current.Clock = incoming.Clock;
+        current.Vpn = incoming.Vpn;
+        current.Wifi = incoming.Wifi;
+        current.Browsers = incoming.Browsers;
+        current.Cooling.Minutes = incoming.Cooling.Minutes;
+    }
+
+    /// <summary>Switches that "release all restrictions" turns off for the whole computer.</summary>
+    private static readonly string[] ReleaseKeys =
+        ["apps.enabled", "apps.blockAdminTools", "apps.blockVideo", "browser.noPrivate", "network.enabled", "boot.lockdown",
+         "isp.required", "vpn.block", "wifi.knownOnly", "clock.locked"];
+
+    /// <summary>
+    /// "Release all restrictions": every blocking switch off, for the whole computer and every account, and no
+    /// lock hours. The lists stay as they are, and the settings before the release are kept so they can come back.
+    /// </summary>
+    public static void ReleaseAll(GuardianConfig cfg)
+    {
+        cfg.ReleasedSnapshot ??= Export(cfg);
+        foreach (var k in ReleaseKeys) TrySetToggle(cfg, k, false, out _);
+        foreach (var u in cfg.UserPolicies)
+        { u.Apps.Enabled = false; u.Apps.BlockAdminTools = false; u.Apps.BlockVideoFiles = false; }
+        cfg.UserLockouts = [];
+    }
+
+    /// <summary>Brings back the settings from before "release all restrictions".</summary>
+    public static bool TryUndoRelease(GuardianConfig cfg)
+    {
+        if (cfg.ReleasedSnapshot is not { } snap) return false;
+        Import(cfg, snap);
+        cfg.ReleasedSnapshot = null;
+        return true;
     }
 
     /// <summary>Admin may change the admin password; only the recovery password may change the recovery password.</summary>
