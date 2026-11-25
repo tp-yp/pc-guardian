@@ -9,7 +9,7 @@ namespace Guardian.Service;
 /// </summary>
 public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
     NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy,
-    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp, TrustedClock clock, WifiGuard wifi) : BackgroundService
+    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp, TrustedClock clock, WifiGuard wifi, AdminToolsPolicy toolsPolicy) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -44,6 +44,7 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
             Run("network", () => network.Tick(cfg, force: ispChanged, isolated: isp.Isolated(cfg)));
             Run("boot", () => boot.Tick(cfg));
             Run("wifi", () => wifi.Tick(cfg));
+            Run("tools", () => toolsPolicy.Tick(cfg));
             Run("direct", () => direct.SetActive(cfg.Network.Enabled && cfg.Network.UrlFiltering));
             Run("watchdog", () =>
             {

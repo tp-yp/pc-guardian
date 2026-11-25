@@ -207,3 +207,46 @@ public class AdminToolsParentTests
     public void Tools_started_by_hand_are_blocked_background_ones_are_not(string? parent, bool byHand) =>
         Assert.Equal(byHand, AdminTools.StartedByHand(parent));
 }
+
+public class ThreeModeScheduleTests
+{
+    private static readonly TimeWindow Evening = new(Enum.GetValues<DayOfWeek>(), new TimeOnly(16, 0), new TimeOnly(22, 0));
+    private static readonly TimeWindow Night = new(Enum.GetValues<DayOfWeek>(), new TimeOnly(23, 0), new TimeOnly(6, 0));
+
+    [Fact]
+    public void Locked_hours_lock_the_screen_and_only_when_it_is_open()
+    {
+        var rules = new List<UserLockoutRule> { new() { UserName = "kid", LockedDuring = new() { Windows = [Night] } } };
+        var p = new LockoutPlanner();
+        var at = new DateTime(2026, 11, 25, 23, 30, 0);
+        Assert.Equal(LockoutKind.Lock, Assert.Single(p.Plan(rules, [new UserSession(2, @"PC\kid")], at)).Kind);
+        Assert.Empty(p.Plan(rules, [new UserSession(2, @"PC\kid", Unlocked: false)], at));
+    }
+
+    [Fact]
+    public void Addiction_prevention_only_in_its_hours_and_counts_from_their_start()
+    {
+        var rule = new UserLockoutRule { UserName = "kid", BreakEveryMinutes = 30, WarningMinutes = 0, BreakDuring = new() { Windows = [Evening] }, LockedDuring = new() { Windows = [Night] } };
+        var p = new BreakPlanner();
+        var kid = new UserSession(2, @"PC\kid");
+        DateTime L(int h, int m) => new(2026, 11, 25, h, m, 0);
+        DateTime U(int h, int m) => DateTime.SpecifyKind(L(h, m), DateTimeKind.Utc);
+        Assert.Empty(p.Plan([rule], [kid], U(14, 0), local: L(14, 0)));   // normal use since 14:00
+        Assert.Empty(p.Plan([rule], [kid], U(15, 59), local: L(15, 59)));
+        Assert.Empty(p.Plan([rule], [kid], U(16, 1), local: L(16, 1)));   // count starts at 16:00, not 14:00
+        Assert.Equal(LockoutKind.Logoff, Assert.Single(p.Plan([rule], [kid], U(16, 31), local: L(16, 31))).Kind);
+        Assert.Empty(p.Plan([rule], [kid], U(23, 40), local: L(23, 40)));  // locked hours: no sign-out (the lock handles it)
+    }
+
+    [Fact]
+    public void Fewer_addiction_hours_is_weaker()
+    {
+        var cfg = new GuardianConfig { Cooling = { Hours = 5 } };
+        ConfigEditing.TrySetLockout(cfg, "kid", [], 5, out _, 30, [Evening]);
+        var b = new Dictionary<string, string> { ["user"] = "kid", ["windows"] = "[]", ["breakEvery"] = "30",
+            ["breakWindows"] = """[{"days":["Monday"],"start":"16:00","end":"17:00"}]""" };
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/users/set", b));
+        b["breakWindows"] = "[]"; // all day = stricter
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/users/set", b));
+    }
+}

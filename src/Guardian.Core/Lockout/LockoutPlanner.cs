@@ -2,9 +2,11 @@ using Guardian.Core.Config;
 
 namespace Guardian.Core.Lockout;
 
-public sealed record UserSession(int SessionId, string UserName);
+/// <param name="Unlocked">The desktop is in use (not at the lock screen, not disconnected).</param>
+public sealed record UserSession(int SessionId, string UserName, bool Unlocked = true);
 
-public enum LockoutKind { Warn, Logoff }
+/// <summary>Lock = the screen is locked (apps keep running, signing back in is refused); Logoff = signed out.</summary>
+public enum LockoutKind { Warn, Logoff, Lock }
 
 public sealed record LockoutAction(LockoutKind Kind, UserSession Session, int MinutesLeft = 0);
 
@@ -27,7 +29,9 @@ public sealed class LockoutPlanner
 
             if (rule.LockedDuring.Windows.Count > 0 && rule.LockedDuring.IsActive(local))
             {
-                actions.Add(new(LockoutKind.Logoff, s));
+                // Locked out, like a parental-control lock screen: the session stays, the screen is locked,
+                // and it is locked again whenever it gets unlocked during these hours.
+                if (s.Unlocked) actions.Add(new(LockoutKind.Lock, s));
                 _warned.Remove((s.SessionId, s.UserName));
                 continue;
             }

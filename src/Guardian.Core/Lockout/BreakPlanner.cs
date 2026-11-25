@@ -10,8 +10,9 @@ public sealed class BreakPlanner
 {
     private readonly Dictionary<(int, string), (DateTime Start, bool Warned)> _sessions = new();
 
+    /// <param name="local">Local (trusted) time, for the hours in which the rule applies.</param>
     public IReadOnlyList<LockoutAction> Plan(IEnumerable<UserLockoutRule> rules, IEnumerable<UserSession> sessions,
-        DateTime utcNow, Func<string, bool>? exempt = null)
+        DateTime utcNow, Func<string, bool>? exempt = null, DateTime? local = null)
     {
         var actions = new List<LockoutAction>();
         var seen = new HashSet<(int, string)>();
@@ -22,6 +23,14 @@ public sealed class BreakPlanner
             if (!_sessions.TryGetValue(key, out var st)) _sessions[key] = st = (utcNow, false);
             var rule = rules.FirstOrDefault(r => LockoutPlanner.SameUser(r.UserName, s.UserName));
             if (rule is null || rule.BreakEveryMinutes <= 0 || exempt?.Invoke(s.UserName) == true) continue;
+            var when = local ?? utcNow.ToLocalTime();
+            if ((rule.BreakDuring.Windows.Count > 0 && !rule.BreakDuring.IsActive(when)) ||
+                (rule.LockedDuring.Windows.Count > 0 && rule.LockedDuring.IsActive(when))) // locked hours win
+            {
+                // Outside its hours: normal use. The count starts when the hours begin.
+                _sessions[key] = (utcNow, false);
+                continue;
+            }
 
             var used = utcNow - st.Start;
             var limit = TimeSpan.FromMinutes(rule.BreakEveryMinutes);

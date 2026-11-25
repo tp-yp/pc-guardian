@@ -262,8 +262,10 @@ body[data-ctx=user] .machine{display:none!important}
 <!-- ===== משתמשים ===== -->
 <div class="page" data-page="users" hidden>
 <section class="wide"><h2>שעות כניסה למשתמשים</h2>
-<p class="hint"><b>מניעת התמכרות:</b> אחרי זמן השימוש הרציף שתבחרו, המשתמש מקבל התראה ואז יוצא מהחשבון. הוא יכול להיכנס שוב מיד, והספירה מתחילה מחדש. זה יוצר הפסקה קטנה ורגע של מחשבה, בלי לחסום לגמרי.</p>
-<p class="hint">לכל משתמש במחשב אפשר לקבוע שעות שבהן אסור לו להיות מחובר. כשמגיעה השעה, המשתמש מקבל הודעה כמה דקות לפני, ואז הוא מנותק והמחשב חוזר למסך הכניסה. בזמן הזה הוא גם לא יכול להיכנס.<br>
+<p class="hint">היום של כל משתמש מתחלק לשלושה מצבים: <b>נעילה</b>, <b>מניעת התמכרות</b> ו<b>שימוש רגיל</b> (כל שאר השעות).<br>
+<b>נעילה:</b> כמה דקות לפני, המשתמש מקבל התראה, ואז המסך ננעל. התוכנות הפתוחות נשארות פתוחות, אבל אי אפשר להיכנס עד סוף שעות הנעילה. גם אם מישהו מצליח לפתוח את המסך, הוא ננעל שוב תוך שניות.<br>
+<b>מניעת התמכרות:</b> בשעות שתבחרו (או כל היום, אם לא תבחרו שעות), אחרי זמן השימוש הרציף שקבעתם המשתמש מקבל התראה ויוצא מהחשבון. הוא יכול להיכנס שוב מיד, והספירה מתחילה מחדש.</p>
+<p class="hint">
 טווח שעות שעובר חצות (למשל 23:00 עד 07:00) נחשב ליום שבו הוא מתחיל. כדי לחסום יום שלם, בחרו אותה שעה בהתחלה ובסוף.</p>
 <div id="allLocked" class="warn" hidden>שימו לב: לכל המשתמשים במחשב יש שעות נעילה. אם יש שעה שבה כולם נעולים, אף אחד לא יוכל להיכנס למחשב בזמן הזה, גם לא כדי לשנות הגדרות. כדאי להשאיר לפחות משתמש מנהל אחד בלי נעילה.</div>
 <div class="tip machine" style="margin-bottom:10px"><b>ניהול נפרד לכל משתמש:</b> בלוח הבקרה לוחצים על משתמש כדי לנהל את התוכנות, האתרים, השעות והפעילות שלו בנפרד. בכניסה הראשונה הוא מקבל הגדרות משלו, שמתחילות כהעתק של ברירת המחדל. משתמש שלא נכנסו לניהול שלו פועל לפי ברירת המחדל, שנערכת ב"המחשב כולו".</div>
@@ -351,7 +353,7 @@ const TOGGLES=[
  ['apps.enabled','נעילת תוכנות','תוכנות שסימנתם כ"נעולות" בלשונית "תוכנות" ייסגרו מיד כשמישהו פותח אותן, ויופיע מסך חסימה. בלי היכולת הזו, הסימונים לא נאכפים.'],
  ['apps.defaultDeny','חסימת כל תוכנה לא מוכרת','כל תוכנה שלא הותקנה כרגיל תיחסם: קבצים שהורדו, תוכנות ניידות, דיסק און קי ותוכנות שמתקינות את עצמן בלי אישור מנהל. כדי לאפשר אחת מהן, התירו אותה מלשונית "פעילות" או הוסיפו אותה ב"תוכנות" > "הוספה ידנית".','לפני שמדליקים: כדאי להדליק קודם את "נעילת תוכנות", לעבוד יום רגיל, ולראות בלשונית "פעילות" מה היה נחסם.'],
  ['apps.trustProgramFiles','לסמוך על תוכנות שהותקנו כרגיל','תוכנות שהותקנו לתיקיית Program Files (התקנה רגילה שדורשת אישור מנהל) נחשבות מוכרות ולא נחסמות. מומלץ להשאיר דולק.'],
- ['apps.blockAdminTools','חסימת כלי מנהל','חוסם את שורת הפקודה, PowerShell, עורך הרישום, מסופי הניהול (שירותים, מתזמן משימות, מדיניות קבוצתית), פקודות הרשאות ושירותים, שחזור מערכת ואיפוס המחשב. כמעט כל הוראה לעקיפת Guardian עוברת דרך הכלים האלה, ולכן זו אחת ההגנות החזקות. גם עותק או שינוי שם של הכלי ייחסמו. מנהל המשימות וההגדרות נשארים פתוחים. כשצריך את הכלים, משחררים אותם לזמן קצוב מתחת למתג הזה.','לפני שמדליקים לחשבון שלכם: ודאו שאתם זוכרים את סיסמת Guardian, כי בלעדיה לא תוכלו לשחרר את הכלים.'],
+ ['apps.blockAdminTools','חסימת כלי מנהל','חוסם את שורת הפקודה, PowerShell, עורך הרישום, מסופי הניהול (שירותים, מתזמן משימות, מדיניות קבוצתית), פקודות הרשאות ושירותים, שחזור מערכת ואיפוס המחשב. כמעט כל הוראה לעקיפת Guardian עוברת דרך הכלים האלה, ולכן זו אחת ההגנות החזקות. גם עותק או שינוי שם של הכלי ייחסמו. שורת הפקודה ועורך הרישום נחסמים מיד דרך מדיניות של ווינדוס (הסייר ותפריט התחל מתחילים לחסום אחרי כניסה מחדש לחשבון). כלים שנפתחים בדרך אחרת, כמו PowerShell בתוך הטרמינל, נסגרים תוך שניות. מנהל המשימות וההגדרות נשארים פתוחים. כשצריך את הכלים, משחררים אותם לזמן קצוב מתחת למתג הזה.','לפני שמדליקים לחשבון שלכם: ודאו שאתם זוכרים את סיסמת Guardian, כי בלעדיה לא תוכלו לשחרר את הכלים.'],
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
  ['isp.required','אינטרנט רק דרך הסינון','חוסם את כל האינטרנט כשהמחשב לא מחובר דרך ספק סינון (נטפרי, אתרוג או נטספארק). הזיהוי לפי תעודת האבטחה, והסבר מלא בהמשך העמוד. ההפעלה דורשת אישור, וכיבוי מחזיר את האינטרנט מיד.'],
  ['vpn.block','חסימת VPN ופרוקסי','חוסם תוכנות VPN ופרוקסי מוכרות (גם אם שינו להן את השם), את אתרי ההורדה שלהן ואתרי פרוקסי מוכרים, את החיבורים של ה-VPN המובנה בווינדוס, ואת האפשרות להגדיר פרוקסי ידנית. ה-VPN המובנה מסוג SSTP משתמש באותו חיבור כמו אתרים רגילים ולא נחסם כאן, וגם תוכנה שלא ברשימה לא תיחסם לפי השם. לכן כדאי להפעיל גם "סינון לפי כתובת מלאה" או "חסימת כל תוכנה לא מוכרת".'],
@@ -518,10 +520,11 @@ function ownRow(a){const r=el('div',{class:'row',style:'margin-top:8px'});
 function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyoneLocked;$('users').replaceChildren(...u.accounts.filter(a=>!scope||a.name.toLowerCase()===scope.toLowerCase()).map(a=>{
  const wins=a.rule?a.rule.lockedDuring.windows:[];const box=el('div');wins.forEach(w=>box.append(winRow(w)));
  const warn=el('input',{type:'number',min:0,max:60,value:a.rule?a.rule.warningMinutes:5,style:'width:70px'});
+ const bwins=a.rule&&a.rule.breakDuring?a.rule.breakDuring.windows:[];const bbox=el('div');bwins.forEach(w=>bbox.append(winRow(w)));
  const BR=[0,5,10,15,20,25,30,40,45,50,60];const cur=a.rule?a.rule.breakEveryMinutes||0:0;if(!BR.includes(cur))BR.push(cur);
  const brk=el('select',{},...BR.sort((x,y)=>x-y).map(m=>el('option',{value:m,selected:m===cur},m?(m<60||m%60?m+' דקות':(m/60===1?'שעה':m/60+' שעות')):'כבוי')));
  const status=a.unlockedUntil?el('span',{class:'badge ok'},'שוחרר זמנית עד '+new Date(a.unlockedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})):wins.length?el('span',{class:'badge'},'יש שעות נעילה'):cur?el('span',{class:'badge'},'הפסקה כל '+cur+' דקות'):el('span',{class:'badge'},'ללא הגבלה');
- const save=()=>post('/api/users/set',{user:a.name,windows:JSON.stringify(readWins(box)),warning:warn.value,breakEvery:brk.value}).then(()=>{toast(readWins(box).length||+brk.value?'ההגדרות של '+a.name+' נשמרו':'הנעילה של '+a.name+' בוטלה');load();loadUsers()}).catch(fail);
+ const save=()=>post('/api/users/set',{user:a.name,windows:JSON.stringify(readWins(box)),warning:warn.value,breakEvery:brk.value,breakWindows:JSON.stringify(readWins(bbox))}).then(()=>{toast(readWins(box).length||+brk.value?'ההגדרות של '+a.name+' נשמרו':'הנעילה של '+a.name+' בוטלה');load();loadUsers()}).catch(fail);
  const mins=el('select',{},...[15,30,60,120,240].map(m=>el('option',{value:m},m<60?m+' דקות':(m/60)+' שעות')));
  const unlock=el('div',{class:'row',style:'margin-top:8px'},el('span',{class:'muted'},'שחרור זמני:'),mins,
   el('button',{class:'ghost',onclick:()=>post('/api/users/unlock',{user:a.name,minutes:mins.value}).then(()=>{toast(a.name+' יכול להשתמש במחשב גם בשעות הנעילה, למשך '+mins.selectedOptions[0].textContent);loadUsers()}).catch(fail)},'לשחרר'),
@@ -529,9 +532,11 @@ function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyon
  return el('div',{class:'user'},el('div',{class:'row'},el('b',{},a.name),status),
   ownRow(a),
   el('div',{class:'row',style:'margin-top:8px'},el('span',{},'מניעת התמכרות: יציאה אחרי'),brk,el('span',{class:'muted'},'של שימוש רציף')),
-  el('div',{class:'hint',style:'margin:6px 0 0'},'שעות שבהן '+a.name+' לא יכול להיות מחובר:'),box,
-  el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.slice(0,5).map(d=>d[0]),start:'23:00',end:'07:00'}))},'+ טווח שעות'),
-   el('label',{},'התראה ',warn,' דקות לפני הניתוק'),el('button',{onclick:save},'שמירה')),wins.length?unlock:null)}))}).catch(fail)}
+  el('div',{class:'hint',style:'margin:6px 0 0'},'שעות מניעת התמכרות (בלי שעות = כל היום):'),bbox,
+  el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>bbox.append(winRow({days:DAYS.map(d=>d[0]),start:'16:00',end:'22:00'}))},'+ טווח שעות למניעת התמכרות')),
+  el('div',{class:'hint',style:'margin:6px 0 0'},'שעות נעילה (המסך ננעל, ואי אפשר להיכנס):'),box,
+  el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.slice(0,5).map(d=>d[0]),start:'23:00',end:'07:00'}))},'+ טווח שעות נעילה'),
+   el('label',{},'התראה ',warn,' דקות לפני'),el('button',{onclick:save},'שמירה')),wins.length?unlock:null)}))}).catch(fail)}
 
 // Activity
 const SRC={web:'אתר',dns:'אתר',app:'תוכנה',direct:'חיבור ישיר',boot:'אתחול',isp:'סינון',wifi:'Wi-Fi'};

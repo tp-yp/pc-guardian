@@ -36,7 +36,7 @@ internal static class Wts
                 if (s.SessionId == 0 || (s.State != WTSActive && s.State != WTSDisconnected)) continue;
                 var user = Query(s.SessionId, WTSUserName);
                 if (string.IsNullOrEmpty(user)) continue;
-                list.Add(new UserSession(s.SessionId, $"{Query(s.SessionId, WTSDomainName)}\\{user}"));
+                list.Add(new UserSession(s.SessionId, $"{Query(s.SessionId, WTSDomainName)}\\{user}", s.State == WTSActive && !IsLocked(s.SessionId)));
             }
         }
         finally { WTSFreeMemory(ptr); }
@@ -44,6 +44,24 @@ internal static class Wts
     }
 
     public static bool Logoff(int sessionId) => WTSLogoffSession(Server, sessionId, false);
+
+    [DllImport("wtsapi32.dll", SetLastError = true)]
+    private static extern bool WTSDisconnectSession(IntPtr h, int sessionId, bool wait);
+
+    /// <summary>Back to the sign-in screen; the session and its programs stay.</summary>
+    public static bool Disconnect(int sessionId) => WTSDisconnectSession(Server, sessionId, false);
+
+    /// <summary>True if the session shows the lock screen (WTSSessionInfoEx, SessionFlags 0 = locked).</summary>
+    private static bool IsLocked(int sessionId)
+    {
+        if (!WTSQuerySessionInformationW(Server, sessionId, 25 /* WTSSessionInfoEx */, out var buf, out var bytes)) return false;
+        try
+        {
+            if (bytes < 20 || Marshal.ReadInt32(buf) != 1) return false; // Level 1
+            return Marshal.ReadInt32(buf + 16) == 0; // WTS_SESSIONSTATE_LOCK
+        }
+        finally { WTSFreeMemory(buf); }
+    }
 
     public static void Notify(int sessionId, string title, string message) =>
         WTSSendMessageW(Server, sessionId, title, title.Length * 2, message, message.Length * 2,

@@ -23,7 +23,7 @@ public class LockoutTests
     {
         var a = new LockoutPlanner().Plan([Rule()], [Kid, Parent], Mon.AddHours(23));
         Assert.Single(a);
-        Assert.Equal(LockoutKind.Logoff, a[0].Kind);
+        Assert.Equal(LockoutKind.Lock, a[0].Kind);
         Assert.Equal(2, a[0].Session.SessionId);
     }
 
@@ -36,7 +36,7 @@ public class LockoutTests
         Assert.Equal(LockoutKind.Warn, Assert.Single(a).Kind);
         Assert.Equal(3, a[0].MinutesLeft);
         Assert.Empty(p.Plan([Rule()], [Kid], t.AddMinutes(1)));
-        Assert.Equal(LockoutKind.Logoff, Assert.Single(p.Plan([Rule()], [Kid], t.AddMinutes(3))).Kind);
+        Assert.Equal(LockoutKind.Lock, Assert.Single(p.Plan([Rule()], [Kid], t.AddMinutes(3))).Kind);
     }
 
     [Fact]

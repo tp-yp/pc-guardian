@@ -56,6 +56,10 @@ public static class Cooling
                 if (old is null) return false;
                 int.TryParse(B("breakEvery"), out var brk);
                 var breakWeaker = old.BreakEveryMinutes > 0 && (brk == 0 || brk > old.BreakEveryMinutes);
+                // Fewer addiction-prevention hours (empty = all day) is weaker too.
+                var newBreak = Windows(B("breakWindows"));
+                if (old.BreakEveryMinutes > 0 && newBreak.Count > 0 && (old.BreakDuring.Windows.Count == 0 || !Covers(newBreak, old.BreakDuring.Windows)))
+                    breakWeaker = true;
                 return breakWeaker || !Covers(Windows(B("windows")), old.LockedDuring.Windows);
             }
             case "/api/users/unlock":
