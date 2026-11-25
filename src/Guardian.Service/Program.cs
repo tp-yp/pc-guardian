@@ -80,6 +80,7 @@ switch (cmd)
         builder.Services.AddSingleton<AccessLog>();
         builder.Services.AddSingleton<NetworkEnforcer>();
         builder.Services.AddSingleton<DirectConnectionWatcher>();
+        builder.Services.AddSingleton<DnsOrigins>();
         builder.Services.AddSingleton<BootGuard>();
         builder.Services.AddSingleton<WifiGuard>();
         builder.Services.AddSingleton<AdminToolsPolicy>();

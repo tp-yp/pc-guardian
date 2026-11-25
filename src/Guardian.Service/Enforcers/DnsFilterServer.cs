@@ -12,7 +12,7 @@ namespace Guardian.Service.Enforcers;
 /// and is not affected by the port-53 firewall block). Internal names of the connected network are asked
 /// from that network's own DNS server (see <see cref="NetworkDns"/>).
 /// </summary>
-public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog accessLog) : BackgroundService
+public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog accessLog, DnsOrigins origins) : BackgroundService
 {
     private static readonly string[] Upstreams =
         ["https://1.1.1.1/dns-query", "https://9.9.9.9/dns-query", "https://8.8.8.8/dns-query", "https://1.0.0.1/dns-query", "https://149.112.112.112/dns-query"];
@@ -46,7 +46,7 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
                 {
                     try
                     {
-                        var reply = await Answer(r.Buffer, ct);
+                        var reply = await Answer(r.Buffer, r.RemoteEndPoint, ct);
                         if (reply != null) await udp.SendAsync(reply, r.RemoteEndPoint, ct);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException) { log.LogDebug(ex, "DNS query failed"); }
@@ -55,10 +55,17 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
         }
     }
 
-    private async Task<byte[]?> Answer(byte[] query, CancellationToken ct)
+    private async Task<byte[]?> Answer(byte[] query, IPEndPoint from, CancellationToken ct)
     {
         var q = DnsMessage.ReadQuestion(query);
         if (q is null) return null;
+        DnsOrigins.Origin? who = null;
+        void Log(bool ok)
+        {
+            try { who ??= origins.Find(q.Name, from.Port, from.AddressFamily == AddressFamily.InterNetworkV6); }
+            catch (Exception) { who = new(null, null); }
+            accessLog.Add("dns", q.Name, ok, who.User, who.App);
+        }
         // Names only the connected network knows (a school's server, a printer): ask the network's own DNS.
         // Names that can never be internet sites skip the site filter; names under the network's suffix do not.
         var net = NetworkDns.Current();
@@ -68,7 +75,7 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
             {
                 if (await NetworkDns.AskAsync(net.Servers, query, ct) is { } local)
                 {
-                    accessLog.Add("dns", q.Name, allowed: true);
+                    Log(true);
                     return local;
                 }
             }
@@ -76,10 +83,10 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
         // DNS cannot tell which account asks: only names blocked for everyone are refused here.
         if (!Guardian.Core.Policy.UserScopes.DnsAllows(_cfg, q.Name))
         {
-            accessLog.Add("dns", q.Name, allowed: false);
+            Log(false);
             return DnsMessage.BuildBlocked(query);
         }
-        accessLog.Add("dns", q.Name, allowed: true);
+        Log(true);
         if (_cache.Get(query, q) is { } cached) return cached;
 
         // Ask two upstreams at once and take the first good answer; then the rest, one by one.

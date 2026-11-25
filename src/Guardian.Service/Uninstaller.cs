@@ -15,9 +15,10 @@ public static class Uninstaller
 {
     public const string ArpKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Guardian";
     public static string StartMenuLink =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Guardian.lnk");
-    private static string OldStartMenuLink =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Guardian.url");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Geder.lnk");
+    /// <summary>Links made by older versions (before the program was called Geder).</summary>
+    private static IEnumerable<string> OldStartMenuLinks => new[] { "Guardian.url", "Guardian.lnk" }
+        .Select(n => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), n));
 
     /// <summary>Returns the service names to stop and delete afterwards.</summary>
     public static string[] LiftProtections(GuardianConfig cfg, NetworkEnforcer? network = null)
@@ -33,7 +34,9 @@ public static class Uninstaller
         Try(ProxyHost.RemoveCa);
         Try(BootGuard.Restore); // recovery environment, Safe Mode, F8 menu back as they were
         Try(() => WifiGuard.Restore(cfg));
-        Try(AdminToolsPolicy.RemoveAll); // command prompt / registry editor / Run policies of each account // Wi-Fi filters off: any network can be joined again
+        Try(AdminToolsPolicy.RemoveAll);
+        Try(DnsOrigins.TurnLogOff);
+        Try(BrowserPrivacy.Remove); // private browsing allowed again // the DNS client log, if Guardian turned it on // command prompt / registry editor / Run policies of each account // Wi-Fi filters off: any network can be joined again
         Try(() => Run("auditpol.exe", "/set /subcategory:\"{0CCE9226-69AE-11D9-BED3-505054503030}\" /failure:disable"));
         Try(() => DataDirSecurity.Unlock(Paths.InstallDir));
         Try(() => File.Delete(Path.Combine(Paths.DataDir, "config.bin")));
@@ -63,7 +66,7 @@ public static class Uninstaller
         Try(CloseOtherGuardianProcesses);
         Try(() => Registry.LocalMachine.DeleteSubKeyTree(ArpKey, false));
         Try(() => File.Delete(StartMenuLink));
-        Try(() => File.Delete(OldStartMenuLink));
+        foreach (var old in OldStartMenuLinks) Try(() => File.Delete(old));
         foreach (var dir in new[] { Paths.InstallDir, Paths.DataDir }) DeleteOrScheduleDelete(dir);
     }
 
@@ -71,7 +74,7 @@ public static class Uninstaller
     public static bool HasLeftovers()
     {
         using var arp = Registry.LocalMachine.OpenSubKey(ArpKey);
-        return arp != null || Directory.Exists(Paths.InstallDir) || File.Exists(StartMenuLink);
+        return arp != null || Directory.Exists(Paths.InstallDir) || File.Exists(StartMenuLink) || OldStartMenuLinks.Any(File.Exists);
     }
 
     private static void CloseOtherGuardianProcesses()
@@ -131,21 +134,21 @@ public static class Uninstaller
     {
         using (var k = Registry.LocalMachine.CreateSubKey(ArpKey))
         {
-            k.SetValue("DisplayName", "Guardian");
+            k.SetValue("DisplayName", "Geder");
             k.SetValue("DisplayVersion", typeof(Uninstaller).Assembly.GetName().Version?.ToString(3) ?? "0.2.0");
-            k.SetValue("Publisher", "Guardian");
+            k.SetValue("Publisher", "Geder");
             k.SetValue("DisplayIcon", exe);
             k.SetValue("UninstallString", $"\"{exe}\" uninstall-gui");
             k.SetValue("NoModify", 1, RegistryValueKind.DWord);
             k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
         }
-        Try(() => File.Delete(OldStartMenuLink));
+        foreach (var old in OldStartMenuLinks) Try(() => File.Delete(old));
         dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
         dynamic link = shell.CreateShortcut(StartMenuLink);
         link.TargetPath = exe;
         link.Arguments = "app";
         link.IconLocation = exe + ",0";
-        link.Description = "Guardian – ניהול";
+        link.Description = "Geder – ניהול";
         link.Save();
     }
 

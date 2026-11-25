@@ -41,7 +41,7 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
                      u => exemptions.Until.Any(e => LockoutPlanner.SameUser(e.Key, u) && e.Value > now), now))
         {
             if (a.Kind == LockoutKind.Warn)
-                Wts.Notify(a.Session.SessionId, "Guardian", $"הגיע הזמן להפסקה: בעוד {a.MinutesLeft} דקות תתבצע יציאה מהחשבון. כדאי לשמור את העבודה עכשיו. אחרי היציאה אפשר להיכנס שוב.");
+                Wts.Notify(a.Session.SessionId, "Geder", $"הגיע הזמן להפסקה: בעוד {a.MinutesLeft} דקות תתבצע יציאה מהחשבון. כדאי לשמור את העבודה עכשיו. אחרי היציאה אפשר להיכנס שוב.");
             else
             {
                 log.LogInformation("Break time: signing out {User} (session {Id})", a.Session.UserName, a.Session.SessionId);
@@ -53,7 +53,7 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
             if (a.Kind == LockoutKind.Warn)
             {
                 log.LogInformation("Warning {User}: locking in {M} min", a.Session.UserName, a.MinutesLeft);
-                Wts.Notify(a.Session.SessionId, "Guardian", $"המחשב יינעל בעוד {a.MinutesLeft} דקות לפי לוח הזמנים. התוכנות הפתוחות יישארו פתוחות.");
+                Wts.Notify(a.Session.SessionId, "Geder", $"המחשב יינעל בעוד {a.MinutesLeft} דקות לפי לוח הזמנים. התוכנות הפתוחות יישארו פתוחות.");
             }
             else
             {

@@ -86,7 +86,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.") || (body.GetValueOrDefault("key") ?? "").StartsWith("browser.")) who = null;
 
             // "Delay before turning off": a change that weakens protection is kept and carried out later.
             if (req.HttpMethod == "POST" && !IsReplay(req))
@@ -97,12 +97,12 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var pending = new PendingChange
                     {
                         Id = Convert.ToHexString(RandomNumberGenerator.GetBytes(6)), Path = path, Body = body, User = who,
-                        RequestedUtc = clock.UtcNow, DueUtc = clock.UtcNow.AddHours(cur.Cooling.Hours),
+                        RequestedUtc = clock.UtcNow, DueUtc = clock.UtcNow.AddMinutes(cur.Cooling.Minutes),
                     };
                     cur.Cooling.Pending.Add(pending);
                     store.Save(cur);
                     log.LogInformation("UI: {Path} delayed until {Due:u}", path, pending.DueUtc);
-                    await SendJson(res, 202, new { pending = true, due = pending.DueUtc.ToLocalTime(), hours = cur.Cooling.Hours });
+                    await SendJson(res, 202, new { pending = true, due = pending.DueUtc.ToLocalTime(), minutes = cur.Cooling.Minutes, delay = CoolingPolicy.Describe(cur.Cooling.Minutes) });
                     return;
                 }
             }
@@ -114,7 +114,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var cfg = store.Load();
                     await SendJson(res, 200, new
                     {
-                        hours = cfg.Cooling.Hours,
+                        minutes = cfg.Cooling.Minutes,
                         pending = cfg.Cooling.Pending.Select(p => new { p.Id, p.Path, p.Body, p.User, due = p.DueUtc.ToLocalTime() }),
                         uninstallDue = cfg.Cooling.UninstallDueUtc?.ToLocalTime(),
                         uninstallReady = cfg.Cooling.UninstallDueUtc is { } u && u <= clock.UtcNow,
@@ -123,13 +123,13 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 }
                 case ("/api/cooling/set", "POST"):
                 {
-                    if (!int.TryParse(body.GetValueOrDefault("hours"), out var hours) || hours < 0 || hours > 1_000_000)
-                    { await SendJson(res, 400, new { error = "מספר שעות לא תקין." }); break; }
+                    if (!Cooling.TryMinutes(body, out var minutes))
+                    { await SendJson(res, 400, new { error = "מספר דקות לא תקין." }); break; }
                     var cfg = store.Load();
-                    cfg.Cooling.Hours = hours;
-                    if (hours == 0) cfg.Cooling.UninstallDueUtc = null;
+                    cfg.Cooling.Minutes = minutes;
+                    if (minutes == 0) cfg.Cooling.UninstallDueUtc = null;
                     store.Save(cfg);
-                    log.LogInformation("UI: delay before turning off = {H} h", hours);
+                    log.LogInformation("UI: delay before turning off = {M} min", minutes);
                     await SendJson(res, 200, new { ok = true });
                     break;
                 }
@@ -145,7 +145,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 {
                     var cfg = store.Load();
                     if (body.GetValueOrDefault("action") == "cancel") cfg.Cooling.UninstallDueUtc = null;
-                    else cfg.Cooling.UninstallDueUtc ??= clock.UtcNow.AddHours(cfg.Cooling.Hours);
+                    else cfg.Cooling.UninstallDueUtc ??= clock.UtcNow.AddMinutes(cfg.Cooling.Minutes);
                     store.Save(cfg);
                     log.LogInformation("UI: removal {Action}", body.GetValueOrDefault("action") ?? "request");
                     await SendJson(res, 200, new { ok = true, due = cfg.Cooling.UninstallDueUtc?.ToLocalTime() });
@@ -193,6 +193,20 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     log.LogInformation("UI: blocked hours for {Exe}: {N} ranges", exe, windows.Count);
+                    await SendJson(res, 200, CatalogFor(await catalog.GetAsync(), cfg, who));
+                    break;
+                }
+                case ("/api/catalog/sites", "POST"):
+                {
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    List<string> sites;
+                    try { sites = JsonSerializer.Deserialize<List<string>>(body.GetValueOrDefault("sites") ?? "[]") ?? []; }
+                    catch (JsonException) { await SendJson(res, 400, new { error = "Invalid value." }); break; }
+                    if (!AppCatalog.TrySetSites(view, body.GetValueOrDefault("path") ?? "", sites, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
+                    store.Save(cfg);
+                    log.LogInformation("UI: site list for {Exe}: {N} sites", body.GetValueOrDefault("path"), sites.Count);
                     await SendJson(res, 200, CatalogFor(await catalog.GetAsync(), cfg, who));
                     break;
                 }
@@ -474,7 +488,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     if (!Enum.TryParse<UrlMode>(body.GetValueOrDefault("mode"), out var mode)) { await SendJson(res, 400, new { error = "Bad mode." }); break; }
                     var cfg = store.Load();
                     var view = UserScopes.View(cfg, who);
-                    view.Network.Mode = mode;
+                    ConfigEditing.SetUrlMode(view.Network, mode);
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     await SendJson(res, 200, State(cfg, who));
@@ -518,19 +532,37 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
     private static object State(GuardianConfig cfg, string? who)
     {
         var c = UserScopes.View(cfg, who);
-        return StateOf(c, UserScopes.Find(cfg, who)?.UserName, cfg.UserPolicies.Select(p => p.UserName).ToList());
+        return StateOf(c, UserScopes.Find(cfg, who)?.UserName, cfg.UserPolicies.Select(p => p.UserName).ToList(), AllOwn(cfg));
     }
 
-    private static object StateOf(GuardianConfig c, string? scope, List<string> scopes) => new
+    private static List<string> _accounts = [];
+    private static DateTime _accountsAt = DateTime.MinValue;
+
+    /// <summary>True when every account on the computer has settings of its own (the defaults then apply to nobody).</summary>
+    private static bool AllOwn(GuardianConfig cfg)
+    {
+        if (cfg.UserPolicies.Count == 0) return false;
+        if (DateTime.UtcNow - _accountsAt > TimeSpan.FromMinutes(1))
+        {
+            try { _accounts = AppCatalogScanner.LocalAccounts(); } catch (Exception) { /* keep the last list */ }
+            _accountsAt = DateTime.UtcNow;
+        }
+        return _accounts.Count > 0 && _accounts.All(a => UserScopes.Find(cfg, a) != null);
+    }
+
+    private static object StateOf(GuardianConfig c, string? scope, List<string> scopes, bool allOwn) => new
     {
         scope,
         scopes,
+        allOwn,
         settings = new Dictionary<string, bool>
         {
             ["apps.enabled"] = c.Apps.Enabled,
             ["apps.defaultDeny"] = c.Apps.DefaultDeny,
             ["apps.trustProgramFiles"] = c.Apps.TrustProgramFiles,
             ["apps.blockAdminTools"] = c.Apps.BlockAdminTools,
+            ["apps.blockVideo"] = c.Apps.BlockVideoFiles,
+            ["browser.noPrivate"] = c.Browsers.NoPrivate,
             ["network.enabled"] = c.Network.Enabled,
             ["network.urlFiltering"] = c.Network.UrlFiltering,
             ["boot.lockdown"] = c.Boot.Lockdown,

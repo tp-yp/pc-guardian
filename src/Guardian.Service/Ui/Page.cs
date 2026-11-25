@@ -8,7 +8,7 @@ internal static class Page
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Guardian</title>
+<title>Geder</title>
 <style>
 /* Material 3 look (tokens from a blue seed), light and dark */
 :root{--bg:#f9f9ff;--card:#f3f3fa;--card2:#ededf4;--card3:#e2e2e9;--text:#191c20;--muted:#44474e;--ok:#2e6b2f;--okbg:#c8eec0;--bad:#ba1a1a;--badbg:#ffdad6;
@@ -21,7 +21,7 @@ internal static class Page
 [hidden]{display:none !important}
 header{padding:10px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg);position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--line)}
 h1{font-size:22px;font-weight:500;margin:0;display:flex;align-items:center;gap:8px}
-h1:before{content:"";width:28px;height:28px;border-radius:8px;background:var(--accent) radial-gradient(circle at 50% 58%,var(--on-accent) 0 4px,transparent 5px)}
+h1:before{content:"";width:28px;height:28px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0.35' y2='1'%3E%3Cstop offset='0' stop-color='%233d64a8'/%3E%3Cstop offset='1' stop-color='%2314213d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M128 14 C 152 28 186 38 220 40 C 226 41 230 46 230 52 L 230 112 C 230 172 190 214 133 240 C 130 241.5 126 241.5 123 240 C 66 214 26 172 26 112 L 26 52 C 26 46 30 41 36 40 C 70 38 104 28 128 14 Z' fill='url(%23g)'/%3E%3Cpath d='M94 116 V 92 a34 34 0 0 1 68 0 V 116' fill='none' stroke='%23fff' stroke-width='22' stroke-linecap='round'/%3E%3Crect x='70' y='106' width='116' height='88' rx='18' fill='%23fff'/%3E%3Ccircle cx='128' cy='146' r='15' fill='%231d2f55'/%3E%3C/svg%3E") center/contain no-repeat}
 nav{display:flex;gap:4px;flex-wrap:wrap;background:var(--card2);padding:4px;border-radius:24px}
 nav button,.sub button{background:none;color:var(--muted);border:0;border-radius:20px;padding:8px 16px;font-weight:500;height:36px}
 nav button:hover,.sub button:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}
@@ -84,9 +84,18 @@ details summary{cursor:pointer;padding:6px 0}
 .card .go{margin-top:auto;padding-top:6px;color:var(--accent);font-size:13px;font-weight:500}
 .card.pc .go{color:inherit}
 body[data-ctx=user] .machine{display:none!important}
+body[data-ctx=computer][data-allown] .peruser{display:none!important}
 .scopebar{background:var(--accent-c);color:var(--on-accent-c);padding:10px 24px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
 .scopebar .ghost{color:var(--on-accent-c);border-color:currentColor;background:transparent}
 .scopebar.general{background:var(--soft);color:var(--on-soft)}.scopebar.general .ghost{color:var(--on-soft)}
+.dlist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--bg)}
+.drow{border-bottom:1px solid var(--line)}.drow:last-child{border:0}.drow.pc{background:var(--accent-c);color:var(--on-accent-c)}
+.dhead{display:flex;align-items:center;gap:10px;height:60px;padding:0 16px;overflow:hidden}
+.dname{font-size:16px;font-weight:500;white-space:nowrap}.dsum{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.drow.pc .dsum{color:inherit;opacity:.8}
+.dacts{margin-inline-start:auto;display:flex;gap:6px;flex:none}
+button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inherit;border-color:currentColor}
+.ddet{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px 16px;padding:0 16px 14px}
+@media (max-width:600px){.dsum{display:none}.dhead{gap:6px;padding:0 10px}}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--inv);color:var(--on-inv);padding:12px 20px;border-radius:8px;font-size:14px;max-width:90vw;z-index:10;box-shadow:var(--shadow)}
 #toast.bad{background:var(--badbg);color:var(--bad)}
 #login{max-width:400px;margin:15vh auto;padding:0 16px}
@@ -99,9 +108,9 @@ body[data-ctx=user] .machine{display:none!important}
 <div id="lerr" class="bad" style="margin-top:6px"></div></section></div>
 
 <div id="app" hidden>
-<header><h1>Guardian</h1>
+<header><h1>Geder</h1>
 <nav id="tabs">
-<button data-tab="home" class="on">לוח בקרה</button><button data-tab="features">יכולות</button><button data-tab="programs">תוכנות</button><button data-tab="net">רשת</button><button data-tab="users" id="usersTab">משתמשים</button><button data-tab="log">פעילות</button><button data-tab="settings" class="machine">הגדרות</button>
+<button data-tab="home" class="on">לוח בקרה</button><button data-tab="features">יכולות</button><button data-tab="security">אבטחה</button><button data-tab="programs" class="peruser">תוכנות</button><button data-tab="net">רשת</button><button data-tab="users" id="usersTab">משתמשים</button><button data-tab="log">פעילות</button><button data-tab="settings" class="machine">הגדרות</button>
 </nav>
 <button class="ghost" id="logout">נעילה</button></header>
 <div id="scopebar" class="scopebar general" hidden><span id="scopeText"></span><button class="ghost" id="backHome" style="margin-inline-start:auto">חזרה ללוח הבקרה</button></div>
@@ -110,8 +119,8 @@ body[data-ctx=user] .machine{display:none!important}
 <!-- ===== לוח בקרה ===== -->
 <div class="page" data-page="home">
 <section class="wide"><h2>לוח בקרה</h2>
-<p class="hint">חלונית לכל משתמש במחשב, עם ההגנות שפועלות עליו עכשיו. לחיצה על משתמש פותחת את הניהול שלו: תוכנות, אתרים, שעות ופעילות, בנפרד מכל השאר. "המחשב כולו" מרכז את מה שחל על כל המחשב יחד, כמו חסימת מצב בטוח, אינטרנט רק דרך הסינון ונעילת השעון.</p>
-<div id="cards" class="cards"></div></section>
+<p class="hint">שורה לכל משתמש במחשב, עם מספר ההגנות שפועלות עליו עכשיו. "עוד" מציג את הפירוט, ו"לניהול" פותח את הניהול שלו: תוכנות, אתרים, שעות ופעילות, בנפרד מכל השאר. "המחשב כולו", בתחתית הרשימה, מרכז את מה שחל על כל המחשב יחד, כמו נעילת סביבת השחזור, אינטרנט רק דרך הסינון ונעילת השעון.</p>
+<div id="cards" class="dlist"></div></section>
 </div>
 
 <!-- ===== יכולות ===== -->
@@ -119,36 +128,25 @@ body[data-ctx=user] .machine{display:none!important}
 <section class="wide"><h2>מה פעיל עכשיו</h2>
 <p class="hint">מומלץ להדליק יכולת אחת, לבדוק שהמחשב עובד כרגיל, ורק אז להמשיך לבאה. כל שינוי נכנס לתוקף תוך כמה שניות, וכיבוי מחזיר את המצב לקדמותו.</p>
 <div id="toggles"></div>
-<div id="bootStatus" class="machine" hidden style="margin-top:8px"></div>
 <div id="ispConfirm" class="warn" hidden style="margin-top:10px">
 <b>לפני שמפעילים "אינטרנט רק דרך הסינון":</b>
 <div id="ispNow" style="margin:6px 0">בודק את החיבור…</div>
 <ul style="margin:6px 0;padding-inline-start:20px;max-height:none">
-<li style="display:list-item;border:0;padding:0">אם Guardian לא מזהה את הסינון, <b>כל האינטרנט במחשב ייחסם</b> מיד, וייפתח מעצמו רק כשהחיבור יעבור שוב דרך הסינון.</li>
+<li style="display:list-item;border:0;padding:0">אם Geder לא מזהה את הסינון, <b>כל האינטרנט במחשב ייחסם</b> מיד, וייפתח מעצמו רק כשהחיבור יעבור שוב דרך הסינון.</li>
 <li style="display:list-item;border:0;padding:0">גם כשאין רשת בכלל, או כשהבדיקה נכשלת, האינטרנט נשאר חסום עד שהסינון מזוהה.</li>
-<li style="display:list-item;border:0;padding:0">כיבוי המתג או הסרת Guardian (שניהם דורשים סיסמה) מחזירים את האינטרנט מיד.</li>
+<li style="display:list-item;border:0;padding:0">כיבוי המתג או הסרת Geder (שניהם דורשים סיסמה) מחזירים את האינטרנט מיד.</li>
 </ul>
 <label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="ispAgree"> הבנתי, ואני רוצה להפעיל</label>
 <div class="row" style="margin-top:8px"><button id="ispGo" disabled>להפעיל</button><button class="ghost" id="ispCancel">ביטול</button></div>
 </div>
-<div id="bootConfirm" class="warn" hidden style="margin-top:10px">
-<b>לפני שמפעילים את חסימת מצב בטוח וסביבת השחזור:</b>
-<ul style="margin:6px 0;padding-inline-start:20px;max-height:none">
-<li style="display:list-item;border:0;padding:0">לא יהיה אפשר להיכנס ל"הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש), לסביבת השחזור או למצב בטוח, גם לא דרך msconfig.</li>
-<li style="display:list-item;border:0;padding:0">אם ווינדוס יתקלקל ולא יעלה, <b>לא יהיה תיקון אוטומטי</b>. כדי לתקן יצטרכו דיסק און קי עם התקנת ווינדוס. כדאי להכין אחד מראש (כלי "Media Creation Tool" של Microsoft).</li>
-<li style="display:list-item;border:0;padding:0">כיבוי המתג או הסרת Guardian (שניהם דורשים סיסמה) מחזירים הכול בדיוק למצב הקודם.</li>
-<li style="display:list-item;border:0;padding:0">אתחול מדיסק חיצוני לא נחסם. לשם כך צריך לנעול את ה-BIOS (הסבר למטה).</li>
-</ul>
-<label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="bootAgree"> הבנתי, ואני רוצה להפעיל את החסימה</label>
-<div class="row" style="margin-top:8px"><button id="bootGo" disabled>להפעיל את החסימה</button><button class="ghost" id="bootCancel">ביטול</button></div>
-</div></section>
+</section>
 <section class="wide machine" id="ispSec"><h2>אינטרנט רק דרך הסינון (נטפרי / אתרוג / נטספארק)</h2>
-<p class="hint">ספקי סינון כמו נטפרי ואתרוג חותמים על האתרים המוצפנים בתעודת אבטחה משלהם. Guardian מתחבר כל דקה לכמה אתרים מוכרים ובודק מי חתם על התעודה. אם החתימה של ספק הסינון, האינטרנט פתוח. אם לא (למשל חיבור לרשת אחרת, נקודה חמה מהטלפון או רשת אורחים), וכשהמתג "אינטרנט רק דרך הסינון" דולק, Guardian חוסם את כל האינטרנט במחשב עד שהחיבור חוזר לעבור דרך הסינון.</p>
+<p class="hint">ספקי סינון כמו נטפרי ואתרוג חותמים על האתרים המוצפנים בתעודת אבטחה משלהם. Geder מתחבר כל דקה לכמה אתרים מוכרים ובודק מי חתם על התעודה. אם החתימה של ספק הסינון, האינטרנט פתוח. אם לא (למשל חיבור לרשת אחרת, נקודה חמה מהטלפון או רשת אורחים), וכשהמתג "אינטרנט רק דרך הסינון" דולק, Geder חוסם את כל האינטרנט במחשב עד שהחיבור חוזר לעבור דרך הסינון.</p>
 <div class="row" style="margin-top:6px"><b>הספק שלי:</b><label><input type="checkbox" id="ispNetfree"> נטפרי</label><label><input type="checkbox" id="ispEtrog"> אתרוג (מבוסס נטספארק)</label></div>
 <div id="ispNoProvider" class="warn" hidden>לא נבחר אף ספק ואין תעודה שסומכים עליה, לכן הסינון לעולם לא יזוהה.</div>
 <div id="ispStatus" style="margin:8px 0"></div>
 <div class="row"><button class="ghost" id="ispCheck">בדיקה עכשיו</button><button class="ghost" id="ispTrust">זה הסינון שלי, לסמוך על התעודה הזו</button></div>
-<div id="ispTrustNote" class="warn" hidden>לסמוך רק אם השם שמופיע למעלה הוא של ספק הסינון שלכם. אם תסמכו על תעודה של אתר רגיל, Guardian יחשוב שכל חיבור מסונן. <button id="ispTrustGo">כן, זה הסינון שלי</button> <button class="ghost" id="ispTrustCancel">ביטול</button></div>
+<div id="ispTrustNote" class="warn" hidden>לסמוך רק אם השם שמופיע למעלה הוא של ספק הסינון שלכם. אם תסמכו על תעודה של אתר רגיל, Geder יחשוב שכל חיבור מסונן. <button id="ispTrustGo">כן, זה הסינון שלי</button> <button class="ghost" id="ispTrustCancel">ביטול</button></div>
 <details style="margin-top:10px"><summary><b>הגדרות מתקדמות: איך מזהים את הסינון</b></summary>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:10px">
 <div><h3>שמות של ספקי סינון</h3><p class="hint">שמות נוספים, מעבר לספקים שסומנו למעלה. אם אחד מהם מופיע בשם של מי שחתם על התעודה, החיבור נחשב מסונן.</p>
@@ -159,14 +157,14 @@ body[data-ctx=user] .machine{display:none!important}
 <form class="row add" data-list="ispApps"><input required style="flex:1" placeholder="C:\Program Files\Filter\client.exe"><button>הוספה</button></form><ul id="ispApps"></ul></div>
 </div></details></section>
 <section class="wide machine" id="wifiSec"><h2>רשתות Wi-Fi מותרות</h2>
-<p class="hint">כש"רק רשתות Wi-Fi מוכרות" דולק, המחשב מתחבר רק לרשתות שברשימה הזו. ההגנה משתמשת במסנני הרשת של ווינדוס עצמו, וחלה על כל המשתמשים. Guardian מחזיר את המסננים אם מישהו מוחק אותם. כיבוי או הסרה של Guardian מחזירים הכול כמו שהיה.<br>
+<p class="hint">כש"רק רשתות Wi-Fi מוכרות" דולק, המחשב מתחבר רק לרשתות שברשימה הזו. ההגנה משתמשת במסנני הרשת של ווינדוס עצמו, וחלה על כל המשתמשים. Geder מחזיר את המסננים אם מישהו מוחק אותם. כיבוי או הסרה של Geder מחזירים הכול כמו שהיה.<br>
 <b>מה זה לא חוסם:</b> חיבור בכבל רשת וחיבור טלפון בכבל USB (שיתוף אינטרנט ב-USB). את אלה עוצר "אינטרנט רק דרך הסינון".</p>
 <ul id="wifiAllowed"></ul>
 <div class="row" style="margin-top:8px"><select id="wifiSaved"></select><button class="ghost" id="wifiAdd">הוספה לרשימה</button></div>
 <div class="hint" id="wifiNote" style="margin-top:6px"></div>
 </section>
 <section class="wide machine"><h2>אנטי-וירוס עם חומת אש משלו</h2>
-<p class="hint">Guardian משתמש בחומת האש של ווינדוס כדי לחסום אינטרנט: לתוכנות שסימנתם "בלי אינטרנט", כשאין חיבור דרך הסינון, ולתוכנות שלא עוברות בסינון לפי כתובת מלאה. יש אנטי-וירוסים (למשל ESET, Kaspersky, Norton, Bitdefender) שמביאים חומת אש משלהם ומכבים את זו של ווינדוס. במצב כזה:</p>
+<p class="hint">Geder משתמש בחומת האש של ווינדוס כדי לחסום אינטרנט: לתוכנות שסימנתם "בלי אינטרנט", כשאין חיבור דרך הסינון, ולתוכנות שלא עוברות בסינון לפי כתובת מלאה. יש אנטי-וירוסים (למשל ESET, Kaspersky, Norton, Bitdefender) שמביאים חומת אש משלהם ומכבים את זו של ווינדוס. במצב כזה:</p>
 <ul class="hint steps" style="line-height:1.8;margin:0;padding-inline-start:22px">
 <li><b>לא יעבדו:</b> "בלי אינטרנט" לתוכנות, "אינטרנט רק דרך הסינון", וחסימת תוכנות שעוקפות את הסינון לפי כתובת מלאה.</li>
 <li><b>ימשיכו לעבוד:</b> נעילת תוכנות, שעות כניסה, חסימת אתרים דרך בירור הכתובות, והסינון לפי כתובת מלאה בדפדפנים.</li>
@@ -175,10 +173,30 @@ body[data-ctx=user] .machine{display:none!important}
 </ul>
 <div id="fwWarn" class="warn" hidden style="margin-top:8px"></div>
 </section>
-<section class="wide machine"><h2>נעילת ה-BIOS (מומלץ מאוד כשמשתמשים בחסימת מצב בטוח)</h2>
-<p class="hint">Guardian שומר על ווינדוס מבפנים. מי שמפעיל את המחשב מדיסק און קי (התקנת ווינדוס או "דיסק טכנאים") עוקף כל תוכנה, וזה נחסם רק בהגדרות המחשב עצמו (BIOS/UEFI). ההוראות שונות מעט בכל יצרן:</p>
+
+</div>
+
+<!-- ===== אבטחה ===== -->
+<div class="page" data-page="security" hidden>
+<section class="wide"><h2>הגנות מפני עקיפה</h2>
+<p class="hint">ההגנות כאן לא חוסמות תוכן. הן מונעות את הדרכים הנפוצות לעקוף את Geder: סביבת השחזור, כלי הניהול של ווינדוס, VPN ופרוקסי, גלישה בסתר ושינוי השעון.</p>
+<div id="secToggles"></div>
+<div id="bootStatus" class="machine" hidden style="margin-top:8px"></div>
+<div id="bootConfirm" class="warn" hidden style="margin-top:10px">
+<b>לפני שמפעילים את נעילת סביבת השחזור:</b>
+<ul style="margin:6px 0;padding-inline-start:20px;max-height:none">
+<li style="display:list-item;border:0;padding:0">שורת הפקודה, שחזור המערכת, איפוס המחשב והסרת עדכונים מהמסך הכחול לא יהיו זמינים. "הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש) תציג רק שתי אפשרויות: הגדרות אתחול (מצב בטוח) והגדרות קושחת UEFI. Geder ממשיך לפעול גם במצב בטוח, ולכן מצב בטוח לא עוקף את החסימות.</li>
+<li style="display:list-item;border:0;padding:0">אם ווינדוס יתקלקל ולא יעלה, <b>לא יהיה תיקון אוטומטי</b>. כדי לתקן יצטרכו דיסק און קי עם התקנת ווינדוס. כדאי להכין אחד מראש (כלי "Media Creation Tool" של Microsoft).</li>
+<li style="display:list-item;border:0;padding:0">כיבוי המתג או הסרת Geder (שניהם דורשים סיסמה) מחזירים הכול בדיוק למצב הקודם.</li>
+<li style="display:list-item;border:0;padding:0">אתחול מדיסק חיצוני לא נחסם. לשם כך צריך לנעול את ה-BIOS (הסבר למטה).</li>
+</ul>
+<label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="bootAgree"> הבנתי, ואני רוצה להפעיל את הנעילה</label>
+<div class="row" style="margin-top:8px"><button id="bootGo" disabled>להפעיל את הנעילה</button><button class="ghost" id="bootCancel">ביטול</button></div>
+</div></section>
+<section class="wide machine"><h2>נעילת ה-BIOS (מומלץ מאוד כשמשתמשים בנעילת סביבת השחזור)</h2>
+<p class="hint">Geder שומר על ווינדוס מבפנים. מי שמפעיל את המחשב מדיסק און קי (התקנת ווינדוס או "דיסק טכנאים") עוקף כל תוכנה, וזה נחסם רק בהגדרות המחשב עצמו (BIOS/UEFI). ההוראות שונות מעט בכל יצרן:</p>
 <ol class="hint steps" style="line-height:1.8;margin:0;padding-inline-start:22px">
-<li>כדי להיכנס ל-BIOS: <b>הגדרות ווינדוס > מערכת > שחזור > הפעלה מתקדמת > הפעל מחדש עכשיו > פתרון בעיות > אפשרויות מתקדמות > הגדרות קושחת UEFI</b>. אם חסימת מצב בטוח כבר דולקת, צריך במקום זה ללחוץ בזמן ההדלקה על F2, Del, F10 או Esc, לפי היצרן.</li>
+<li>כדי להיכנס ל-BIOS: <b>הגדרות ווינדוס > מערכת > שחזור > הפעלה מתקדמת > הפעל מחדש עכשיו > פתרון בעיות > אפשרויות מתקדמות > הגדרות קושחת UEFI</b>. זה עובד גם כשנעילת סביבת השחזור דולקת: בתפריט יופיעו רק שתי אפשרויות, ו"הגדרות קושחת UEFI" היא אחת מהן. אפשר גם ללחוץ בזמן ההדלקה על F2, Del, F10 או Esc, לפי היצרן.</li>
 <li><b>סיסמת מנהל ל-BIOS</b> (Supervisor / Administrator Password): בלשונית Security. שמרו אותה במקום בטוח. אם שוכחים אותה, לפעמים רק מעבדה יכולה לאפס.</li>
 <li><b>סדר אתחול</b> (Boot): להשאיר רק את הדיסק הפנימי (Windows Boot Manager), ולכבות אתחול מ-USB ומהרשת (USB Boot, PXE / Network Boot).</li>
 <li><b>תפריט אתחול חד-פעמי</b> (Boot Menu, בדרך כלל F12): לכבות אותו, או לוודא שהוא דורש את הסיסמה.</li>
@@ -191,18 +209,20 @@ body[data-ctx=user] .machine{display:none!important}
 
 <!-- ===== תוכנות ===== -->
 <div class="page" data-page="programs" hidden>
-<section class="wide"><h2>כל התוכנות במחשב</h2>
+<section class="wide peruser"><h2>כל התוכנות במחשב</h2>
 <p class="hint">הרשימה נאספת מתפריט התחל, מ"אפליקציות מותקנות" בהגדרות ומהחנות של Microsoft. לכל תוכנה אפשר לבחור:<br>
 <b>נעולה</b> – התוכנה תיסגר מיד בכל פעם שמישהו ינסה לפתוח אותה, ויופיע מסך חסימה.<br>
 <b>בלי אינטרנט</b> – התוכנה תיפתח כרגיל, אבל לא תוכל להתחבר לאינטרנט.<br>
 <b>שעות</b> – התוכנה תיחסם רק בשעות שתקבעו (למשל משחק שמותר רק אחרי הצהריים). מחוץ לשעות האלה היא עובדת כרגיל, ואם היא פתוחה כשהשעה מגיעה, היא נסגרת.<br>
 <b>גישה ישירה</b> – רלוונטי רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תתחבר לאינטרנט בלי לעבור בסינון. מתאים למשחקים, Steam, Spotify ותוכנות שמפסיקות לעבוד כשהסינון דולק.<br>
+<b>אתרים</b> – רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תוכל להגיע רק לאתרים שברשימה שלה, גם דרך חלון אינטרנט שמובנה בתוכנה (WebView2). מתאים לתוכנה שצריכה אתר אחד או שניים.<br>
 <b>תוכנות של משתמש אחר</b> – בניהול של משתמש מופיעות רק תוכנות שמותקנות לכולם ותוכנות שהותקנו למשתמש הזה. תוכנה שנמצאת בתיקייה של משתמש אחר (למשל בהורדות שלו או ב-AppData שלו) חסומה אוטומטית לכל השאר, כל עוד "נעילת תוכנות" דולקת אצלם.</p>
-<div class="row"><input id="q" placeholder="חיפוש תוכנה…" style="flex:1;min-width:180px"><label><input type="checkbox" id="onlySet"> רק תוכנות עם הגבלה</label><button class="ghost" id="refresh">רענון הרשימה</button></div>
+<div class="row"><input id="q" placeholder="חיפוש תוכנה…" style="flex:1;min-width:180px"><select id="srcPick"><option value="">כל המקורות</option><option value="StartMenu">רק מתפריט התחל</option><option value="InstalledApps">רק אפליקציות מותקנות</option><option value="Store">רק מהחנות של Microsoft</option></select><button class="ghost" id="refresh">רענון הרשימה</button></div>
+<div class="row" style="margin-top:6px"><label><input type="checkbox" id="onlySet"> רק תוכנות עם הגבלה</label><label><input type="checkbox" id="hideWin" checked> להסתיר תוכנות של ווינדוס (System32 ותיקיית Windows)</label></div>
 <div id="catNote" class="hint" style="margin-top:8px"></div>
-<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th><th>שעות חסימה</th></tr></thead><tbody id="catalog"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th><th>שעות חסימה</th><th>אתרים</th></tr></thead><tbody id="catalog"></tbody></table></div>
 </section>
-<section class="wide"><details><summary><b>הוספה ידנית (לתוכנות שלא מופיעות ברשימה, למשל קבצים ניידים)</b></summary>
+<section class="wide peruser"><details><summary><b>הוספה ידנית (לתוכנות שלא מופיעות ברשימה, למשל קבצים ניידים)</b></summary>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px">
 <div><h3>תוכנות מותרות</h3><p class="hint">כשהיכולת "חסימת כל תוכנה לא מוכרת" דולקת, רק תוכנות מוכרות נפתחות. כאן מוסיפים תוכנה או תיקייה שמותר להפעיל. אפשר לכתוב שם קובץ (zoom.exe) או תיקייה שלמה (C:\Tools\).</p>
 <form class="row add" data-list="allowApps"><input required style="flex:1" placeholder="zoom.exe או C:\Tools\"><button>הוספה</button></form><ul id="allowApps"></ul></div>
@@ -216,41 +236,41 @@ body[data-ctx=user] .machine{display:none!important}
 <div class="wide sub" id="netsub"><button data-sub="urls" class="on">חסימת כתובות</button><button data-sub="netapps">תוכנות ברשת</button></div>
 
 <div class="page" data-sub-page="urls">
-<section class="wide"><h2>איך לחסום אתרים</h2>
+<section class="wide peruser"><h2>איך לחסום אתרים</h2>
 <div class="row" style="margin-bottom:8px"><select id="mode"><option value="Blocklist">רשימה שחורה – הכול מותר, חוץ ממה שברשימה</option><option value="Allowlist">רשימה לבנה – הכול חסום, חוץ ממה שברשימה</option></select></div>
 <p class="hint" id="modeHint"></p>
 <div class="row" style="margin:8px 0"><button class="ghost" id="msUpdates">להתיר עדכוני ווינדוס ואופיס</button><span class="hint">פותח את כתובות העדכונים של Microsoft (גם ברשימה לבנה) ונותן גישה ישירה לתוכנת העדכון של Office.</span></div>
 <div id="netOff" class="warn" hidden>היכולת "סינון אתרים וחומת אש" כבויה כרגע, ולכן הרשימות כאן לא נאכפות. אפשר להדליק אותה בלשונית "יכולות".</div>
 <div id="urlOff" class="warn" hidden>"סינון לפי כתובת מלאה" כבוי, לכן כתובות עם נתיב (למשל youtube.com/shorts) לא נאכפות. רק אתרים שלמים נחסמים.</div>
 </section>
-<section><h2 id="domainsTitle">רשימה</h2>
+<section class="peruser"><h2 id="domainsTitle">רשימה</h2>
 <p class="hint">אפשר לכתוב אתר שלם (tiktok.com, וזה כולל גם www.tiktok.com) או חלק מאתר (youtube.com/shorts).</p>
 <form class="row add" data-list="domains"><input placeholder="tiktok.com או youtube.com/shorts" required style="flex:1"><button>הוספה</button></form>
 <ul id="domains"></ul></section>
-<section><h2>יוצאי דופן</h2>
+<section class="peruser"><h2>יוצאי דופן</h2>
 <p class="hint" id="excHint"></p>
 <form class="row add" data-list="exceptions"><input placeholder="youtube.com/watch?v=..." required style="flex:1"><button>הוספה</button></form>
 <ul id="exceptions"></ul></section>
 <section class="wide machine"><h2>אתרים שלא נבדקים לעומק (בנקים ואתרים רגישים)</h2>
-<p class="hint">כדי לראות כתובת מלאה, Guardian פותח את התקשורת המוצפנת במחשב שלך (שום דבר לא יוצא מהמחשב). באתרים שברשימה הזו הוא לא עושה את זה, ובודק רק את שם האתר. מומלץ להוסיף כאן בנקים, קופות חולים ואתרים רשמיים. אם אתר מסוים מציג שגיאת אבטחה, הוסיפו אותו לכאן.</p>
+<p class="hint">כדי לראות כתובת מלאה, Geder פותח את התקשורת המוצפנת במחשב שלך (שום דבר לא יוצא מהמחשב). באתרים שברשימה הזו הוא לא עושה את זה, ובודק רק את שם האתר. מומלץ להוסיף כאן בנקים, קופות חולים ואתרים רשמיים. אם אתר מסוים מציג שגיאת אבטחה, הוסיפו אותו לכאן.</p>
 <form class="row add" data-list="noDecrypt"><input placeholder="bankhapoalim.co.il" required style="flex:1"><button>הוספה</button></form>
 <ul id="noDecrypt"></ul></section>
 <section class="wide machine"><h2>מכשירים ברשת המקומית (לא מסוננים)</h2>
 <p class="hint">כתובות במחשבים ובמכשירים שבבית, כמו שרת מקומי, מדפסת, NAS או הנתב, שהסינון לא חל עליהן: כל תוכנה יכולה להתחבר אליהן ישירות. אפשר לכתוב כתובת אחת (192.168.1.20) או טווח (192.168.1.0/24). מתקבלות רק כתובות של רשת מקומית, כך שאי אפשר לפתוח כאן את האינטרנט. חשוב: מכשיר שמוחרג כאן יכול בעצמו להעביר אינטרנט לא מסונן (למשל אם מריצים עליו שרת פרוקסי), לכן כדאי להחריג רק מכשירים שאתם סומכים עליהם.</p>
-<p class="hint">לא יודעים את הכתובת? הכפתור "כל הרשת המקומית" מחריג את כל הכתובות של רשתות מקומיות (בבית, במקום הלימודים, מדפסות). שמות של שרתים פנימיים ברשת (למשל של מאגר במקום הלימודים) Guardian שואל תמיד משרת השמות של אותה רשת, גם בלי הרשימה הזו. הרשימה נחוצה רק כש"סינון לפי כתובת מלאה" או "אינטרנט רק דרך הסינון" דולקים.</p>
+<p class="hint">לא יודעים את הכתובת? הכפתור "כל הרשת המקומית" מחריג את כל הכתובות של רשתות מקומיות (בבית, במקום הלימודים, מדפסות). שמות של שרתים פנימיים ברשת (למשל של מאגר במקום הלימודים) Geder שואל תמיד משרת השמות של אותה רשת, גם בלי הרשימה הזו. הרשימה נחוצה רק כש"סינון לפי כתובת מלאה" או "אינטרנט רק דרך הסינון" דולקים.</p>
 <form class="row add" data-list="localAddresses"><input required style="flex:1;direction:ltr" placeholder="192.168.1.20"><button>הוספה</button><button type="button" class="ghost" id="allLan">כל הרשת המקומית</button></form>
 <ul id="localAddresses"></ul></section>
 </div>
 
 <div class="page" data-sub-page="netapps" hidden>
-<section><h2>תוכנות בלי אינטרנט</h2>
+<section class="peruser"><h2>תוכנות בלי אינטרנט</h2>
 <p class="hint">התוכנות האלה נפתחות כרגיל אבל לא יכולות להתחבר לאינטרנט. הדרך הנוחה להוסיף היא בלשונית "תוכנות". כאן אפשר גם להדביק נתיב מלא לקובץ.</p>
 <form class="row add" data-list="blockedApps"><input required style="flex:1" placeholder="C:\Games\game.exe"><button>הוספה</button></form><ul id="blockedApps"></ul></section>
 <section class="machine"><h2>תוכנות עם גישה ישירה</h2>
 <p class="hint">כש"סינון לפי כתובת מלאה" דולק, כל התקשורת עוברת דרך מסנן אחד במחשב. רוב הדפדפנים עוברים בו בלי בעיה, אבל יש תוכנות שלא יודעות לעבור דרכו ולכן מאבדות אינטרנט. תוכנות ברשימה הזו מתחברות ישירות, בלי סינון.</p>
 <form class="row add" data-list="directApps"><input required style="flex:1" placeholder="C:\Program Files (x86)\Steam\steam.exe"><button>הוספה</button></form><ul id="directApps"></ul></section>
 <section class="wide machine"><h2>תוכנות שניסו להתחבר ונחסמו</h2>
-<p class="hint">במקום ניסוי וטעייה: Guardian רושם כל תוכנה שניסתה להתחבר לאינטרנט ישירות, בלי לעבור במסנן, ונחסמה. אם תוכנה שאתם צריכים מופיעה כאן ולא עובדת, לחצו "לאפשר גישה ישירה". הרשימה מתמלאת רק כש"סינון לפי כתובת מלאה" דולק.</p>
+<p class="hint">במקום ניסוי וטעייה: Geder רושם כל תוכנה שניסתה להתחבר לאינטרנט ישירות, בלי לעבור במסנן, ונחסמה. אם תוכנה שאתם צריכים מופיעה כאן ולא עובדת, לחצו "לאפשר גישה ישירה". הרשימה מתמלאת רק כש"סינון לפי כתובת מלאה" דולק.</p>
 <div class="scroll"><table><thead><tr><th>תוכנה</th><th>ניסיונות</th><th>לאחרונה</th><th></th></tr></thead><tbody id="direct"></tbody></table></div>
 <div id="directEmpty" class="hint" style="margin-top:8px"></div>
 </section>
@@ -259,7 +279,7 @@ body[data-ctx=user] .machine{display:none!important}
 <ul>
 <li><b>עובדים דרך המסנן:</b> Edge, Chrome, Brave, Opera, רוב תוכנות Office, Teams, Zoom, Windows Update, החנות של Microsoft, Dropbox, OneDrive.</li>
 <li><b>Firefox:</b> עובד, בתנאי שבהגדרות הרשת שלו נבחר "השתמש בהגדרות ה-proxy של המערכת" (זו ברירת המחדל).</li>
-<li><b>בדרך כלל צריכים גישה ישירה:</b> Steam ומשחקים מקוונים, Epic Games, Spotify, Discord (קול ווידאו), WhatsApp ו-Telegram למחשב, תוכנות VPN, תוכנות שיתוף מסך כמו AnyDesk ו-TeamViewer.</li>
+<li><b>בדרך כלל צריכים גישה ישירה:</b> WhatsApp למחשב, תוכנות VPN, תוכנות שיתוף מסך כמו AnyDesk ו-TeamViewer.</li>
 <li>תוכנה שמקבלת גישה ישירה לא מסוננת בכלל. אם המטרה היא לחסום אותה, השתמשו ב"בלי אינטרנט" או ב"נעולה".</li>
 </ul></div></section>
 </div>
@@ -284,8 +304,9 @@ body[data-ctx=user] .machine{display:none!important}
 <div class="page" data-page="log" hidden>
 <section class="wide"><h2>פעילות בזמן אמת</h2>
 <p class="hint">כל אתר שנפתח וכל תוכנה שנחסמה מופיעים כאן. אפשר לחסום או להתיר כל שורה: רק את הכתובת המדויקת, או את כל האתר (הדומיין). לתוכנה שנחסמה אפשר להתיר רק את הקובץ, או את כל התיקייה שלה (מומלץ לתוכנות שמורכבות מכמה קבצים, כמו Discord או Zoom).</p>
-<div class="row"><label><input type="checkbox" id="onlyBlocked"> רק מה שנחסם</label><input id="filter" placeholder="סינון…" style="flex:1;min-width:160px"><label><input type="checkbox" id="pause"> עצירת עדכון</label></div>
-<div class="scroll" style="margin-top:8px"><table><thead><tr><th>שעה</th><th>משתמש</th><th>סוג</th><th>מצב</th><th>מה</th><th>פעולות</th></tr></thead><tbody id="log"></tbody></table></div></section>
+<p class="hint">בעמודה "תוכנה" מופיעה התוכנה שיצרה את החיבור. כשהבקשה עוברת דרך שירות השמות של ווינדוס, Geder מזהה את התוכנה לפי יומן השירות. אם הזיהוי לא מצליח, השדה נשאר ריק.</p>
+<div class="row"><label><input type="checkbox" id="onlyBlocked"> רק מה שנחסם</label><select id="logUser" class="machine"><option value="">כל המשתמשים</option></select><select id="logApp"><option value="">כל התוכנות</option></select><input id="filter" placeholder="סינון…" style="flex:1;min-width:160px"><label><input type="checkbox" id="pause"> עצירת עדכון</label></div>
+<div class="scroll" style="margin-top:8px"><table><thead><tr><th>שעה</th><th>משתמש</th><th>תוכנה</th><th>סוג</th><th>מצב</th><th>מה</th><th>פעולות</th></tr></thead><tbody id="log"></tbody></table></div></section>
 </div>
 
 <!-- ===== הגדרות ===== -->
@@ -302,19 +323,19 @@ body[data-ctx=user] .machine{display:none!important}
 <input type="password" id="pwNew2" required minlength="8" placeholder="הסיסמה החדשה שוב" autocomplete="new-password">
 <div><button>שינוי הסיסמה</button></div></form></section>
 <section><h2>מצב החיבור</h2>
-<p class="hint">כאן רואים אם Guardian מצליח לברר כתובות אתרים. אם יש "מחובר, אין אינטרנט", הסתכלו כאן קודם.</p>
+<p class="hint">כאן רואים אם Geder מצליח לברר כתובות אתרים. אם יש "מחובר, אין אינטרנט", הסתכלו כאן קודם.</p>
 <div id="health" class="hint"></div><button class="ghost" id="healthBtn">בדיקה</button></section>
 <section class="wide machine"><h2>השהיית כיבוי</h2>
-<p class="hint">כל שינוי שמחליש את ההגנה (כיבוי יכולת, שחרור תוכנה או אתר, הסרת שעות, שחרור זמני, הקטנת ההשהיה עצמה) לא מתבצע מיד, אלא אחרי מספר השעות שתקבעו. בזמן הזה אפשר לבטל אותו כאן. שינויים שמחמירים את ההגנה מתבצעים מיד. גם הסרת Guardian דורשת בקשה מראש, והיא מתאפשרת רק אחרי ההשהיה. הזמן נמדד לפי השעון המהימן של Guardian, כך ששינוי השעון לא מקצר אותו. 0 = בלי השהיה.</p>
-<div class="row"><label>השהיה של <input type="number" id="coolHours" min="0" style="width:110px"> שעות</label><button id="coolSave">שמירה</button></div>
+<p class="hint">כל שינוי שמחליש את ההגנה (כיבוי יכולת, שחרור תוכנה או אתר, הסרת שעות, שחרור זמני, הקטנת ההשהיה עצמה) לא מתבצע מיד, אלא אחרי מספר הדקות שתקבעו (60 = שעה, 1440 = יממה). בזמן הזה אפשר לבטל אותו כאן. שינויים שמחמירים את ההגנה מתבצעים מיד. גם הסרת Geder דורשת בקשה מראש, והיא מתאפשרת רק אחרי ההשהיה. הזמן נמדד לפי השעון המהימן של Geder, כך ששינוי השעון לא מקצר אותו. 0 = בלי השהיה.</p>
+<div class="row"><label>השהיה של <input type="number" id="coolMin" min="0" step="1" style="width:120px"> דקות</label><span class="hint" id="coolWords" style="margin:0"></span><button id="coolSave">שמירה</button></div>
 <h3 style="margin:14px 0 4px;font-size:15px">שינויים שממתינים</h3>
 <ul id="coolPending"></ul>
 <div id="coolUninstall" class="row" style="margin-top:10px"></div>
 </section>
-<section class="wide"><h2>הסרת Guardian</h2>
-<p class="hint">מסיר את Guardian מהמחשב ומחזיר את כל מה שהוא שינה: חומת האש, הגדרות הרשת, תעודת האבטחה ושעות הכניסה של המשתמשים. ווינדוס יבקש אישור מנהל, ואחריו צריך להקליד את סיסמת הניהול או את הסיסמה המצילה.</p>
-<button class="ghost" id="uninstall" style="color:var(--bad);border-color:var(--bad)">הסרת Guardian…</button>
-<div id="uninstallNote" class="hint" hidden style="margin-top:8px">אפשר גם להסיר דרך הגדרות ווינדוס: אפליקציות > אפליקציות מותקנות > Guardian > הסרת התקנה.</div></section>
+<section class="wide"><h2>הסרת Geder</h2>
+<p class="hint">מסיר את Geder מהמחשב ומחזיר את כל מה שהוא שינה: חומת האש, הגדרות הרשת, תעודת האבטחה ושעות הכניסה של המשתמשים. ווינדוס יבקש אישור מנהל, ואחריו צריך להקליד את סיסמת הניהול או את הסיסמה המצילה.</p>
+<button class="ghost" id="uninstall" style="color:var(--bad);border-color:var(--bad)">הסרת Geder…</button>
+<div id="uninstallNote" class="hint" hidden style="margin-top:8px">אפשר גם להסיר דרך הגדרות ווינדוס: אפליקציות > אפליקציות מותקנות > Geder > הסרת התקנה.</div></section>
 </div>
 </main>
 </div>
@@ -328,10 +349,11 @@ let idleMin=5,lastAct=Date.now(),lastPing=Date.now(),state=null;
 function toast(msg,bad){const t=$('toast');t.textContent=msg;t.className=bad?'bad':'';t.hidden=false;clearTimeout(t._t);t._t=setTimeout(()=>t.hidden=true,4500)}
 function api(p,o={},active=true){const h={'X-Guardian':'1','Content-Type':'application/json'};if(active)h['X-Active']='1';
  return fetch(p,{...o,headers:h,credentials:'same-origin'}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401&&p!=='/api/login'){show(false)}
-  if(r.status===202&&j.pending){toast('השינוי נשמר ויתבצע ב-'+fmtDue(j.due)+' (השהיית כיבוי של '+j.hours+' שעות). אפשר לבטל אותו בלשונית "הגדרות".');load();loadCooling();if(catalog)renderCatalog();return new Promise(()=>{})}
+  if(r.status===202&&j.pending){toast('השינוי נשמר ויתבצע ב-'+fmtDue(j.due)+' (השהיית כיבוי של '+(j.delay||fmtMin(j.minutes))+'). אפשר לבטל אותו בלשונית "הגדרות".');load();loadCooling();if(catalog)renderCatalog();return new Promise(()=>{})}
   if(!r.ok)throw new Error(HE[j.error]||j.error||('שגיאה '+r.status));return j})}
+const fmtMin=m=>{m=+m||0;return m===1?'דקה':m<60?m+' דקות':m===60?'שעה':m===120?'שעתיים':m%60===0?(m/60)+' שעות':m+' דקות'};
 const fmtDue=d=>new Date(d).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow','/api/tools/unlock','/api/catalog/hours'];
+let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow','/api/tools/unlock','/api/catalog/hours','/api/catalog/sites'];
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(SCOPED.includes(p)&&!('user' in b)?{...b,user:scope}:b)});
 const q=(p,extra)=>p+'?user='+encodeURIComponent(scope)+(extra||'');
 const short=u=>u?String(u).split('\\').pop():'';
@@ -350,7 +372,8 @@ setInterval(()=>{if(!$('app').hidden&&Date.now()-lastAct>idleMin*60000){post('/a
 function openTab(name){if(name==='settings'&&scope)name='features';
  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));document.querySelectorAll('[data-page]').forEach(m=>m.hidden=m.dataset.page!==name);
  $('scopebar').hidden=name==='home';if(name==='home')loadDash();
- if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings'){loadHealth();loadCooling()}if(name==='features'){loadIsp();if(!scope)loadWifi()}}
+ if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings'){loadHealth();loadCooling()}if(name==='features'){loadIsp();if(!scope)loadWifi()}if(name==='security'&&!scope)loadBoot();
+ if(name==='programs'&&!scope&&state&&state.allOwn)openTab('features')}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
 document.querySelectorAll('#netsub button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#netsub button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('[data-sub-page]').forEach(m=>m.hidden=m.dataset.subPage!==b.dataset.sub);if(b.dataset.sub==='netapps')loadDirect()});
 
@@ -359,21 +382,23 @@ const TOGGLES=[
  ['apps.enabled','נעילת תוכנות','תוכנות שסימנתם כ"נעולות" בלשונית "תוכנות" ייסגרו מיד כשמישהו פותח אותן, ויופיע מסך חסימה. בלי היכולת הזו, הסימונים לא נאכפים.'],
  ['apps.defaultDeny','חסימת כל תוכנה לא מוכרת','כל תוכנה שלא הותקנה כרגיל תיחסם: קבצים שהורדו, תוכנות ניידות, דיסק און קי ותוכנות שמתקינות את עצמן בלי אישור מנהל. כדי לאפשר אחת מהן, התירו אותה מלשונית "פעילות" או הוסיפו אותה ב"תוכנות" > "הוספה ידנית".','לפני שמדליקים: כדאי להדליק קודם את "נעילת תוכנות", לעבוד יום רגיל, ולראות בלשונית "פעילות" מה היה נחסם.'],
  ['apps.trustProgramFiles','לסמוך על תוכנות שהותקנו כרגיל','תוכנות שהותקנו לתיקיית Program Files (התקנה רגילה שדורשת אישור מנהל) נחשבות מוכרות ולא נחסמות. מומלץ להשאיר דולק.'],
- ['apps.blockAdminTools','חסימת כלי מנהל','חוסם את שורת הפקודה, PowerShell, עורך הרישום, מסופי הניהול (שירותים, מתזמן משימות, מדיניות קבוצתית), פקודות הרשאות ושירותים, שחזור מערכת ואיפוס המחשב. כמעט כל הוראה לעקיפת Guardian עוברת דרך הכלים האלה, ולכן זו אחת ההגנות החזקות. גם עותק או שינוי שם של הכלי ייחסמו. שורת הפקודה ועורך הרישום נחסמים מיד דרך מדיניות של ווינדוס (הסייר ותפריט התחל מתחילים לחסום אחרי כניסה מחדש לחשבון). כלים שנפתחים בדרך אחרת, כמו PowerShell בתוך הטרמינל, נסגרים תוך שניות. מנהל המשימות וההגדרות נשארים פתוחים. כשצריך את הכלים, משחררים אותם לזמן קצוב מתחת למתג הזה.','לפני שמדליקים לחשבון שלכם: ודאו שאתם זוכרים את סיסמת Guardian, כי בלעדיה לא תוכלו לשחרר את הכלים.'],
+ ['apps.blockAdminTools','חסימת כלי מנהל','חוסם את שורת הפקודה, PowerShell, עורך הרישום, מסופי הניהול (שירותים, מתזמן משימות, מדיניות קבוצתית), פקודות הרשאות ושירותים, שחזור מערכת ואיפוס המחשב. כמעט כל הוראה לעקיפת Geder עוברת דרך הכלים האלה, ולכן זו אחת ההגנות החזקות. גם עותק או שינוי שם של הכלי ייחסמו. שורת הפקודה ועורך הרישום נחסמים מיד דרך מדיניות של ווינדוס (הסייר ותפריט התחל מתחילים לחסום אחרי כניסה מחדש לחשבון). כלים שנפתחים בדרך אחרת, כמו PowerShell בתוך הטרמינל, נסגרים תוך שניות. מנהל המשימות וההגדרות נשארים פתוחים. כשצריך את הכלים, משחררים אותם לזמן קצוב מתחת למתג הזה.','לפני שמדליקים לחשבון שלכם: ודאו שאתם זוכרים את סיסמת Geder, כי בלעדיה לא תוכלו לשחרר את הכלים.','sec'],
+ ['apps.blockVideo','חסימת קבצי וידאו','נגני וידאו נסגרים מיד כשהם נפתחים, כולל נגן המדיה של ווינדוס (גם כשמשתמשים בו למוזיקה), VLC ונגנים נפוצים אחרים, גם אם שינו להם את השם. גם כל תוכנה אחרת שנפתחת עם קובץ וידאו, למשל בלחיצה כפולה על הקובץ, ב"פתח באמצעות" או בקישור לקובץ, נסגרת.'],
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
  ['isp.required','אינטרנט רק דרך הסינון','חוסם את כל האינטרנט כשהמחשב לא מחובר דרך ספק סינון (נטפרי, אתרוג או נטספארק). הזיהוי לפי תעודת האבטחה, והסבר מלא בהמשך העמוד. ההפעלה דורשת אישור, וכיבוי מחזיר את האינטרנט מיד.'],
- ['vpn.block','חסימת VPN ופרוקסי','חוסם תוכנות VPN ופרוקסי מוכרות (גם אם שינו להן את השם), את אתרי ההורדה שלהן ואתרי פרוקסי מוכרים, את החיבורים של ה-VPN המובנה בווינדוס, ואת האפשרות להגדיר פרוקסי ידנית. ה-VPN המובנה מסוג SSTP משתמש באותו חיבור כמו אתרים רגילים ולא נחסם כאן, וגם תוכנה שלא ברשימה לא תיחסם לפי השם. לכן כדאי להפעיל גם "סינון לפי כתובת מלאה" או "חסימת כל תוכנה לא מוכרת".'],
+ ['vpn.block','חסימת VPN ופרוקסי','חוסם תוכנות VPN ופרוקסי מוכרות (גם אם שינו להן את השם), את אתרי ההורדה שלהן ואתרי פרוקסי מוכרים, את החיבורים של ה-VPN המובנה בווינדוס, ואת האפשרות להגדיר פרוקסי ידנית. ה-VPN המובנה מסוג SSTP משתמש באותו חיבור כמו אתרים רגילים ולא נחסם כאן, וגם תוכנה שלא ברשימה לא תיחסם לפי השם. לכן כדאי להפעיל גם "סינון לפי כתובת מלאה" או "חסימת כל תוכנה לא מוכרת".','','sec'],
  ['wifi.knownOnly','רק רשתות Wi-Fi מוכרות','המחשב יוכל להתחבר רק לרשתות Wi-Fi שכבר שמורות בו עכשיו. רשתות חדשות, כמו נקודה חמה מטלפון או רשת של שכנים, לא יופיעו ולא יהיה אפשר להתחבר אליהן. הרשימה המלאה ואפשרות להוסיף רשת נמצאות בהמשך העמוד.'],
- ['clock.locked','נעילת השעון','Guardian לוקח את השעה הנכונה מהאינטרנט וסופר אותה בעצמו, כך ששינוי השעה או אזור הזמן במחשב לא עוקף את שעות הנעילה ואת התוכנות שחסומות לפי שעות. אם מישהו משנה את השעון, הוא חוזר לשעה הנכונה תוך כמה שניות.'],
- ['boot.lockdown','חסימת מצב בטוח וסביבת השחזור','מונע עקיפה של Guardian דרך מצב בטוח, "הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש) וסביבת השחזור של ווינדוס. תיקון אוטומטי ותפריט F8 מכובים גם הם. ההפעלה דורשת אישור, והכיבוי או ההסרה מחזירים הכול כמו שהיה.'],
- ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Guardian מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
+ ['browser.noPrivate','ביטול גלישה בסתר','מבטל את חלונות הגלישה בסתר (InPrivate, Incognito, חלון פרטי) ב-Edge, ב-Chrome, ב-Brave וב-Firefox, וגם את חלונות Tor של Brave. גלישה בסתר לא עוקפת את סינון האתרים, אבל בלעדיה ההיסטוריה נשמרת. דפדפנים אחרים, כמו Opera, לא מאפשרים לבטל גלישה בסתר, ולכן כדאי לנעול אותם. אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים.','','sec'],
+ ['clock.locked','נעילת השעון','Geder לוקח את השעה הנכונה מהאינטרנט וסופר אותה בעצמו, כך ששינוי השעה או אזור הזמן במחשב לא עוקף את שעות הנעילה ואת התוכנות שחסומות לפי שעות. אם מישהו משנה את השעון, הוא חוזר לשעה הנכונה תוך כמה שניות.','','sec'],
+ ['boot.lockdown','נעילת סביבת השחזור','מכבה את סביבת השחזור של ווינדוס, וכך מונע את הדרכים לעקוף את Geder מהמסך הכחול: שורת פקודה, שחזור מערכת, איפוס המחשב והסרת עדכונים. גם תיקון אוטומטי ותפריט F8 מכובים, ובקשות להפעלה במצב בטוח (למשל דרך msconfig) מבוטלות. "הפעלה מחדש מתקדמת" (Shift+הפעלה מחדש) עדיין פותחת תפריט, אבל יש בו רק "הגדרות אתחול" ו"הגדרות קושחת UEFI". אפשר להיכנס משם למצב בטוח, אבל Geder פועל גם בו, ולכן אי אפשר להסיר אותו או לשנות את ההגדרות שלו משם. ההפעלה דורשת אישור, והכיבוי או ההסרה מחזירים הכול כמו שהיה.','','sec'],
+ ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Geder מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
 ];
 function sw(checked,onchange,label,disabled){const i=el('input',{type:'checkbox',checked,disabled:!!disabled});i.setAttribute('aria-label',label);i.onchange=()=>onchange(i);return el('label',{class:'switch',title:label},i,el('span',{class:'slider'}))}
-const PER_USER=['apps.enabled','apps.defaultDeny','apps.trustProgramFiles','apps.blockAdminTools'];
+const PER_USER=['apps.enabled','apps.defaultDeny','apps.trustProgramFiles','apps.blockAdminTools','apps.blockVideo'];
 function askBoot(){$('bootConfirm').hidden=false;$('bootAgree').checked=false;$('bootGo').disabled=true;$('bootConfirm').scrollIntoView({behavior:'smooth',block:'center'})}
 $('bootAgree').onchange=()=>$('bootGo').disabled=!$('bootAgree').checked;
 $('bootCancel').onclick=()=>$('bootConfirm').hidden=true;
-$('bootGo').onclick=()=>post('/api/settings',{key:'boot.lockdown',value:'true'}).then(st=>{$('bootConfirm').hidden=true;render(st);setTimeout(loadBoot,8000);toast('חסימת מצב בטוח וסביבת השחזור הופעלה. מומלץ לנעול גם את ה-BIOS.')}).catch(fail);
+$('bootGo').onclick=()=>post('/api/settings',{key:'boot.lockdown',value:'true'}).then(st=>{$('bootConfirm').hidden=true;render(st);setTimeout(loadBoot,8000);toast('נעילת סביבת השחזור הופעלה. מומלץ לנעול גם את ה-BIOS.')}).catch(fail);
 // Filtered line (ISP filter)
 const ISPST={Filtered:['ok','החיבור עובר דרך הסינון'],NotFiltered:['bad','החיבור לא עובר דרך הסינון'],NoNetwork:['bad','אין חיבור לאינטרנט'],Unknown:['muted','עוד לא נבדק']};
 let isp=null;
@@ -387,7 +412,7 @@ function renderIspNow(i){const n=$('ispNow');n.replaceChildren(ispLine(i));
  if(i.status!=='Filtered')n.append(el('div',{class:'bad',style:'margin-top:4px'},'שימו לב: כרגע הסינון לא מזוהה, ולכן ההפעלה תחסום את האינטרנט מיד. אם אתם כן מחוברים דרך הסינון, לחצו קודם "זה הסינון שלי" בחלק "אינטרנט רק דרך הסינון" למטה.'))}
 function loadBoot(){return api('/api/boot',{},false).then(b=>{const d=$('bootStatus');d.hidden=!b.lockdown;if(!b.lockdown)return;
  d.className='machine '+(b.winReOff===false?'warn':'tip');
- d.replaceChildren(el('b',{},'מצב חסימת מצב בטוח וסביבת השחזור: '),
+ d.replaceChildren(el('b',{},'מצב נעילת סביבת השחזור: '),
   b.winReOff===true?el('span',{class:'ok'},'סביבת השחזור כבויה ✓'):b.winReOff===false?el('span',{class:'bad'},'ווינדוס לא איפשר לכבות את סביבת השחזור. '+(b.error||'')):el('span',{class:'muted'},'בודק…'),
   b.safeModePending?el('div',{class:'bad'},'יש בקשה להפעלה מחדש במצב בטוח, והיא תבוטל.'):'',
   el('div',{class:'muted',style:'font-size:12px'},'בדיקה לאחרונה: '+(b.checked?new Date(b.checked).toLocaleTimeString('he-IL'):'עדיין לא')+'. כדי לוודא: הגדרות > מערכת > שחזור > "הפעל מחדש עכשיו" אמור להציג הודעה שסביבת השחזור לא נמצאה.'))}).catch(()=>{})}
@@ -414,10 +439,15 @@ function toolsUnlock(){const m=el('select',{},...[15,30,60,120].map(x=>el('optio
  return el('div',{class:'row',style:'margin-top:6px'},el('small',{},'שחרור זמני'+(scope?' עבור '+scope:'')+':'),m,
   el('button',{class:'ghost',onclick:()=>post('/api/tools/unlock',{minutes:m.value}).then(r=>toast('כלי המנהל משוחררים עד '+new Date(r.until).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}))).catch(fail)},'לשחרר'),
   el('button',{class:'link',onclick:()=>post('/api/tools/unlock',{minutes:'0'}).then(()=>toast('כלי המנהל חסומים שוב')).catch(fail)},'לחסום שוב עכשיו'))}
-function renderToggles(s){$('toggles').replaceChildren(...TOGGLES.filter(([k])=>!scope||PER_USER.includes(k)).map(([k,t,d,w])=>{const txt=el('div',{},el('b',{},t),el('small',{},d));
+// Each switch goes to "יכולות" or to "אבטחה". On the whole-computer screen, when every account has settings of
+// its own, the per-account defaults are hidden: they would apply to nobody.
+function toggleRow([k,t,d,w]){const s=state.settings;const txt=el('div',{},el('b',{},t),el('small',{},d));
  if(k==='apps.blockAdminTools'&&s[k])txt.append(toolsUnlock());
  txt.append(el('small',{class:'badge',style:'display:inline-block;margin-top:4px'},PER_USER.includes(k)?(scope?'חל רק על '+scope:'ברירת מחדל: חל על משתמשים בלי הגדרות נפרדות'):'חל על כל המחשב'));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
- return el('div',{class:'toggle'},txt,sw(s[k],i=>(ASK[k]&&i.checked)?(i.checked=false,ASK[k]()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);if(k==='isp.required')loadIsp();if(k==='boot.lockdown')loadBoot();if(k==='wifi.knownOnly')loadWifi();toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}))}
+ return el('div',{class:'toggle'},txt,sw(s[k],i=>(ASK[k]&&i.checked)?(i.checked=false,ASK[k]()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);if(k==='isp.required')loadIsp();if(k==='boot.lockdown')loadBoot();if(k==='wifi.knownOnly')loadWifi();toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}
+function renderToggles(){const show=([k])=>scope?PER_USER.includes(k):!(state.allOwn&&PER_USER.includes(k));
+ $('toggles').replaceChildren(...TOGGLES.filter(x=>x[4]!=='sec'&&show(x)).map(toggleRow));
+ $('secToggles').replaceChildren(...TOGGLES.filter(x=>x[4]==='sec'&&show(x)).map(toggleRow))}
 
 // Wi-Fi networks
 function loadWifi(){api('/api/wifi',{},false).then(w=>{
@@ -440,9 +470,9 @@ function renderMode(st){const allow=st.mode==='Allowlist';$('mode').value=st.mod
  $('domainsTitle').textContent=allow?'אתרים מותרים':'אתרים חסומים';
  $('excHint').textContent=allow?'כתובות שייחסמו למרות שהאתר שלהן ברשימת המותרים. למשל: youtube.com מותר, אבל youtube.com/shorts חסום.':'כתובות שיהיו פתוחות למרות שהאתר שלהן חסום. למשל: youtube.com חסום, אבל סרטון מסוים מותר.';
  $('netOff').hidden=st.settings['network.enabled'];$('urlOff').hidden=!st.settings['network.enabled']||st.settings['network.urlFiltering']}
-function renderScope(st){const bar=$('scopebar');document.body.dataset.ctx=st.scope?'user':'computer';
+function renderScope(st){const bar=$('scopebar');document.body.dataset.ctx=st.scope?'user':'computer';if(st.allOwn)document.body.dataset.allown='1';else delete document.body.dataset.allown;
  bar.className='scopebar'+(st.scope?'':' general');$('usersTab').textContent=st.scope?'שעות':'משתמשים';
- $('scopeText').replaceChildren(...(st.scope?['מנהלים עכשיו את ',el('b',{},st.scope),'. כל שינוי בתוכנות, באתרים ובשעות חל רק עליו.']:[el('b',{},'המחשב כולו'),'. הגדרות שחלות על כל המחשב, וברירת המחדל למשתמשים בלי הגדרות נפרדות.']));
+ $('scopeText').replaceChildren(...(st.scope?['מנהלים עכשיו את ',el('b',{},st.scope),'. כל שינוי בתוכנות, באתרים ובשעות חל רק עליו.']:[el('b',{},'המחשב כולו'),st.allOwn?'. לכל המשתמשים יש הגדרות נפרדות, ולכן מוצגות כאן רק הגדרות שחלות על כל המחשב.':'. הגדרות שחלות על כל המחשב, וברירת המחדל למשתמשים בלי הגדרות נפרדות.']));
  $('scopeUrlWarn').hidden=!(st.scopes.length&&!st.settings['network.urlFiltering'])}
 $('backHome').onclick=()=>openTab('home');
 function setScope(u,tab){scope=u||'';catalog=null;return api(q('/api/state')).then(st=>{render(st);openTab(tab||'features')}).catch(fail)}
@@ -456,34 +486,37 @@ function scopeLines(m){return[
  stLine(m.adminTools,m.adminTools?'כלי מנהל חסומים':'כלי מנהל פתוחים'),
  stLine(m.noInternetApps>0,m.noInternetApps?m.noInternetApps+' תוכנות בלי אינטרנט':'אין תוכנות בלי אינטרנט')]}
 const ISPDASH={Filtered:'מחובר דרך הסינון',NotFiltered:'לא מחובר דרך הסינון',NoNetwork:'אין רשת',Unknown:'עוד לא נבדק'};
-function renderDash(d){const c=d.computer;
- const pc=el('button',{class:'card pc'},el('h3',{},'המחשב כולו'),
-  stLine(c.network,c.network?'סינון אתרים וחומת אש פועלים':'סינון אתרים וחומת אש כבויים'),
-  stLine(c.urlFiltering,c.urlFiltering?'סינון לפי כתובת מלאה':'סינון לפי כתובת מלאה כבוי'),
-  stLine(c.isp.required,c.isp.required?'אינטרנט רק דרך הסינון: '+(c.isp.blocked?'האינטרנט חסום עכשיו':ISPDASH[c.isp.status]||''):'אינטרנט רק דרך הסינון כבוי'),
-  stLine(c.clock,c.clock?'השעון נעול':'השעון לא נעול'),
-  stLine(c.vpn,c.vpn?'VPN ופרוקסי חסומים':'VPN ופרוקסי לא חסומים'),
-  stLine(c.wifi,c.wifi?'רק רשתות Wi-Fi מוכרות':'אפשר להתחבר לכל רשת Wi-Fi'),
-  stLine(c.boot,c.boot?'מצב בטוח וסביבת השחזור חסומים':'מצב בטוח וסביבת השחזור פתוחים'),
-  (c.otherFirewalls||[]).length?el('div',{class:'warn'},'חומת אש של '+c.otherFirewalls.join(', ')+' פועלת במחשב. חלק מהחסימות של Guardian לא יעבדו (פירוט בלשונית "יכולות").'):'',
-  el('small',{class:'muted',style:'margin-top:4px'},'ברירת מחדל למשתמשים בלי הגדרות נפרדות:'),...scopeLines(d.general),
-  el('span',{class:'go'},'לניהול המחשב כולו ←'));
- pc.onclick=()=>setScope('');
- const users=d.users.map(u=>{const badges=[u.online?el('span',{class:'badge ok'},'מחובר עכשיו'):null,u.lockedNow?el('span',{class:'badge bad'},'בשעות נעילה'):null,
-   u.unlockedUntil?el('span',{class:'badge'},'שוחרר עד '+new Date(u.unlockedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})):null];
-  const b=el('button',{class:'card'},el('h3',{},u.name,...badges),
-   el('small',{class:'muted'},u.own?'הגדרות נפרדות':'עדיין לפי ברירת המחדל'),...scopeLines(u.summary),
-   stLine(u.summary.schedule,u.summary.schedule?'יש שעות נעילה':'אין שעות נעילה'),
-   stLine(u.summary.breakEvery>0,u.summary.breakEvery>0?'מניעת התמכרות: הפסקה כל '+u.summary.breakEvery+' דקות':'בלי מניעת התמכרות'),
-   el('span',{class:'go'},'לניהול של '+u.name+' ←'));
-  b.onclick=()=>enterUser(u);return b});
+// One row per account (and one for the whole computer) at a fixed height; "עוד" opens the details.
+const openRows=new Set();
+function dashRow(key,title,badges,lines,manage,onManage){const on=lines.filter(x=>x.classList&&x.classList.contains('on')).length,all=lines.filter(x=>x.classList&&x.classList.contains('st')).length;
+ const more=el('button',{class:'ghost small'},openRows.has(key)?'פחות':'עוד');
+ const det=el('div',{class:'ddet'},...lines);det.hidden=!openRows.has(key);
+ more.onclick=()=>{if(openRows.has(key))openRows.delete(key);else openRows.add(key);det.hidden=!openRows.has(key);more.textContent=openRows.has(key)?'פחות':'עוד'};
+ return el('div',{class:'drow'},el('div',{class:'dhead'},el('b',{class:'dname'},title),...badges.filter(Boolean),
+  el('span',{class:'muted dsum'},on+' מתוך '+all+' הגנות פעילות'),el('span',{class:'dacts'},more,el('button',{class:'small',onclick:onManage},manage))),det)}
+function renderDash(d){const c=d.computer;const allOwn=d.users.length&&d.users.every(u=>u.own);
+ const users=d.users.map(u=>dashRow('u:'+u.name,u.name,[u.online?el('span',{class:'badge ok'},'מחובר עכשיו'):null,u.lockedNow?el('span',{class:'badge bad'},'בשעות נעילה'):null,
+   u.unlockedUntil?el('span',{class:'badge'},'שוחרר עד '+new Date(u.unlockedUntil).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})):null,u.own?null:el('span',{class:'badge'},'לפי ברירת המחדל')],
+  [...scopeLines(u.summary),stLine(u.summary.schedule,u.summary.schedule?'יש שעות נעילה':'אין שעות נעילה'),
+   stLine(u.summary.breakEvery>0,u.summary.breakEvery>0?'מניעת התמכרות: הפסקה כל '+u.summary.breakEvery+' דקות':'בלי מניעת התמכרות')],'לניהול',()=>enterUser(u)));
+ const pc=dashRow('pc','המחשב כולו',[(c.otherFirewalls||[]).length?el('span',{class:'badge bad'},'חומת אש נוספת'):null],
+  [stLine(c.network,c.network?'סינון אתרים וחומת אש פועלים':'סינון אתרים וחומת אש כבויים'),
+   stLine(c.urlFiltering,c.urlFiltering?'סינון לפי כתובת מלאה':'סינון לפי כתובת מלאה כבוי'),
+   stLine(c.isp.required,c.isp.required?'אינטרנט רק דרך הסינון: '+(c.isp.blocked?'האינטרנט חסום עכשיו':ISPDASH[c.isp.status]||''):'אינטרנט רק דרך הסינון כבוי'),
+   stLine(c.clock,c.clock?'השעון נעול':'השעון לא נעול'),
+   stLine(c.vpn,c.vpn?'VPN ופרוקסי חסומים':'VPN ופרוקסי לא חסומים'),
+   stLine(c.wifi,c.wifi?'רק רשתות Wi-Fi מוכרות':'אפשר להתחבר לכל רשת Wi-Fi'),
+   stLine(c.boot,c.boot?'סביבת השחזור נעולה':'סביבת השחזור פתוחה'),
+   (c.otherFirewalls||[]).length?el('div',{class:'warn',style:'grid-column:1/-1'},'חומת אש של '+c.otherFirewalls.join(', ')+' פועלת במחשב. חלק מהחסימות של Geder לא יעבדו (פירוט בלשונית "יכולות").'):'',
+   ...(allOwn?[]:[el('small',{class:'muted',style:'grid-column:1/-1;margin-top:4px'},'ברירת מחדל למשתמשים בלי הגדרות נפרדות:'),...scopeLines(d.general)])],'לניהול',()=>setScope(''));
+ pc.classList.add('pc');
  $('cards').replaceChildren(...users,pc)}
 function loadDash(){return api('/api/dashboard',{},false).then(d=>{renderDash(d);const f=d.computer.otherFirewalls||[];$('fwWarn').hidden=!f.length;$('fwWarn').textContent=f.length?'נמצאה במחשב חומת אש פעילה של: '+f.join(', ')+'.':''}).catch(()=>{})}
 // Entering a user gives them settings of their own (a copy of the defaults) the first time.
 function enterUser(u){(u.own?Promise.resolve():post('/api/users/own',{name:u.name,own:'true'}).then(()=>toast(u.name+' קיבל הגדרות נפרדות, שמתחילות כהעתק של ברירת המחדל.')))
  .then(()=>setScope(u.name)).catch(fail)}
 setInterval(()=>{if(!$('app').hidden&&!document.querySelector('[data-page=home]').hidden)loadDash()},15000);
-function render(st){state=st;scope=st.scope||'';renderScope(st);renderProviders(st);idleMin=st.idleMinutes||5;renderToggles(st.settings);renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
+function render(st){state=st;scope=st.scope||'';renderScope(st);renderProviders(st);idleMin=st.idleMinutes||5;renderToggles();renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
  $('idle').replaceChildren(...st.idleChoices.map(m=>el('option',{value:m,selected:m===idleMin},String(m))));if(catalog)renderCatalog()}
 function load(){api(q('/api/state')).then(render).catch(fail)}
 $('idle').onchange=e=>post('/api/settings/idle',{minutes:e.target.value}).then(st=>{render(st);toast('הממשק יינעל אחרי '+e.target.value+' דקות ללא פעילות')}).catch(fail);
@@ -491,22 +524,37 @@ $('idle').onchange=e=>post('/api/settings/idle',{minutes:e.target.value}).then(s
 // Programs (catalog)
 let catalog=null;const SRCN={StartMenu:'תפריט התחל',InstalledApps:'אפליקציות מותקנות',Store:'Microsoft Store'};
 function loadCatalog(refresh){$('catNote').textContent='טוען את רשימת התוכנות… (בפעם הראשונה זה יכול לקחת כחצי דקה)';api(q('/api/catalog',refresh?'&refresh=1':'')).then(c=>{catalog=c;renderCatalog()}).catch(x=>{$('catNote').textContent='';fail(x)})}
-$('refresh').onclick=()=>loadCatalog(true);$('q').oninput=()=>renderCatalog();$('onlySet').onchange=()=>renderCatalog();
+$('refresh').onclick=()=>loadCatalog(true);$('q').oninput=()=>renderCatalog();$('onlySet').onchange=()=>renderCatalog();$('srcPick').onchange=()=>renderCatalog();$('hideWin').onchange=()=>renderCatalog();
+const isWin=p=>/^[a-z]:\\windows\\/i.test(p);
 function setApp(a,kind,i){post('/api/catalog/set',{path:a.exePath,kind,value:String(i.checked)}).then(c=>{catalog=c;load();
  const msg={lock:['ננעלה','שוחררה מנעילה'],internet:['לא תוכל להתחבר לאינטרנט','יכולה שוב להתחבר לאינטרנט'],direct:['קיבלה גישה ישירה לאינטרנט','תעבור שוב דרך הסינון']}[kind];toast(a.name+' '+(i.checked?msg[0]:msg[1])+(kind==='direct'?'':(scope?' (עבור '+scope+')':'')))}).catch(x=>{fail(x);i.checked=!i.checked})}
 function renderCatalog(){if(!catalog)return;const q=$('q').value.trim().toLowerCase(),only=$('onlySet').checked,direct=state&&state.settings['network.urlFiltering'];
- const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length));
- $('catNote').textContent=catalog.length+' תוכנות נמצאו'+(q||only?', מוצגות '+rows.length:'')+'.'+(state&&!state.settings['apps.enabled']&&catalog.some(a=>a.locked)?' שימו לב: "נעילת תוכנות" כבויה בלשונית "יכולות", ולכן הנעילות לא נאכפות.':'');
+ const src=$('srcPick').value,hw=$('hideWin').checked;
+ const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length||(a.sites||[]).length)&&(!src||a.source===src)&&(!hw||!isWin(a.exePath)||a.locked||(a.hours||[]).length));
+ $('catNote').textContent=catalog.length+' תוכנות נמצאו'+(rows.length!==catalog.length?', מוצגות '+rows.length:'')+'.'+(state&&!state.settings['apps.enabled']&&catalog.some(a=>a.locked)?' שימו לב: "נעילת תוכנות" כבויה בלשונית "יכולות", ולכן הנעילות לא נאכפות.':'');
  $('catalog').replaceChildren(...rows.map(a=>el('tr',{},el('td',{},el('b',{},a.name),el('div',{class:'hint ltr',style:'margin:0;font-size:11px'},a.exePath)),el('td',{},el('span',{class:'badge'},SRCN[a.source]||a.source),a.owner?el('div',{class:'hint',style:'margin:2px 0 0;font-size:11px'},'של '+a.owner):''),
   el('td',{},sw(a.locked,i=>setApp(a,'lock',i),'נעולה')),el('td',{},sw(a.internetBlocked,i=>setApp(a,'internet',i),'בלי אינטרנט')),el('td',{},sw(a.directInternet,i=>setApp(a,'direct',i),'גישה ישירה',!direct&&!a.directInternet)),
-  el('td',{},el('button',{class:'link',onclick:e=>appHours(a,e.target.closest('tr'))},(a.hours||[]).length?'חסומה לפי שעות':'+ שעות')))))}
+  el('td',{},el('button',{class:'link',onclick:e=>appHours(a,e.target.closest('tr'))},(a.hours||[]).length?'חסומה לפי שעות':'+ שעות')),
+  el('td',{},el('button',{class:'link',onclick:e=>appSites(a,e.target.closest('tr'))},(a.sites||[]).length?(a.sites.length===1?'אתר אחד':a.sites.length+' אתרים'):'+ אתרים')))))}
 // Blocked hours for one program, edited in a row under it.
 function appHours(a,tr){const open=tr.nextElementSibling;if(open&&open.classList.contains('hrs')){open.remove();return}
  const box=el('div');(a.hours||[]).forEach(w=>box.append(winRow(w)));
  const save=()=>post('/api/catalog/hours',{path:a.exePath,windows:JSON.stringify(readWins(box))}).then(c=>{catalog=c;load();renderCatalog();
   toast(readWins(box).length?a.name+' תיחסם בשעות שנקבעו'+(scope?' (עבור '+scope+')':''):'הוסרו שעות החסימה של '+a.name)}).catch(fail);
- tr.after(el('tr',{class:'hrs'},el('td',{colspan:6},el('div',{class:'hint',style:'margin:0'},'השעות שבהן '+a.name+' חסומה'+(scope?' עבור '+scope:'')+'. בשאר הזמן היא עובדת כרגיל (אלא אם היא מסומנת "נעולה").'),box,
+ tr.after(el('tr',{class:'hrs'},el('td',{colspan:7},el('div',{class:'hint',style:'margin:0'},'השעות שבהן '+a.name+' חסומה'+(scope?' עבור '+scope:'')+'. בשאר הזמן היא עובדת כרגיל (אלא אם היא מסומנת "נעולה").'),box,
   el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.map(d=>d[0]),start:'22:00',end:'07:00'}))},'+ טווח שעות'),el('button',{onclick:save},'שמירה')))))}
+
+// The only sites one program may reach (also its built-in browser parts, WebView2), edited in a row under it.
+function appSites(a,tr){const open=tr.nextElementSibling;if(open&&open.classList.contains('hrs')){open.remove();return}
+ const ta=el('textarea',{class:'ltr',rows:4,style:'width:100%;margin-top:6px',placeholder:'example.com\nlogin.example.com'});ta.value=(a.sites||[]).join('\n');
+ const on=state&&state.settings['network.urlFiltering'];
+ const save=()=>{const list=ta.value.split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);
+  post('/api/catalog/sites',{path:a.exePath,sites:JSON.stringify(list)}).then(c=>{catalog=c;load();renderCatalog();
+   toast(list.length?a.name+' תוכל להגיע רק לאתרים שברשימה'+(scope?' (עבור '+scope+')':''):'הוסרה רשימת האתרים של '+a.name)}).catch(fail)};
+ tr.after(el('tr',{class:'hrs'},el('td',{colspan:7},el('div',{class:'hint',style:'margin:0'},'האתרים היחידים ש-'+a.name+' יכולה להגיע אליהם'+(scope?' עבור '+scope:'')+', כתובת בכל שורה. שאר האתרים חסומים לה, גם אם הם מותרים בשאר המחשב. רשימה ריקה מבטלת את ההגבלה.'),
+  on?'':el('div',{class:'warn',style:'margin-top:6px'},'הרשימה נאכפת רק כש"סינון לפי כתובת מלאה" פועל.'),
+  a.directInternet?el('div',{class:'warn',style:'margin-top:6px'},'לתוכנה הזו יש "גישה ישירה", ולכן היא לא עוברת דרך הסינון והרשימה לא חלה עליה.'):'',
+  ta,el('div',{class:'row',style:'margin-top:8px'},el('button',{onclick:save},'שמירה')))))}
 
 // Direct-connection attempts
 function loadDirect(){api('/api/direct',{},false).then(rows=>{$('direct').replaceChildren(...rows.map(d=>el('tr',{},el('td',{class:'l'},d.appPath),el('td',{},String(d.count)),el('td',{},new Date(d.last).toLocaleString('he-IL')),
@@ -564,34 +612,42 @@ function actions(r){const t=r.target,u=rowScope(r);
  if(r.source==='app'&&!r.allowed)return[btn('להתיר תוכנה זו',()=>appAllow(t,'file',u)),btn('להתיר את כל התיקייה',()=>appAllow(t,'folder',u))];
  if(r.source==='direct')return[btn('לאפשר גישה ישירה',()=>edit('directApps','add',t).then(()=>toast('התוכנה קיבלה גישה ישירה')).catch(()=>{}))];
  return[]}
+// The program behind a row: its file name ("chrome.exe").
+const appOf=r=>{const a=r.app||(r.source==='app'||r.source==='direct'?r.target:'');return a?a.split('\\').pop():''};
+// Fills a filter list with the values seen, keeping the current choice.
+function fillPick(id,all,vals){const s=$(id),cur=s.value,set=[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b));if(cur&&!set.includes(cur))set.unshift(cur);
+ const sig=set.join('|');if(s.dataset.sig===sig)return;s.dataset.sig=sig;s.replaceChildren(el('option',{value:''},all),...set.map(v=>el('option',{value:v,selected:v===cur},v)))}
+$('logUser').onchange=()=>tick();$('logApp').onchange=()=>tick();
 let timer;function tick(){clearTimeout(timer);if($('app').hidden)return;if($('pause').checked||document.querySelector('[data-page=log]').hidden){timer=setTimeout(tick,3000);return}
- api('/api/log',{},false).then(rows=>{const ob=$('onlyBlocked').checked,q=$('filter').value.toLowerCase();
- $('log').replaceChildren(...rows.filter(r=>(!scope||short(r.user).toLowerCase()===scope.toLowerCase())&&(!ob||!r.allowed)&&(!q||r.target.toLowerCase().includes(q))).slice(0,200).map(r=>el('tr',{},
-  el('td',{},new Date(r.time).toLocaleTimeString('he-IL')),el('td',{},short(r.user)||(r.source==='dns'?'(לא ידוע)':'')),el('td',{},SRC[r.source]||r.source),el('td',{class:r.allowed?'ok':'bad'},r.allowed?'הותר':'נחסם'),
+ api('/api/log',{},false).then(rows=>{const ob=$('onlyBlocked').checked,q=$('filter').value.toLowerCase(),fu=scope?'':$('logUser').value,fa=$('logApp').value;
+ fillPick('logUser','כל המשתמשים',rows.map(r=>short(r.user)));fillPick('logApp','כל התוכנות',rows.map(appOf));
+ $('log').replaceChildren(...rows.filter(r=>(!scope||short(r.user).toLowerCase()===scope.toLowerCase())&&(!fu||short(r.user)===fu)&&(!fa||appOf(r)===fa)&&(!ob||!r.allowed)&&(!q||r.target.toLowerCase().includes(q)||(r.app||'').toLowerCase().includes(q))).slice(0,200).map(r=>el('tr',{},
+  el('td',{},new Date(r.time).toLocaleTimeString('he-IL')),el('td',{},short(r.user)||(r.source==='dns'?'(לא ידוע)':'')),el('td',{title:r.app||''},appOf(r)),el('td',{},SRC[r.source]||r.source),el('td',{class:r.allowed?'ok':'bad'},r.allowed?'הותר':'נחסם'),
   el('td',{class:'l'},r.target),el('td',{},el('div',{class:'acts'},...actions(r))))))}).catch(()=>{}).finally(()=>timer=setTimeout(tick,3000))}
 $('pause').onchange=()=>tick();
 
 // Settings
 // Delay before turning off
-const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
+const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/catalog/sites':'רשימת אתרים לתוכנה','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
  '/api/site':'היתר לאתר','/api/network/list':'רשימת רשת','/api/network/mode':'מצב סינון האתרים','/api/users/set':'שעות ומניעת התמכרות','/api/users/unlock':'שחרור זמני של משתמש',
  '/api/tools/unlock':'שחרור זמני של כלי מנהל','/api/users/own':'חזרה לברירת המחדל','/api/wifi/list':'הוספת רשת Wi-Fi','/api/network/msupdates':'החרגת עדכוני מיקרוסופט','/api/isp/trust':'תעודת סינון','/api/cooling/set':'הקטנת ההשהיה'};
 function describePending(p){const b=p.body||{};const t=(TOGGLES.find(x=>x[0]===b.key)||[])[1];
- const what=p.path==='/api/settings'?(t||b.key)+' – '+(b.value==='true'?'הדלקה':'כיבוי'):p.path==='/api/cooling/set'?'הקטנת ההשהיה ל-'+b.hours+' שעות':
+ const what=p.path==='/api/settings'?(t||b.key)+' – '+(b.value==='true'?'הדלקה':'כיבוי'):p.path==='/api/cooling/set'?'הקטנת ההשהיה ל-'+(b.minutes!=null?fmtMin(b.minutes):b.hours+' שעות'):
   (PLAB[p.path]||p.path)+(b.path?': '+b.path.split('\\').pop():b.value?': '+b.value:b.target?': '+b.target:b.minutes?': '+b.minutes+' דקות':'');
  return what+(p.user?' (עבור '+p.user+')':'')}
-function loadCooling(){api('/api/cooling',{},false).then(c=>{$('coolHours').value=c.hours;
+function loadCooling(){api('/api/cooling',{},false).then(c=>{$('coolMin').value=c.minutes;$('coolWords').textContent='('+(c.minutes?fmtMin(c.minutes):'בלי השהיה')+')';
  $('coolPending').replaceChildren(...(c.pending.length?c.pending.map(p=>el('li',{},el('span',{},describePending(p)+' · יתבצע ב-'+fmtDue(p.due)),
   el('button',{class:'link',onclick:()=>post('/api/cooling/cancel',{id:p.id}).then(()=>{toast('השינוי בוטל');loadCooling()}).catch(fail)},'ביטול'))):[el('li',{class:'muted'},'אין שינויים שממתינים')]));
- const u=$('coolUninstall');u.replaceChildren();if(!c.hours)return;
- if(!c.uninstallDue)u.append(el('span',{class:'muted'},'הסרת Guardian:'),el('button',{class:'ghost',onclick:()=>post('/api/cooling/uninstall',{action:'request'}).then(r=>{toast('ההסרה תתאפשר ב-'+fmtDue(r.due));loadCooling()}).catch(fail)},'בקשת הסרה'));
+ const u=$('coolUninstall');u.replaceChildren();if(!c.minutes)return;
+ if(!c.uninstallDue)u.append(el('span',{class:'muted'},'הסרת Geder:'),el('button',{class:'ghost',onclick:()=>post('/api/cooling/uninstall',{action:'request'}).then(r=>{toast('ההסרה תתאפשר ב-'+fmtDue(r.due));loadCooling()}).catch(fail)},'בקשת הסרה'));
  else u.append(el('span',{class:c.uninstallReady?'badge ok':'badge'},c.uninstallReady?'אפשר להסיר עכשיו':'ההסרה תתאפשר ב-'+fmtDue(c.uninstallDue)),
   el('button',{class:'link',onclick:()=>post('/api/cooling/uninstall',{action:'cancel'}).then(()=>{toast('בקשת ההסרה בוטלה');loadCooling()}).catch(fail)},'ביטול הבקשה'))}).catch(()=>{})}
-$('coolSave').onclick=()=>post('/api/cooling/set',{hours:$('coolHours').value}).then(()=>{toast('ההשהיה נשמרה: '+$('coolHours').value+' שעות');loadCooling()}).catch(fail);
+$('coolMin').oninput=()=>$('coolWords').textContent='('+(+$('coolMin').value?fmtMin($('coolMin').value):'בלי השהיה')+')';
+$('coolSave').onclick=()=>post('/api/cooling/set',{minutes:$('coolMin').value}).then(()=>{toast('ההשהיה נשמרה: '+(+$('coolMin').value?fmtMin($('coolMin').value):'בלי השהיה'));loadCooling()}).catch(fail);
 function loadHealth(){api('/api/health').then(h=>{$('health').replaceChildren(
  h.dnsLastSuccess?el('div',{class:'ok'},'בירור כתובות עובד. הצלחה אחרונה: '+new Date(h.dnsLastSuccess).toLocaleTimeString('he-IL')):el('div',{class:'muted'},'עדיין לא היו בירורי כתובות (סינון האתרים כבוי או שהשירות רק התחיל).'),
  h.dnsLastError?el('div',{class:'bad'},'שגיאה אחרונה: '+h.dnsLastError):'',
- h.clockSynced?el('div',{class:'ok'},'השעה אומתה מול האינטרנט ב-'+new Date(h.clockLastSync).toLocaleTimeString('he-IL')+'. השעה הנכונה לפי Guardian: '+new Date(h.clockTrusted).toLocaleTimeString('he-IL')):el('div',{class:'muted'},'השעה עדיין לא אומתה מול האינטרנט.'))}).catch(fail)}
+ h.clockSynced?el('div',{class:'ok'},'השעה אומתה מול האינטרנט ב-'+new Date(h.clockLastSync).toLocaleTimeString('he-IL')+'. השעה הנכונה לפי Geder: '+new Date(h.clockTrusted).toLocaleTimeString('he-IL')):el('div',{class:'muted'},'השעה עדיין לא אומתה מול האינטרנט.'))}).catch(fail)}
 $('healthBtn').onclick=loadHealth;
 $('uninstall').onclick=()=>{if(window.chrome&&chrome.webview){chrome.webview.postMessage('uninstall')}else{$('uninstallNote').hidden=false}};
 

@@ -9,7 +9,8 @@ using Guardian.Core.Policy;
 namespace Guardian.Core.Network;
 
 /// <summary>Who is behind a proxy connection (found from its local port), and which rules apply to them.</summary>
-public sealed record ProxyClient(NetworkPolicy Policy, string? User);
+/// <param name="App">The program behind the connection (full path), when known.</param>
+public sealed record ProxyClient(NetworkPolicy Policy, string? User, string? App = null);
 
 /// <summary>
 /// Local HTTP/HTTPS filtering proxy. HTTPS is decrypted with a per-machine CA so the full URL
@@ -25,7 +26,8 @@ public sealed class FilterProxy(
     Action<string, string, bool>? log = null,
     RemoteCertificateValidationCallback? upstreamValidation = null,
     Func<string, string>? blockPage = null,
-    Func<IPEndPoint, ProxyClient>? identify = null)
+    Func<IPEndPoint, ProxyClient>? identify = null,
+    Action<ProxyClient, string, bool>? logClient = null)
 {
 
     private TcpListener? _listener;
@@ -107,7 +109,11 @@ public sealed class FilterProxy(
     }
 
     /// <summary>Log callback receives (user or host, url, allowed); the user is known when <c>identify</c> is set.</summary>
-    private void Log(ProxyClient who, string host, string url, bool ok) => log?.Invoke(who.User ?? host, url, ok);
+    private void Log(ProxyClient who, string host, string url, bool ok)
+    {
+        if (logClient != null) logClient(who, url, ok);
+        else log?.Invoke(who.User ?? host, url, ok);
+    }
 
     private async Task Forward(Stream client, HttpHead head, byte[] rest, string host, int port, string path, bool tls, ProxyClient who, CancellationToken ct)
     {

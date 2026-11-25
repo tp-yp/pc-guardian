@@ -29,7 +29,7 @@ div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:i
     {
         if (GetSystemMetrics(67 /* SM_CLEANBOOT */) == 0) return false;
         MessageBoxW(IntPtr.Zero, "המחשב נמצא במצב בטוח. במצב הזה ווינדוס לא טוען חלק מהרכיבים שחלונות Guardian צריכים, ולכן אי אפשר לפתוח כאן את הניהול, ההתקנה או ההסרה.\n\nהפעילו מחדש את המחשב כרגיל ונסו שוב.",
-            "Guardian", 0x40 | 0x80000 | 0x100000 /* info, right-to-left reading, right-aligned */);
+            "Geder", 0x40 | 0x80000 | 0x100000 /* info, right-to-left reading, right-aligned */);
         return true;
     }
 
@@ -38,7 +38,7 @@ div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:i
         if (InSafeModeNotice()) return 0;
         using var single = new Mutex(true, "Local\\Guardian.App", out var first);
         if (!first) return 0; // already open
-        var shown = AppWindow.Show(new AppWindow.Options("Guardian", 1150, 820), wv =>
+        var shown = AppWindow.Show(new AppWindow.Options("Geder", 1150, 820), wv =>
         {
             wv.NavigationCompleted += (_, e) =>
             {
@@ -65,7 +65,7 @@ div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:i
     {
         if (InSafeModeNotice()) return 0;
         using var web = new SetupWeb(store, mode);
-        var title = mode switch { SetupMode.Install => "התקנת Guardian", SetupMode.Update => "עדכון Guardian", _ => "הסרת Guardian" };
+        var title = mode switch { SetupMode.Install => "התקנת Geder", SetupMode.Update => "עדכון Geder", _ => "הסרת Geder" };
         var shown = AppWindow.Show(new AppWindow.Options(title, mode == SetupMode.Install ? 1150 : 560, mode == SetupMode.Install ? 820 : 520),
             wv => wv.Navigate(web.Url));
         if (!shown)
@@ -82,7 +82,7 @@ div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:i
     {
         string name;
         try { name = Encoding.UTF8.GetString(Convert.FromBase64String(base64Name)); } catch { name = ""; }
-        AppWindow.Show(new AppWindow.Options("Guardian", 560, 340, Popup: true, TopMost: true, AutoCloseSeconds: 15),
+        AppWindow.Show(new AppWindow.Options("Geder", 560, 340, Popup: true, TopMost: true, AutoCloseSeconds: 15),
             wv => wv.NavigateToString(BlockScreen.ForProgram(name)));
         return 0;
     }

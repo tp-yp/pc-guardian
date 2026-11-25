@@ -17,7 +17,25 @@ internal static class ProcessParent
     [DllImport("kernel32.dll")] private static extern bool GetProcessTimes(IntPtr h, out long creation, out long exit, out long kernel, out long user);
 
     /// <summary>The path of the process that started <paramref name="pid"/>, or null if it is gone (or the id was reused).</summary>
-    public static string? PathOf(int pid)
+    public static string? PathOf(int pid) => ParentId(pid) is int parent and > 0 ? ProcessPath.Get(parent) : null;
+
+    /// <summary>
+    /// The program a connection really belongs to: WebView2 (msedgewebview2.exe) runs web content for another
+    /// program (Teams, Outlook, Gader itself…), so that program is reported instead.
+    /// </summary>
+    public static (int Pid, string? Path) Owner(int pid, string? path)
+    {
+        for (var i = 0; i < 5 && path != null && System.IO.Path.GetFileName(path).Equals("msedgewebview2.exe", StringComparison.OrdinalIgnoreCase); i++)
+        {
+            if (ParentId(pid) is not int parent || parent <= 4) break;
+            pid = parent;
+            path = ProcessPath.Get(pid);
+        }
+        return (pid, path);
+    }
+
+    /// <summary>The id of the process that started <paramref name="pid"/>, or null if it is gone (or the id was reused).</summary>
+    public static int? ParentId(int pid)
     {
         var h = OpenProcess(0x1000, false, pid);
         if (h == IntPtr.Zero) return null;
@@ -39,6 +57,6 @@ internal static class ProcessParent
             if (!GetProcessTimes(ph, out var parentStart, out _, out _, out _) || parentStart > childStart) return null;
         }
         finally { CloseHandle(ph); }
-        return ProcessPath.Get(parent);
+        return parent;
     }
 }

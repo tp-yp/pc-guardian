@@ -63,12 +63,12 @@ public sealed class ControlPipeServer(ILogger<ControlPipeServer> log, EncryptedC
                 return new(true, auth.ToString());
             case "export":
                 return new(true, ConfigEditing.Export(cfg));
-            case "import" or "unlock" when cfg.Cooling.Hours > 0:
+            case "import" or "unlock" when cfg.Cooling.Minutes > 0:
                 return new(false, "לא זמין כש\"השהיית כיבוי\" פעילה. אפשר לשנות דרך חלון הניהול.");
-            case "uninstall" when cfg.Cooling.Hours > 0 && !(cfg.Cooling.UninstallDueUtc is { } due && due <= clock.UtcNow):
+            case "uninstall" when cfg.Cooling.Minutes > 0 && !(cfg.Cooling.UninstallDueUtc is { } due && due <= clock.UtcNow):
                 return new(false, cfg.Cooling.UninstallDueUtc is { } d
                     ? $"ההסרה מושהית. היא תתאפשר ב-{d.ToLocalTime():dd/MM/yyyy HH:mm}."
-                    : $"ההסרה מושהית ב-{cfg.Cooling.Hours} שעות. בקשו הסרה בחלון הניהול (הגדרות > השהיית כיבוי), ואחרי הזמן הזה אפשר יהיה להסיר.");
+                    : $"ההסרה מושהית ב-{CoolingPolicy.Describe(cfg.Cooling.Minutes)}. בקשו הסרה בחלון הניהול (הגדרות > השהיית כיבוי), ואחרי הזמן הזה אפשר יהיה להסיר.");
             case "import":
                 var oldUsers = cfg.UserLockouts.Select(u => u.UserName).ToList();
                 try { ConfigEditing.Import(cfg, req.Payload ?? ""); }

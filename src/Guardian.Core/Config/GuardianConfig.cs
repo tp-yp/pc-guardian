@@ -28,6 +28,7 @@ public sealed class GuardianConfig
     public ClockPolicy Clock { get; set; } = new();
     public VpnPolicy Vpn { get; set; } = new();
     public WifiPolicy Wifi { get; set; } = new();
+    public BrowserPolicy Browsers { get; set; } = new();
     public CoolingPolicy Cooling { get; set; } = new();
 
     /// <summary>
@@ -81,7 +82,21 @@ public sealed class BootPolicy
 /// </summary>
 public sealed class CoolingPolicy
 {
-    public int Hours { get; set; }
+    /// <summary>The delay in minutes (0 = none).</summary>
+    public int Minutes { get; set; }
+    /// <summary>Older versions stored whole hours; read once and turned into minutes.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public int Hours { get => 0; set { if (value > 0 && Minutes == 0) Minutes = value * 60; } }
+    /// <summary>The delay in words, e.g. "90 דקות", "שעתיים", "3 שעות".</summary>
+    public static string Describe(int minutes) => minutes switch
+    {
+        1 => "דקה",
+        < 60 => $"{minutes} דקות",
+        60 => "שעה",
+        120 => "שעתיים",
+        _ when minutes % 60 == 0 => $"{minutes / 60} שעות",
+        _ => $"{minutes} דקות",
+    };
     public List<PendingChange> Pending { get; set; } = new();
     /// <summary>When a requested removal becomes possible (null = not requested).</summary>
     public DateTime? UninstallDueUtc { get; set; }
@@ -96,6 +111,20 @@ public sealed class PendingChange
     public string? User { get; set; }
     public DateTime RequestedUtc { get; set; }
     public DateTime DueUtc { get; set; }
+}
+
+/// <summary>A program that may connect only to <see cref="Sites"/> (domains or URL prefixes, as in the site lists).</summary>
+public sealed class AppSites
+{
+    public string ExePath { get; set; } = "";
+    public List<string> Sites { get; set; } = new();
+}
+
+/// <summary>Browser settings for the whole computer.</summary>
+public sealed class BrowserPolicy
+{
+    /// <summary>Private / incognito windows turned off in Edge, Chrome, Brave and Firefox (Brave's Tor windows too).</summary>
+    public bool NoPrivate { get; set; }
 }
 
 /// <summary>Wi-Fi: only networks already known to this computer may be joined (Windows' own network filters).</summary>
@@ -173,6 +202,8 @@ public sealed class AppPolicy
     public bool TrustProgramFiles { get; set; } = true;
     /// <summary>Block command line, PowerShell, registry editor and similar tools (see AdminTools).</summary>
     public bool BlockAdminTools { get; set; }
+    /// <summary>Video players and programs opened with a video file are closed (see VideoFiles).</summary>
+    public bool BlockVideoFiles { get; set; }
     public List<AppRule> Rules { get; set; } = new();
 }
 
@@ -187,6 +218,9 @@ public sealed class NetworkPolicy
     /// <summary>Exceptions to <see cref="Domains"/> with the opposite meaning: in blocklist mode always
     /// allowed, in allowlist mode always blocked. Lets the owner allow one page of a blocked site, etc.</summary>
     public List<string> Exceptions { get; set; } = new();
+    /// <summary>The site list and exceptions of the other mode (block-list vs allow-list), kept for switching back.</summary>
+    public List<string> OtherDomains { get; set; } = new();
+    public List<string> OtherExceptions { get; set; } = new();
     /// <summary>Executables denied any network access (outbound firewall rules).</summary>
     public List<string> BlockedAppPaths { get; set; } = new();
     /// <summary>
@@ -199,6 +233,8 @@ public sealed class NetworkPolicy
     public List<string> NoDecryptDomains { get; set; } = new();
     /// <summary>Executables allowed to reach the internet directly, bypassing the proxy (e.g. games, Steam).</summary>
     public List<string> AllowDirectApps { get; set; } = new();
+    /// <summary>Programs that may reach only some sites (also through WebView2). Enforced by the full-URL filter.</summary>
+    public List<AppSites> AppSites { get; set; } = new();
     /// <summary>
     /// Home-network addresses left out of the filter (a NAS, a printer, a local server): one address or a
     /// CIDR range, private ranges only. For the whole computer. DNS stays filtered.

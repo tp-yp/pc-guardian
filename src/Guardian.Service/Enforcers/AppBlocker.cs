@@ -90,7 +90,7 @@ public sealed class AppBlocker : IDisposable
 
         // Never block Guardian itself (e.g. the temporary copy that runs the uninstaller):
         // identified by identical file contents, not by name.
-        if (Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) &&
+        if ((Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(path).StartsWith("geder", StringComparison.OrdinalIgnoreCase)) &&
             _selfHash.Value is { } self && Hash(path) == self) return;
         // Each Windows account may have its own rules; unknown accounts follow the general ones.
         var user = cfg.UserPolicies.Count > 0 ? ProcessUser.Of(pid) : null;
@@ -107,6 +107,12 @@ public sealed class AppBlocker : IDisposable
 
         // Essential parts of Windows (and Guardian's folder) are never closed, whatever the rules say.
         if (ProtectedApps.IsProtected(path, WindowsDir, Paths.InstallDir)) return;
+        // "Block video files": video players, and any program opened with a video file.
+        if (rules.BlockVideoFiles && (VideoFiles.IsPlayer(path, OriginalName(path)) || VideoFiles.InCommandLine(ProcessCommandLine.Get(pid))))
+        {
+            Kill(proc, pid, path, "video", user);
+            return;
+        }
         // Programs installed inside another account's profile folder are that account's only.
         if (rules.Enabled && UserPrograms.OwnerOf(path, UserProfiles.Current()) != null &&
             UserPrograms.IsOtherUsers(path, user ?? ProcessUser.Of(pid), UserProfiles.Current()))
@@ -131,7 +137,7 @@ public sealed class AppBlocker : IDisposable
         {
             proc.Kill(entireProcessTree: true);
             _log.LogInformation("Blocked {Path} (pid {Pid}): {Reason}", path, pid, reason);
-            _access.Add("app", path, allowed: false, user ?? ProcessUser.Of(pid));
+            _access.Add("app", path, allowed: false, user ?? ProcessUser.Of(pid), path);
             NotifyOnce(proc.SessionId, path);
         }
         catch (Exception ex) { _log.LogWarning(ex, "Could not terminate {Path}", path); }
@@ -146,7 +152,7 @@ public sealed class AppBlocker : IDisposable
         // A styled Hebrew screen on the user's desktop; a plain message box if that fails.
         var arg = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(name));
         if (!UserLauncher.Launch(sessionId, Environment.ProcessPath!, $"blocked {arg}"))
-            Wts.Notify(sessionId, "Guardian", $"התוכנה \"{name}\" חסומה במחשב הזה.");
+            Wts.Notify(sessionId, "Geder", $"התוכנה \"{name}\" חסומה במחשב הזה.");
     }
 
     private string? Hash(string path)
