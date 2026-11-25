@@ -16,6 +16,7 @@ button{margin-top:18px;width:100%;font:inherit;padding:10px;border:0;border-radi
 .sac{background:#fffbeb;color:#78350f;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;font-size:14px;line-height:1.6;margin-bottom:6px}
 .sac ol{margin:6px 0 0;padding-inline-start:20px}.sac button{width:auto;margin-top:10px;padding:6px 16px}
 @media (prefers-color-scheme:dark){.sac{background:#2a2210;color:#fcd34d;border-color:#715a14}}
+.terms{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:13px;line-height:1.6}.terms ol{margin:0;padding-inline-start:18px}.terms li{margin:4px 0}
 #msg{min-height:1.3em;margin-top:12px;color:var(--bad);font-size:14px}.done{background:var(--okbg);border-radius:8px;padding:14px;line-height:1.6}
 </style></head><body><div class="card">
 """;
@@ -29,6 +30,21 @@ async function post(data){const r=await fetch(location.pathname,{method:'POST',h
 
     public const string Install = Head + """
 <h1>התקנת Geder</h1>
+<div id="consent">
+<p>לפני ההתקנה, קראו את התנאים ואשרו אותם.</p>
+<div class="terms"><ol>
+<li>Geder היא תוכנה לשליטה עצמית ולפיקוח, שנועדה להגביל תוכנות, אתרים ושעות שימוש במחשב הזה.</li>
+<li>מתקינים אותה רק על מחשב שלכם או שאתם אחראים עליו. מי שמשתמש במחשב צריך לדעת שהיא מותקנת.</li>
+<li>התוכנה משנה הגדרות של ווינדוס: חומת האש, שרת השמות (DNS), הגדרות proxy, תעודת אבטחה מקומית, ואם בוחרים בכך גם את הגדרות האתחול. כשמסירים אותה, השינויים מוחזרים.</li>
+<li>היא יכולה לחסום גישה לתוכנות, לאתרים ולמחשב עצמו, לפי ההגדרות שתבחרו. אתם אחראים להגדרות ולתוצאות שלהן.</li>
+<li>שמרו את הסיסמה המצילה במקום בטוח. בלי סיסמת הניהול או הסיסמה המצילה אי אפשר לשנות את ההגדרות או להסיר את התוכנה.</li>
+<li>אין חסימה מושלמת. מי שיש לו הרשאות מנהל ונחישות יכול לעקוף אותה. היא לא מחליפה השגחה ושיחה.</li>
+<li>התוכנה ניתנת כמו שהיא (AS IS), בלי אחריות מכל סוג. המפתחים לא אחראים לנזק, לאובדן מידע, לחסימה של גישה או לכל תקלה שנגרמים משימוש בה.</li>
+</ol></div>
+<div class="check"><input id="agree" type="checkbox"><label for="agree" style="margin:0">קראתי את התנאים, אני מסכים להם ומקבל על עצמי את האחריות לשימוש בתוכנה</label></div>
+<button id="next" type="button" disabled>המשך</button>
+</div>
+<div id="step2" hidden>
 <p>שלושה דברים קצרים וזהו. אחרי ההתקנה <b>שום דבר עוד לא נחסם</b> – בוחרים מה לחסום במסך הניהול, צעד אחרי צעד.</p>
 <!--SAC-->
 <form id="f">
@@ -41,16 +57,18 @@ async function post(data){const r=await fetch(location.pathname,{method:'POST',h
 <option value="" selected disabled>בחר…</option><option value="1">דקה</option><option value="3">3 דקות</option><option value="5">5 דקות</option><option value="10">10 דקות</option><option value="15">15 דקות</option><option value="30">30 דקות</option></select>
 <div class="check"><input id="saved" type="checkbox"><label for="saved" style="margin:0">רשמתי את הסיסמה המצילה במקום בטוח (נייר, כספת, או אצל אדם אחר)</label></div>
 <button id="go">התקנה</button><div id="msg"></div></form>
+</div>
 <div id="ok" class="done" hidden>✓ Geder הותקן. עוד רגע נפתח מסך הניהול…<br>אפשר לפתוח אותו תמיד מתפריט התחל: <b>Geder</b>.</div>
 """ + Script + """
 <script>
+$('agree').onchange=()=>$('next').disabled=!$('agree').checked;$('next').onclick=()=>{$('consent').hidden=true;$('step2').hidden=false;$('a1').focus()};
 $('f').onsubmit=async e=>{e.preventDefault();const a=$('a1').value,r=$('r1').value;let m='';
 if(a.length<8||r.length<8)m='כל סיסמה צריכה להיות באורך 8 תווים לפחות.';else if(a!==$('a2').value)m='שתי סיסמאות הניהול לא זהות.';
 else if(r!==$('r2').value)m='שתי הסיסמאות המצילות לא זהות.';else if(a===r)m='הסיסמה המצילה חייבת להיות שונה מסיסמת הניהול.';
 else if(!$('idle').value)m='בחר אחרי כמה זמן מסך הניהול יינעל.';
 else if(!$('saved').checked)m='סמן שרשמת את הסיסמה המצילה – בלעדיה אי אפשר להסיר את התוכנה אם שוכחים את סיסמת הניהול.';
 $('msg').textContent=m;if(m)return;$('go').disabled=true;$('go').textContent='מתקין… (עד חצי דקה)';
-const res=await post({admin:a,recovery:r,idle:$('idle').value});
+const res=await post({admin:a,recovery:r,idle:$('idle').value,agree:$('agree').checked?'1':''});
 if(res.ok){$('f').hidden=true;$('ok').hidden=false;setTimeout(()=>location.href=res.ui,6000)}else{$('msg').textContent=res.message||'ההתקנה נכשלה';$('go').disabled=false;$('go').textContent='התקנה'}};
 </script></div></body></html>
 """;

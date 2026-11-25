@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Management;
 using System.Security.Cryptography;
+using Guardian.Core.Apps;
 using Guardian.Core.Config;
 using Guardian.Core.Policy;
 using Guardian.Service.Native;
@@ -92,6 +93,8 @@ public sealed class AppBlocker : IDisposable
         // identified by identical file contents, not by name.
         if ((Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(path).StartsWith("geder", StringComparison.OrdinalIgnoreCase)) &&
             _selfHash.Value is { } self && Hash(path) == self) return;
+        // Nor any other Geder build, such as an update that is being installed from a Downloads folder.
+        if (IsGederFile(path)) return;
         // Each Windows account may have its own rules; unknown accounts follow the general ones.
         var user = cfg.UserPolicies.Count > 0 ? ProcessUser.Of(pid) : null;
         var rules = UserScopes.Effective(cfg, user).Apps;
@@ -183,6 +186,22 @@ public sealed class AppBlocker : IDisposable
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Size, DateTime Mtime, bool Geder)> _selfCache = new(StringComparer.OrdinalIgnoreCase);
+
+    private bool IsGederFile(string path)
+    {
+        try
+        {
+            var fi = new FileInfo(path);
+            if (_selfCache.TryGetValue(path, out var c) && c.Size == fi.Length && c.Mtime == fi.LastWriteTimeUtc) return c.Geder;
+            var v = FileVersionInfo.GetVersionInfo(path);
+            var geder = SelfIdentity.IsGeder(!string.IsNullOrWhiteSpace(v.OriginalFilename) ? v.OriginalFilename : v.InternalName, v.ProductName);
+            _selfCache[path] = (fi.Length, fi.LastWriteTimeUtc, geder);
+            return geder;
+        }
+        catch (Exception) { return false; }
     }
 
     public static string? ReadOriginalName(string path)

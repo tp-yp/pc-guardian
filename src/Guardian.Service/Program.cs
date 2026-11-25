@@ -70,6 +70,7 @@ switch (cmd)
     case "run":
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddWindowsService();
+        builder.Logging.AddProvider(new FileLogProvider(FileLogProvider.Dir));
         builder.Services.AddSingleton(store);
         builder.Services.AddSingleton<AdminGate>();
         builder.Services.AddHostedService<Guardian.Service.Ui.ManagementUi>();
@@ -100,6 +101,7 @@ switch (cmd)
     {
         var wb = Host.CreateApplicationBuilder(args);
         wb.Services.AddWindowsService();
+        wb.Logging.AddProvider(new FileLogProvider(FileLogProvider.Dir));
         wb.Services.AddSingleton(store);
         wb.Services.AddHostedService<WatchdogWorker>();
         wb.Build().Run();

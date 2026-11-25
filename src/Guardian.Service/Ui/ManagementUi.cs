@@ -433,6 +433,45 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     await SendJson(res, 200, IspState(cfg));
                     break;
                 }
+                case ("/api/release", "POST"):
+                {
+                    // "Release all restrictions" for everyone, or bring the settings from before back.
+                    var cfg = store.Load();
+                    if (body.GetValueOrDefault("action") == "undo")
+                    {
+                        if (!ConfigEditing.TryUndoRelease(cfg)) { await SendJson(res, 400, new { error = "אין הגבלות שמורות להחזיר." }); break; }
+                        log.LogInformation("UI: restrictions brought back");
+                    }
+                    else
+                    {
+                        ConfigEditing.ReleaseAll(cfg);
+                        log.LogInformation("UI: all restrictions released");
+                    }
+                    store.Save(cfg);
+                    await SendJson(res, 200, State(cfg, who));
+                    break;
+                }
+                case ("/api/backup", "GET"):
+                    await SendJson(res, 200, new { file = ConfigEditing.Export(store.Load()) });
+                    break;
+                case ("/api/backup/restore", "POST"):
+                {
+                    var cfg = store.Load();
+                    try { ConfigEditing.Import(cfg, body.GetValueOrDefault("config") ?? ""); }
+                    catch (InvalidDataException ex) { log.LogWarning("UI: restore refused: {Msg}", ex.Message); await SendJson(res, 400, new { error = "הקובץ הזה הוא לא גיבוי הגדרות תקין של Geder." }); break; }
+                    cfg.ReleasedSnapshot = null;
+                    store.Save(cfg);
+                    log.LogInformation("UI: settings restored from a backup");
+                    await SendJson(res, 200, State(cfg, who));
+                    break;
+                }
+                case ("/api/logs/export", "GET"):
+                {
+                    var zip = DiagnosticsExport.Build(store.Load(), accessLog);
+                    res.Headers["Content-Disposition"] = $"attachment; filename=\"geder-logs-{DateTime.Now:yyyyMMdd-HHmm}.zip\"";
+                    await Send(res, 200, "application/zip", zip);
+                    break;
+                }
                 case ("/api/state", "GET"):
                     await SendJson(res, 200, State(store.Load(), who));
                     break;
@@ -532,7 +571,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
     private static object State(GuardianConfig cfg, string? who)
     {
         var c = UserScopes.View(cfg, who);
-        return StateOf(c, UserScopes.Find(cfg, who)?.UserName, cfg.UserPolicies.Select(p => p.UserName).ToList(), AllOwn(cfg));
+        return StateOf(c, UserScopes.Find(cfg, who)?.UserName, cfg.UserPolicies.Select(p => p.UserName).ToList(), AllOwn(cfg), cfg.ReleasedSnapshot != null);
     }
 
     private static List<string> _accounts = [];
@@ -550,11 +589,12 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         return _accounts.Count > 0 && _accounts.All(a => UserScopes.Find(cfg, a) != null);
     }
 
-    private static object StateOf(GuardianConfig c, string? scope, List<string> scopes, bool allOwn) => new
+    private static object StateOf(GuardianConfig c, string? scope, List<string> scopes, bool allOwn, bool released) => new
     {
         scope,
         scopes,
         allOwn,
+        released,
         settings = new Dictionary<string, bool>
         {
             ["apps.enabled"] = c.Apps.Enabled,
@@ -653,9 +693,10 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
     private static Task SendJson(HttpListenerResponse res, int status, object value) =>
         Send(res, status, "application/json", JsonSerializer.Serialize(value, Json));
 
-    private static async Task Send(HttpListenerResponse res, int status, string type, string text)
+    private static Task Send(HttpListenerResponse res, int status, string type, string text) => Send(res, status, type, Encoding.UTF8.GetBytes(text));
+
+    private static async Task Send(HttpListenerResponse res, int status, string type, byte[] bytes)
     {
-        var bytes = Encoding.UTF8.GetBytes(text);
         res.StatusCode = status;
         res.ContentType = type;
         res.ContentLength64 = bytes.Length;

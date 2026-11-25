@@ -76,6 +76,7 @@ internal sealed class SetupWeb : IDisposable
                 }
                 default:
                     if (Setup.IsInstalled()) { await SendJson(ctx, 200, new { ok = true, ui = "http://127.0.0.1:8898/" }); break; }
+                    if (body.GetValueOrDefault("agree") != "1") { await SendJson(ctx, 400, new { ok = false, message = "צריך לאשר את התנאים לפני ההתקנה." }); break; }
                     try
                     {
                         int.TryParse(body.GetValueOrDefault("idle"), out var idle);

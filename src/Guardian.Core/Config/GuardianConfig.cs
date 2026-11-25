@@ -30,6 +30,11 @@ public sealed class GuardianConfig
     public WifiPolicy Wifi { get; set; } = new();
     public BrowserPolicy Browsers { get; set; } = new();
     public CoolingPolicy Cooling { get; set; } = new();
+    /// <summary>
+    /// The settings as they were before "release all restrictions" (exported form, no passwords),
+    /// so they can be brought back with one click. Null when nothing was released.
+    /// </summary>
+    public string? ReleasedSnapshot { get; set; }
 
     /// <summary>
     /// Config for a fresh install: protected and running, but every blocking feature OFF,
