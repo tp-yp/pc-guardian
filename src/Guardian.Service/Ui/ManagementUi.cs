@@ -287,7 +287,10 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
                     int.TryParse(body.GetValueOrDefault("warning"), out var warn);
                     int.TryParse(body.GetValueOrDefault("breakEvery"), out var breakEvery);
-                    if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err, breakEvery)) { await SendJson(res, 400, new { error = err }); break; }
+                    List<Guardian.Core.Scheduling.TimeWindow> breakWindows;
+                    try { breakWindows = JsonSerializer.Deserialize<List<Guardian.Core.Scheduling.TimeWindow>>(body.GetValueOrDefault("breakWindows") ?? "[]", Json) ?? []; }
+                    catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
+                    if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err, breakEvery, breakWindows)) { await SendJson(res, 400, new { error = err }); break; }
                     store.Save(cfg);
                     await SendJson(res, 200, new { ok = true });
                     break;

@@ -38,7 +38,7 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
         var sessions = Wts.UserSessions();
         // Addiction prevention: a sign-out after N minutes of continuous use; signing in again is allowed.
         foreach (var a in _breaks.Plan(cfg.UserLockouts, sessions, clock.UtcNow,
-                     u => exemptions.Until.Any(e => LockoutPlanner.SameUser(e.Key, u) && e.Value > now)))
+                     u => exemptions.Until.Any(e => LockoutPlanner.SameUser(e.Key, u) && e.Value > now), now))
         {
             if (a.Kind == LockoutKind.Warn)
                 Wts.Notify(a.Session.SessionId, "Guardian", $"הגיע הזמן להפסקה: בעוד {a.MinutesLeft} דקות תתבצע יציאה מהחשבון. כדאי לשמור את העבודה עכשיו. אחרי היציאה אפשר להיכנס שוב.");
@@ -53,12 +53,14 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
             if (a.Kind == LockoutKind.Warn)
             {
                 log.LogInformation("Warning {User}: locking in {M} min", a.Session.UserName, a.MinutesLeft);
-                Wts.Notify(a.Session.SessionId, "Guardian", $"החשבון ייסגר בעוד {a.MinutesLeft} דקות לפי לוח הזמנים. כדאי לשמור את העבודה עכשיו.");
+                Wts.Notify(a.Session.SessionId, "Guardian", $"המחשב יינעל בעוד {a.MinutesLeft} דקות לפי לוח הזמנים. התוכנות הפתוחות יישארו פתוחות.");
             }
             else
             {
-                log.LogInformation("Signing out {User} (session {Id})", a.Session.UserName, a.Session.SessionId);
-                Wts.Logoff(a.Session.SessionId);
+                // Lock the screen (like Win+L) inside the user's session; signing back in is refused by the
+                // logon hours, and an unlocked screen is locked again on the next check.
+                log.LogInformation("Locking {User} (session {Id})", a.Session.UserName, a.Session.SessionId);
+                if (!UserLauncher.Launch(a.Session.SessionId, Environment.ProcessPath!, "lock")) Wts.Disconnect(a.Session.SessionId);
             }
         }
     }

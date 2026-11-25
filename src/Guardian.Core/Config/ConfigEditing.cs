@@ -191,7 +191,8 @@ public static class ConfigEditing
     }
 
     /// <summary>Sets (or with no windows, removes) the lock-out schedule of one Windows account.</summary>
-    public static bool TrySetLockout(GuardianConfig cfg, string user, IEnumerable<Scheduling.TimeWindow> windows, int warningMinutes, out string error, int breakEveryMinutes = 0)
+    public static bool TrySetLockout(GuardianConfig cfg, string user, IEnumerable<Scheduling.TimeWindow> windows, int warningMinutes, out string error, int breakEveryMinutes = 0,
+        IEnumerable<Scheduling.TimeWindow>? breakWindows = null)
     {
         error = "";
         user = user.Trim();
@@ -200,12 +201,15 @@ public static class ConfigEditing
         var list = windows.ToList();
         if (list.Any(w => w.Days.Length == 0)) { error = "Pick at least one day for each time range."; return false; }
         if (warningMinutes is < 0 or > 60) { error = "Warning must be 0-60 minutes."; return false; }
+        var breakList = (breakWindows ?? []).ToList();
+        if (breakList.Any(w => w.Days.Length == 0)) { error = "Pick at least one day for each time range."; return false; }
         if (breakEveryMinutes != 0 && breakEveryMinutes is < 5 or > 600) { error = "זמן השימוש הרציף צריך להיות בין 5 ל-600 דקות."; return false; }
         cfg.UserLockouts.RemoveAll(r => Lockout.LockoutPlanner.SameUser(r.UserName, user));
         if (list.Count > 0 || breakEveryMinutes > 0)
             cfg.UserLockouts.Add(new UserLockoutRule
             {
                 UserName = user, WarningMinutes = warningMinutes, BreakEveryMinutes = breakEveryMinutes,
+                BreakDuring = new Scheduling.WeeklySchedule { Windows = breakEveryMinutes > 0 ? breakList : [] },
                 LockedDuring = new Scheduling.WeeklySchedule { Windows = list },
             });
         return true;

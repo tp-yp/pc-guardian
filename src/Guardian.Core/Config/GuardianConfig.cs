@@ -141,6 +141,8 @@ public sealed class UserLockoutRule
     public int WarningMinutes { get; set; } = 5;
     /// <summary>"Addiction prevention": sign the user out after this many minutes of continuous use (0 = off). Signing in again is allowed.</summary>
     public int BreakEveryMinutes { get; set; }
+    /// <summary>When addiction prevention applies (empty = all day). Hours that are neither locked nor here are normal use.</summary>
+    public WeeklySchedule BreakDuring { get; set; } = new();
 }
 
 public enum RuleAction { Allow, Block }

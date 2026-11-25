@@ -252,6 +252,9 @@ public static class Setup
 
     // ---- console handling for double-click launches ----
     [DllImport("kernel32.dll")] private static extern bool AttachConsole(int pid);
+    [DllImport("user32.dll")] private static extern bool LockWorkStation();
+
+    public static bool LockScreen() => LockWorkStation();
 
     public static void AttachParentConsole()
     {
