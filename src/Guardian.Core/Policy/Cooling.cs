@@ -28,6 +28,17 @@ public static class Cooling
                 return !TryMinutes(body, out var mins) || mins < cfg.Cooling.Minutes;
             case "/api/catalog/set":
                 return B("kind") == "direct" ? on : !on;
+            case "/api/catalog/sites":
+            {
+                // A list limits the program: a longer list, or none at all, is weaker.
+                var old = AppCatalog.SitesOf(view, B("path"));
+                List<string> now;
+                try { now = JsonSerializer.Deserialize<List<string>>(B("sites").Length == 0 ? "[]" : B("sites")) ?? []; }
+                catch (JsonException) { now = []; }
+                now = now.Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                if (old.Count == 0) return false;
+                return now.Count == 0 || now.Any(n => !old.Contains(n, StringComparer.OrdinalIgnoreCase));
+            }
             case "/api/catalog/hours":
                 return !Covers(Windows(B("windows")), AppCatalog.HoursOf(view, B("path")));
             case "/api/apps/list":

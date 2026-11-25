@@ -215,11 +215,12 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 <b>בלי אינטרנט</b> – התוכנה תיפתח כרגיל, אבל לא תוכל להתחבר לאינטרנט.<br>
 <b>שעות</b> – התוכנה תיחסם רק בשעות שתקבעו (למשל משחק שמותר רק אחרי הצהריים). מחוץ לשעות האלה היא עובדת כרגיל, ואם היא פתוחה כשהשעה מגיעה, היא נסגרת.<br>
 <b>גישה ישירה</b> – רלוונטי רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תתחבר לאינטרנט בלי לעבור בסינון. מתאים למשחקים, Steam, Spotify ותוכנות שמפסיקות לעבוד כשהסינון דולק.<br>
+<b>אתרים</b> – רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תוכל להגיע רק לאתרים שברשימה שלה, גם דרך חלון אינטרנט שמובנה בתוכנה (WebView2). מתאים לתוכנה שצריכה אתר אחד או שניים.<br>
 <b>תוכנות של משתמש אחר</b> – בניהול של משתמש מופיעות רק תוכנות שמותקנות לכולם ותוכנות שהותקנו למשתמש הזה. תוכנה שנמצאת בתיקייה של משתמש אחר (למשל בהורדות שלו או ב-AppData שלו) חסומה אוטומטית לכל השאר, כל עוד "נעילת תוכנות" דולקת אצלם.</p>
 <div class="row"><input id="q" placeholder="חיפוש תוכנה…" style="flex:1;min-width:180px"><select id="srcPick"><option value="">כל המקורות</option><option value="StartMenu">רק מתפריט התחל</option><option value="InstalledApps">רק אפליקציות מותקנות</option><option value="Store">רק מהחנות של Microsoft</option></select><button class="ghost" id="refresh">רענון הרשימה</button></div>
 <div class="row" style="margin-top:6px"><label><input type="checkbox" id="onlySet"> רק תוכנות עם הגבלה</label><label><input type="checkbox" id="hideWin" checked> להסתיר תוכנות של ווינדוס (System32 ותיקיית Windows)</label></div>
 <div id="catNote" class="hint" style="margin-top:8px"></div>
-<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th><th>שעות חסימה</th></tr></thead><tbody id="catalog"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th><th>שעות חסימה</th><th>אתרים</th></tr></thead><tbody id="catalog"></tbody></table></div>
 </section>
 <section class="wide peruser"><details><summary><b>הוספה ידנית (לתוכנות שלא מופיעות ברשימה, למשל קבצים ניידים)</b></summary>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px">
@@ -352,7 +353,7 @@ function api(p,o={},active=true){const h={'X-Guardian':'1','Content-Type':'appli
   if(!r.ok)throw new Error(HE[j.error]||j.error||('שגיאה '+r.status));return j})}
 const fmtMin=m=>{m=+m||0;return m===1?'דקה':m<60?m+' דקות':m===60?'שעה':m===120?'שעתיים':m%60===0?(m/60)+' שעות':m+' דקות'};
 const fmtDue=d=>new Date(d).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow','/api/tools/unlock','/api/catalog/hours'];
+let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow','/api/tools/unlock','/api/catalog/hours','/api/catalog/sites'];
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(SCOPED.includes(p)&&!('user' in b)?{...b,user:scope}:b)});
 const q=(p,extra)=>p+'?user='+encodeURIComponent(scope)+(extra||'');
 const short=u=>u?String(u).split('\\').pop():'';
@@ -529,18 +530,31 @@ function setApp(a,kind,i){post('/api/catalog/set',{path:a.exePath,kind,value:Str
  const msg={lock:['ננעלה','שוחררה מנעילה'],internet:['לא תוכל להתחבר לאינטרנט','יכולה שוב להתחבר לאינטרנט'],direct:['קיבלה גישה ישירה לאינטרנט','תעבור שוב דרך הסינון']}[kind];toast(a.name+' '+(i.checked?msg[0]:msg[1])+(kind==='direct'?'':(scope?' (עבור '+scope+')':'')))}).catch(x=>{fail(x);i.checked=!i.checked})}
 function renderCatalog(){if(!catalog)return;const q=$('q').value.trim().toLowerCase(),only=$('onlySet').checked,direct=state&&state.settings['network.urlFiltering'];
  const src=$('srcPick').value,hw=$('hideWin').checked;
- const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length)&&(!src||a.source===src)&&(!hw||!isWin(a.exePath)||a.locked||(a.hours||[]).length));
+ const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length||(a.sites||[]).length)&&(!src||a.source===src)&&(!hw||!isWin(a.exePath)||a.locked||(a.hours||[]).length));
  $('catNote').textContent=catalog.length+' תוכנות נמצאו'+(rows.length!==catalog.length?', מוצגות '+rows.length:'')+'.'+(state&&!state.settings['apps.enabled']&&catalog.some(a=>a.locked)?' שימו לב: "נעילת תוכנות" כבויה בלשונית "יכולות", ולכן הנעילות לא נאכפות.':'');
  $('catalog').replaceChildren(...rows.map(a=>el('tr',{},el('td',{},el('b',{},a.name),el('div',{class:'hint ltr',style:'margin:0;font-size:11px'},a.exePath)),el('td',{},el('span',{class:'badge'},SRCN[a.source]||a.source),a.owner?el('div',{class:'hint',style:'margin:2px 0 0;font-size:11px'},'של '+a.owner):''),
   el('td',{},sw(a.locked,i=>setApp(a,'lock',i),'נעולה')),el('td',{},sw(a.internetBlocked,i=>setApp(a,'internet',i),'בלי אינטרנט')),el('td',{},sw(a.directInternet,i=>setApp(a,'direct',i),'גישה ישירה',!direct&&!a.directInternet)),
-  el('td',{},el('button',{class:'link',onclick:e=>appHours(a,e.target.closest('tr'))},(a.hours||[]).length?'חסומה לפי שעות':'+ שעות')))))}
+  el('td',{},el('button',{class:'link',onclick:e=>appHours(a,e.target.closest('tr'))},(a.hours||[]).length?'חסומה לפי שעות':'+ שעות')),
+  el('td',{},el('button',{class:'link',onclick:e=>appSites(a,e.target.closest('tr'))},(a.sites||[]).length?(a.sites.length===1?'אתר אחד':a.sites.length+' אתרים'):'+ אתרים')))))}
 // Blocked hours for one program, edited in a row under it.
 function appHours(a,tr){const open=tr.nextElementSibling;if(open&&open.classList.contains('hrs')){open.remove();return}
  const box=el('div');(a.hours||[]).forEach(w=>box.append(winRow(w)));
  const save=()=>post('/api/catalog/hours',{path:a.exePath,windows:JSON.stringify(readWins(box))}).then(c=>{catalog=c;load();renderCatalog();
   toast(readWins(box).length?a.name+' תיחסם בשעות שנקבעו'+(scope?' (עבור '+scope+')':''):'הוסרו שעות החסימה של '+a.name)}).catch(fail);
- tr.after(el('tr',{class:'hrs'},el('td',{colspan:6},el('div',{class:'hint',style:'margin:0'},'השעות שבהן '+a.name+' חסומה'+(scope?' עבור '+scope:'')+'. בשאר הזמן היא עובדת כרגיל (אלא אם היא מסומנת "נעולה").'),box,
+ tr.after(el('tr',{class:'hrs'},el('td',{colspan:7},el('div',{class:'hint',style:'margin:0'},'השעות שבהן '+a.name+' חסומה'+(scope?' עבור '+scope:'')+'. בשאר הזמן היא עובדת כרגיל (אלא אם היא מסומנת "נעולה").'),box,
   el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.map(d=>d[0]),start:'22:00',end:'07:00'}))},'+ טווח שעות'),el('button',{onclick:save},'שמירה')))))}
+
+// The only sites one program may reach (also its built-in browser parts, WebView2), edited in a row under it.
+function appSites(a,tr){const open=tr.nextElementSibling;if(open&&open.classList.contains('hrs')){open.remove();return}
+ const ta=el('textarea',{class:'ltr',rows:4,style:'width:100%;margin-top:6px',placeholder:'example.com\nlogin.example.com'});ta.value=(a.sites||[]).join('\n');
+ const on=state&&state.settings['network.urlFiltering'];
+ const save=()=>{const list=ta.value.split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);
+  post('/api/catalog/sites',{path:a.exePath,sites:JSON.stringify(list)}).then(c=>{catalog=c;load();renderCatalog();
+   toast(list.length?a.name+' תוכל להגיע רק לאתרים שברשימה'+(scope?' (עבור '+scope+')':''):'הוסרה רשימת האתרים של '+a.name)}).catch(fail)};
+ tr.after(el('tr',{class:'hrs'},el('td',{colspan:7},el('div',{class:'hint',style:'margin:0'},'האתרים היחידים ש-'+a.name+' יכולה להגיע אליהם'+(scope?' עבור '+scope:'')+', כתובת בכל שורה. שאר האתרים חסומים לה, גם אם הם מותרים בשאר המחשב. רשימה ריקה מבטלת את ההגבלה.'),
+  on?'':el('div',{class:'warn',style:'margin-top:6px'},'הרשימה נאכפת רק כש"סינון לפי כתובת מלאה" פועל.'),
+  a.directInternet?el('div',{class:'warn',style:'margin-top:6px'},'לתוכנה הזו יש "גישה ישירה", ולכן היא לא עוברת דרך הסינון והרשימה לא חלה עליה.'):'',
+  ta,el('div',{class:'row',style:'margin-top:8px'},el('button',{onclick:save},'שמירה')))))}
 
 // Direct-connection attempts
 function loadDirect(){api('/api/direct',{},false).then(rows=>{$('direct').replaceChildren(...rows.map(d=>el('tr',{},el('td',{class:'l'},d.appPath),el('td',{},String(d.count)),el('td',{},new Date(d.last).toLocaleString('he-IL')),
@@ -614,7 +628,7 @@ $('pause').onchange=()=>tick();
 
 // Settings
 // Delay before turning off
-const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
+const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/catalog/sites':'רשימת אתרים לתוכנה','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
  '/api/site':'היתר לאתר','/api/network/list':'רשימת רשת','/api/network/mode':'מצב סינון האתרים','/api/users/set':'שעות ומניעת התמכרות','/api/users/unlock':'שחרור זמני של משתמש',
  '/api/tools/unlock':'שחרור זמני של כלי מנהל','/api/users/own':'חזרה לברירת המחדל','/api/wifi/list':'הוספת רשת Wi-Fi','/api/network/msupdates':'החרגת עדכוני מיקרוסופט','/api/isp/trust':'תעודת סינון','/api/cooling/set':'הקטנת ההשהיה'};
 function describePending(p){const b=p.body||{};const t=(TOGGLES.find(x=>x[0]===b.key)||[])[1];

@@ -196,6 +196,20 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     await SendJson(res, 200, CatalogFor(await catalog.GetAsync(), cfg, who));
                     break;
                 }
+                case ("/api/catalog/sites", "POST"):
+                {
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    List<string> sites;
+                    try { sites = JsonSerializer.Deserialize<List<string>>(body.GetValueOrDefault("sites") ?? "[]") ?? []; }
+                    catch (JsonException) { await SendJson(res, 400, new { error = "Invalid value." }); break; }
+                    if (!AppCatalog.TrySetSites(view, body.GetValueOrDefault("path") ?? "", sites, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
+                    store.Save(cfg);
+                    log.LogInformation("UI: site list for {Exe}: {N} sites", body.GetValueOrDefault("path"), sites.Count);
+                    await SendJson(res, 200, CatalogFor(await catalog.GetAsync(), cfg, who));
+                    break;
+                }
                 case ("/api/tools/unlock", "POST"):
                 {
                     // Temporary release of the admin tools for the account being managed (or everyone in the general scope).

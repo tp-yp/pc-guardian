@@ -10,7 +10,7 @@ public sealed record CatalogApp(string Name, string ExePath, AppSource Source);
 /// <param name="Hours">Times when the program is blocked (empty = no time limits).</param>
 /// <param name="Owner">The account the program was installed for (inside its profile folder), or null if shared.</param>
 public sealed record CatalogEntry(string Name, string ExePath, AppSource Source, bool Locked, bool InternetBlocked, bool DirectInternet,
-    List<Scheduling.TimeWindow>? Hours = null, string? Owner = null);
+    List<Scheduling.TimeWindow>? Hours = null, string? Owner = null, List<string>? Sites = null);
 
 /// <summary>Merges apps found in the Start menu, "Installed apps" and the Store into one list.</summary>
 public static class AppCatalog
@@ -39,7 +39,30 @@ public static class AppCatalog
             Locked: IsLocked(cfg, a.ExePath),
             InternetBlocked: cfg.Network.BlockedAppPaths.Contains(a.ExePath, StringComparer.OrdinalIgnoreCase),
             DirectInternet: cfg.Network.AllowDirectApps.Contains(a.ExePath, StringComparer.OrdinalIgnoreCase),
-            Hours: HoursOf(cfg, a.ExePath))).ToList();
+            Hours: HoursOf(cfg, a.ExePath), Sites: SitesOf(cfg, a.ExePath))).ToList();
+
+    /// <summary>The only sites a program may reach, or empty when it has no list of its own.</summary>
+    public static List<string> SitesOf(GuardianConfig cfg, string exe) =>
+        cfg.Network.AppSites.FirstOrDefault(a => string.Equals(a.ExePath, exe, StringComparison.OrdinalIgnoreCase))?.Sites.ToList() ?? [];
+
+    /// <summary>Sets the only sites a program may reach. An empty list removes the limit.</summary>
+    public static bool TrySetSites(GuardianConfig cfg, string exe, IEnumerable<string> sites, out string error)
+    {
+        error = "";
+        if (!exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || exe.Any(char.IsControl) || exe.Length > 500)
+        { error = "Invalid program."; return false; }
+        var list = new List<string>();
+        foreach (var raw in sites)
+        {
+            var v = raw.Trim();
+            if (v.Length == 0) continue;
+            if (v.Length > 500 || v.Any(char.IsControl) || v.Contains(' ') || Policy.UrlPolicy.ParseEntry(v).Host.Length == 0) { error = "Invalid value."; return false; }
+            if (!list.Contains(v, StringComparer.OrdinalIgnoreCase)) list.Add(v);
+        }
+        cfg.Network.AppSites.RemoveAll(a => string.Equals(a.ExePath, exe, StringComparison.OrdinalIgnoreCase));
+        if (list.Count > 0) cfg.Network.AppSites.Add(new AppSites { ExePath = exe, Sites = list });
+        return true;
+    }
 
     /// <summary>The blocked hours set for a program (one timed block rule per program).</summary>
     public static List<Scheduling.TimeWindow> HoursOf(GuardianConfig cfg, string exe) =>

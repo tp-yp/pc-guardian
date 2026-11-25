@@ -113,7 +113,13 @@ public sealed class PendingChange
     public DateTime DueUtc { get; set; }
 }
 
-/// <summary>Wi-Fi: only networks already known to this computer may be joined (Windows' own network filters).</summary>
+/// <summary>A program that may connect only to <see cref="Sites"/> (domains or URL prefixes, as in the site lists).</summary>
+public sealed class AppSites
+{
+    public string ExePath { get; set; } = "";
+    public List<string> Sites { get; set; } = new();
+}
+
 /// <summary>Browser settings for the whole computer.</summary>
 public sealed class BrowserPolicy
 {
@@ -121,6 +127,7 @@ public sealed class BrowserPolicy
     public bool NoPrivate { get; set; }
 }
 
+/// <summary>Wi-Fi: only networks already known to this computer may be joined (Windows' own network filters).</summary>
 public sealed class WifiPolicy
 {
     public bool KnownOnly { get; set; }
@@ -226,6 +233,8 @@ public sealed class NetworkPolicy
     public List<string> NoDecryptDomains { get; set; } = new();
     /// <summary>Executables allowed to reach the internet directly, bypassing the proxy (e.g. games, Steam).</summary>
     public List<string> AllowDirectApps { get; set; } = new();
+    /// <summary>Programs that may reach only some sites (also through WebView2). Enforced by the full-URL filter.</summary>
+    public List<AppSites> AppSites { get; set; } = new();
     /// <summary>
     /// Home-network addresses left out of the filter (a NAS, a printer, a local server): one address or a
     /// CIDR range, private ranges only. For the whole computer. DNS stays filtered.

@@ -36,7 +36,7 @@ public static class UserScopes
     private static NetworkPolicy Merge(NetworkPolicy g, NetworkPolicy u) => new()
     {
         Enabled = g.Enabled, UrlFiltering = g.UrlFiltering, NoDecryptDomains = g.NoDecryptDomains, AllowDirectApps = g.AllowDirectApps, LocalAddresses = g.LocalAddresses,
-        Mode = u.Mode, Domains = u.Domains, Exceptions = u.Exceptions, BlockedAppPaths = u.BlockedAppPaths,
+        Mode = u.Mode, Domains = u.Domains, Exceptions = u.Exceptions, BlockedAppPaths = u.BlockedAppPaths, AppSites = u.AppSites,
     };
 
     /// <summary>
@@ -86,6 +86,7 @@ public static class UserScopes
             {
                 Mode = cfg.Network.Mode, Domains = [.. cfg.Network.Domains], Exceptions = [.. cfg.Network.Exceptions],
                 OtherDomains = [.. cfg.Network.OtherDomains], OtherExceptions = [.. cfg.Network.OtherExceptions],
+                AppSites = cfg.Network.AppSites.Select(a => new AppSites { ExePath = a.ExePath, Sites = [.. a.Sites] }).ToList(),
                 BlockedAppPaths = [.. cfg.Network.BlockedAppPaths], NoDecryptDomains = [], AllowDirectApps = [],
             },
         });
@@ -151,6 +152,22 @@ public static class UserScopes
             result.Add((path, everyone ? null : users.Distinct(cmp).ToList()));
         }
         return result;
+    }
+
+    /// <summary>
+    /// The rules for one connection: a program with a site list of its own may reach only those sites
+    /// (and the home-network addresses); everything else follows the account's rules.
+    /// </summary>
+    public static NetworkPolicy ForProgram(NetworkPolicy account, string? exePath)
+    {
+        if (string.IsNullOrEmpty(exePath)) return account;
+        var rule = account.AppSites.FirstOrDefault(a => string.Equals(a.ExePath, exePath, StringComparison.OrdinalIgnoreCase));
+        if (rule is null) return account;
+        return new NetworkPolicy
+        {
+            Enabled = true, UrlFiltering = account.UrlFiltering, Mode = UrlMode.Allowlist, Domains = rule.Sites,
+            NoDecryptDomains = account.NoDecryptDomains, LocalAddresses = account.LocalAddresses,
+        };
     }
 
     /// <summary>True if any rule anywhere matches by file hash (so hashing is needed).</summary>
