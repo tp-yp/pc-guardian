@@ -105,7 +105,9 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         if (isolated)
         {
             // Programs people run: blocked outright (a block rule beats any allow rule Windows or an app added).
-            wanted.Add(("Guardian isolate users", r => { r.RemoteAddresses = NonLoopback; r.LocalUserAuthorizedList = InteractiveSddl; }));
+            // Home-network addresses the owner left out of the filter are not part of the block.
+            var outside = Guardian.Core.Network.LocalNetwork.Subtract(NonLoopback, p.LocalAddresses);
+            wanted.Add(($"Guardian isolate users {ShortHash(outside)}", r => { r.RemoteAddresses = outside; r.LocalUserAuthorizedList = InteractiveSddl; }));
             // Services: blocked by default; only Guardian (to keep checking), DHCP and the filter's own programs.
             var svchost = Path.Combine(Environment.SystemDirectory, "svchost.exe");
             wanted.Add(("Guardian isolate DHCP", r => { r.ApplicationName = svchost; r.Protocol = 17; r.RemotePorts = "67,547"; r.Action = 1; }));
@@ -122,6 +124,12 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
             foreach (var app in allow.Distinct(StringComparer.OrdinalIgnoreCase))
                 wanted.Add(($"Guardian allow {ShortHash(app)}", r => { r.ApplicationName = app; r.Action = 1; }));
         }
+
+        // Home-network addresses left out of the filter: any program may reach them directly
+        // (DNS to them stays blocked by the rules above, which win over this one).
+        var local = Guardian.Core.Network.LocalNetwork.FirewallList(p.LocalAddresses);
+        if (local.Length > 0 && (isolated || p.UrlFiltering))
+            wanted.Add(($"Guardian local network {ShortHash(local)}", r => { r.RemoteAddresses = local; r.Action = 1; }));
 
         var fw = Fw();
         var existing = new HashSet<string>();

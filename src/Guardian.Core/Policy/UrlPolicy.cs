@@ -47,7 +47,7 @@ public static class UrlPolicy
     /// <summary>Full decision for a request whose path is known (HTTP, or HTTPS through the proxy).</summary>
     public static bool IsUrlAllowed(NetworkPolicy policy, string host, string path)
     {
-        if (!policy.Enabled) return true;
+        if (!policy.Enabled || Network.LocalNetwork.Contains(policy.LocalAddresses, host)) return true;
         var blocklist = policy.Mode == UrlMode.Blocklist;
         if (policy.Exceptions.Any(d => UrlMatches(d, host, path))) return blocklist;
         var listed = policy.Domains.Any(d => UrlMatches(d, host, path));
@@ -60,7 +60,7 @@ public static class UrlPolicy
     /// </summary>
     public static bool IsHostAllowed(NetworkPolicy policy, string host)
     {
-        if (!policy.Enabled) return true;
+        if (!policy.Enabled || Network.LocalNetwork.Contains(policy.LocalAddresses, host)) return true;
         bool WholeHost(string d) => ParseEntry(d) is { Path: "" } e && HostMatches(host, e.Host);
         if (policy.Mode == UrlMode.Blocklist)
         {

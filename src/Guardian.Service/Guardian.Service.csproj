@@ -3,7 +3,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
-    <Version>0.9.2</Version>
+    <Version>0.9.3</Version>
     <ApplicationIcon>..\..\assets\guardian.ico</ApplicationIcon>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>guardian</AssemblyName>

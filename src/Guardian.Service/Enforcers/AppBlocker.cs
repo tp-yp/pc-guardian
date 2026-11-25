@@ -107,6 +107,13 @@ public sealed class AppBlocker : IDisposable
 
         // Essential parts of Windows (and Guardian's folder) are never closed, whatever the rules say.
         if (ProtectedApps.IsProtected(path, WindowsDir, Paths.InstallDir)) return;
+        // Programs installed inside another account's profile folder are that account's only.
+        if (rules.Enabled && UserPrograms.OwnerOf(path, UserProfiles.Current()) != null &&
+            UserPrograms.IsOtherUsers(path, user ?? ProcessUser.Of(pid), UserProfiles.Current()))
+        {
+            Kill(proc, pid, path, "program of another account", user);
+            return;
+        }
         var hashNeeded = rules.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
         var nameNeeded = rules.Rules.Any(r => r.Action == RuleAction.Block && (!string.IsNullOrEmpty(r.FileName) || !string.IsNullOrEmpty(r.OriginalName)));
         var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null, nameNeeded ? OriginalName(path) : null);

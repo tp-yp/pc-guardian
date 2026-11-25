@@ -199,4 +199,9 @@ public sealed class NetworkPolicy
     public List<string> NoDecryptDomains { get; set; } = new();
     /// <summary>Executables allowed to reach the internet directly, bypassing the proxy (e.g. games, Steam).</summary>
     public List<string> AllowDirectApps { get; set; } = new();
+    /// <summary>
+    /// Home-network addresses left out of the filter (a NAS, a printer, a local server): one address or a
+    /// CIDR range, private ranges only. For the whole computer. DNS stays filtered.
+    /// </summary>
+    public List<string> LocalAddresses { get; set; } = new();
 }
