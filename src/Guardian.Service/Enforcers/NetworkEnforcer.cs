@@ -83,8 +83,10 @@ public sealed class NetworkEnforcer(ILogger<NetworkEnforcer> log)
         var p = cfg.Network;
         var wanted = new List<(string Name, Action<dynamic> Setup)>
         {
-            ("Guardian DNS UDP", r => { r.Protocol = 17; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; }),
-            ("Guardian DNS TCP", r => { r.Protocol = 6; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; }),
+            // Programs people run may not ask other DNS servers. Guardian itself (a service) may: it asks the
+            // network's own DNS server for that network's internal names.
+            ("Guardian DNS UDP users", r => { r.Protocol = 17; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; r.LocalUserAuthorizedList = InteractiveSddl; }),
+            ("Guardian DNS TCP users", r => { r.Protocol = 6; r.RemotePorts = "53,853"; r.RemoteAddresses = NonLoopbackV4; r.LocalUserAuthorizedList = InteractiveSddl; }),
         };
         // "No internet" programs: for everyone, or (with per-account rules) only for some accounts.
         foreach (var (path, users) in Guardian.Core.Policy.UserScopes.InternetBlocks(cfg, cfg.UserPolicies.Count > 0 ? Accounts() : []))

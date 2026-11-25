@@ -256,7 +256,20 @@ public static class ConfigEditing
         if (value.Length is 0 or > 500 || value.Any(char.IsControl) || (list is "domains" or "noDecrypt" or "exceptions" && value.Contains(' ')))
         { error = "Invalid value."; return false; }
         if (list == "blockedApps" && action == "add" && Policy.ProtectedApps.IsProtected(value)) { error = ProtectedError; return false; }
-        if (list == "localAddresses" && action == "add" && !Network.LocalNetwork.TryNormalize(value, out value, out error)) return false;
+        if (list == "localAddresses" && action == "add")
+        {
+            // One address, or several separated by commas or spaces ("the whole local network" button).
+            var parts = value.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var norm = new List<string>();
+            foreach (var part in parts)
+            {
+                if (!Network.LocalNetwork.TryNormalize(part, out var n, out error)) return false;
+                norm.Add(n);
+            }
+            foreach (var n in norm)
+                if (!target.Contains(n, StringComparer.OrdinalIgnoreCase)) target.Add(n);
+            return true;
+        }
         var existing = target.FindIndex(v => v.Equals(value, StringComparison.OrdinalIgnoreCase));
         switch (action)
         {

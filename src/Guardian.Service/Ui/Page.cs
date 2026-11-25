@@ -237,7 +237,8 @@ body[data-ctx=user] .machine{display:none!important}
 <ul id="noDecrypt"></ul></section>
 <section class="wide machine"><h2>מכשירים ברשת המקומית (לא מסוננים)</h2>
 <p class="hint">כתובות במחשבים ובמכשירים שבבית, כמו שרת מקומי, מדפסת, NAS או הנתב, שהסינון לא חל עליהן: כל תוכנה יכולה להתחבר אליהן ישירות. אפשר לכתוב כתובת אחת (192.168.1.20) או טווח (192.168.1.0/24). מתקבלות רק כתובות של רשת מקומית, כך שאי אפשר לפתוח כאן את האינטרנט. חשוב: מכשיר שמוחרג כאן יכול בעצמו להעביר אינטרנט לא מסונן (למשל אם מריצים עליו שרת פרוקסי), לכן כדאי להחריג רק מכשירים שאתם סומכים עליהם.</p>
-<form class="row add" data-list="localAddresses"><input required style="flex:1;direction:ltr" placeholder="192.168.1.20"><button>הוספה</button></form>
+<p class="hint">לא יודעים את הכתובת? הכפתור "כל הרשת המקומית" מחריג את כל הכתובות של רשתות מקומיות (בבית, במקום הלימודים, מדפסות). שמות של שרתים פנימיים ברשת (למשל של מאגר במקום הלימודים) Guardian שואל תמיד משרת השמות של אותה רשת, גם בלי הרשימה הזו. הרשימה נחוצה רק כש"סינון לפי כתובת מלאה" או "אינטרנט רק דרך הסינון" דולקים.</p>
+<form class="row add" data-list="localAddresses"><input required style="flex:1;direction:ltr" placeholder="192.168.1.20"><button>הוספה</button><button type="button" class="ghost" id="allLan">כל הרשת המקומית</button></form>
 <ul id="localAddresses"></ul></section>
 </div>
 
@@ -428,6 +429,8 @@ $('wifiAdd').onclick=()=>{const n=$('wifiSaved').value;if(n)post('/api/wifi/list
 
 // Lists
 const APP_LISTS=['allowApps','blockApps'];
+const LAN_RANGES=['192.168.0.0/16','10.0.0.0/8','172.16.0.0/12','169.254.0.0/16','fc00::/7','fe80::/10'];
+document.addEventListener('click',e=>{if(e.target&&e.target.id==='allLan'){e.preventDefault();edit('localAddresses','add',LAN_RANGES.join(',')).then(()=>toast('כל הרשת המקומית הוחרגה מהסינון')).catch(()=>{})}});
 function renderList(id,items){$(id).replaceChildren(...(items.length?items.map(v=>el('li',{},el('span',{},v),el('button',{class:'link',onclick:()=>edit(id,'remove',v).then(()=>toast('הוסר: '+v))},'הסרה'))):[el('li',{class:'muted'},'הרשימה ריקה')]))}
 function edit(list,action,value){const url=APP_LISTS.includes(list)?'/api/apps/list':'/api/network/list';return post(url,{list,action,value}).then(render).catch(x=>{fail(x);throw x})}
 document.querySelectorAll('form.add').forEach(f=>f.onsubmit=e=>{e.preventDefault();const i=f.querySelector('input');const v=i.value.trim();edit(f.dataset.list,'add',v).then(()=>{i.value='';toast('נוסף: '+v)}).catch(()=>{})});

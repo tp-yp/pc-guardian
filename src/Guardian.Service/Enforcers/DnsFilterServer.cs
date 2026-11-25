@@ -9,7 +9,8 @@ namespace Guardian.Service.Enforcers;
 /// <summary>
 /// Local DNS resolver on 127.0.0.1:53 and [::1]:53. Blocked names get 0.0.0.0 / :: / NXDOMAIN;
 /// everything else is resolved upstream over DNS-over-HTTPS (by IP, so it needs no DNS itself
-/// and is not affected by the port-53 firewall block).
+/// and is not affected by the port-53 firewall block). Internal names of the connected network are asked
+/// from that network's own DNS server (see <see cref="NetworkDns"/>).
 /// </summary>
 public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog accessLog) : BackgroundService
 {
@@ -58,6 +59,20 @@ public sealed class DnsFilterServer(ILogger<DnsFilterServer> log, AccessLog acce
     {
         var q = DnsMessage.ReadQuestion(query);
         if (q is null) return null;
+        // Names only the connected network knows (a school's server, a printer): ask the network's own DNS.
+        // Names that can never be internet sites skip the site filter; names under the network's suffix do not.
+        var net = NetworkDns.Current();
+        if (net.Servers.Count > 0 && InternalNames.IsInternal(q.Name, net.Suffixes))
+        {
+            if (InternalNames.IsPrivateOnly(q.Name) || Guardian.Core.Policy.UserScopes.DnsAllows(_cfg, q.Name))
+            {
+                if (await NetworkDns.AskAsync(net.Servers, query, ct) is { } local)
+                {
+                    accessLog.Add("dns", q.Name, allowed: true);
+                    return local;
+                }
+            }
+        }
         // DNS cannot tell which account asks: only names blocked for everyone are refused here.
         if (!Guardian.Core.Policy.UserScopes.DnsAllows(_cfg, q.Name))
         {

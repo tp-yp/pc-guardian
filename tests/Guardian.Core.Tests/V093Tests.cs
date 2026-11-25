@@ -93,6 +93,41 @@ public class LocalNetworkTests
     }
 }
 
+public class InternalNamesTests
+{
+    [Theory]
+    [InlineData("dbserver", true)]
+    [InlineData("printer.lan", true)]
+    [InlineData("files.college.local.", true)]
+    [InlineData("router.home.arpa", true)]
+    [InlineData("20.1.168.192.in-addr.arpa", true)]
+    [InlineData("5.0.20.172.in-addr.arpa", true)]
+    [InlineData("8.8.8.8.in-addr.arpa", false)]
+    [InlineData("google.com", false)]
+    [InlineData("local.com", false)]
+    public void Private_only_names(string name, bool expected) => Assert.Equal(expected, InternalNames.IsPrivateOnly(name));
+
+    [Fact]
+    public void Network_suffix_names_are_internal_but_one_word_suffixes_are_ignored()
+    {
+        Assert.True(InternalNames.IsInternal("db.college.ac.il", ["college.ac.il"]));
+        Assert.True(InternalNames.IsInternal("college.ac.il", ["college.ac.il"]));
+        Assert.False(InternalNames.IsInternal("www.college.ac.il.evil.com", ["college.ac.il"]));
+        Assert.False(InternalNames.IsInternal("youtube.com", ["com"]));
+        Assert.False(InternalNames.IsInternal("youtube.com", []));
+    }
+
+    [Fact]
+    public void Whole_local_network_button_adds_every_range_in_one_change()
+    {
+        var cfg = new GuardianConfig();
+        Assert.True(ConfigEditing.TryEditNetworkList(cfg, "localAddresses", "add", "192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,169.254.0.0/16,fc00::/7,fe80::/10", out _));
+        Assert.Equal(6, cfg.Network.LocalAddresses.Count);
+        Assert.False(ConfigEditing.TryEditNetworkList(cfg, "localAddresses", "add", "10.0.0.1,8.8.8.8", out _));
+        Assert.Equal(6, cfg.Network.LocalAddresses.Count); // nothing added when one entry is bad
+    }
+}
+
 public class UserProgramsTests
 {
     private static readonly Dictionary<string, string> Profiles = new(StringComparer.OrdinalIgnoreCase)
