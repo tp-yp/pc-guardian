@@ -21,7 +21,7 @@ internal static class Page
 [hidden]{display:none !important}
 header{padding:10px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg);position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--line)}
 h1{font-size:22px;font-weight:500;margin:0;display:flex;align-items:center;gap:8px}
-h1:before{content:"";width:28px;height:28px;border-radius:8px;background:var(--accent) radial-gradient(circle at 50% 58%,var(--on-accent) 0 4px,transparent 5px)}
+h1:before{content:"";width:28px;height:28px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0.35' y2='1'%3E%3Cstop offset='0' stop-color='%233d64a8'/%3E%3Cstop offset='1' stop-color='%2314213d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M128 14 C 152 28 186 38 220 40 C 226 41 230 46 230 52 L 230 112 C 230 172 190 214 133 240 C 130 241.5 126 241.5 123 240 C 66 214 26 172 26 112 L 26 52 C 26 46 30 41 36 40 C 70 38 104 28 128 14 Z' fill='url(%23g)'/%3E%3Cpath d='M94 116 V 92 a34 34 0 0 1 68 0 V 116' fill='none' stroke='%23fff' stroke-width='22' stroke-linecap='round'/%3E%3Crect x='70' y='106' width='116' height='88' rx='18' fill='%23fff'/%3E%3Ccircle cx='128' cy='146' r='15' fill='%231d2f55'/%3E%3C/svg%3E") center/contain no-repeat}
 nav{display:flex;gap:4px;flex-wrap:wrap;background:var(--card2);padding:4px;border-radius:24px}
 nav button,.sub button{background:none;color:var(--muted);border:0;border-radius:20px;padding:8px 16px;font-weight:500;height:36px}
 nav button:hover,.sub button:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}
