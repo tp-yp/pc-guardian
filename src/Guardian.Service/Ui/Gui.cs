@@ -78,12 +78,13 @@ div{text-align:center;max-width:420px;padding:16px}button{margin-top:14px;font:i
         return web.Succeeded ? 0 : 1;
     }
 
-    public static int Blocked(string base64Name)
+    public static int Blocked(string base64Name, string base64Reason = "")
     {
-        string name;
-        try { name = Encoding.UTF8.GetString(Convert.FromBase64String(base64Name)); } catch { name = ""; }
-        AppWindow.Show(new AppWindow.Options("Geder", 560, 340, Popup: true, TopMost: true, AutoCloseSeconds: 15),
-            wv => wv.NavigateToString(BlockScreen.ForProgram(name)));
+        static string Decode(string b) { try { return Encoding.UTF8.GetString(Convert.FromBase64String(b)); } catch { return ""; } }
+        var name = Decode(base64Name);
+        var reason = Decode(base64Reason);
+        AppWindow.Show(new AppWindow.Options("Geder", 560, reason.Length > 0 ? 400 : 340, Popup: true, TopMost: true, AutoCloseSeconds: 20),
+            wv => wv.NavigateToString(BlockScreen.ForProgram(name, reason)));
         return 0;
     }
 

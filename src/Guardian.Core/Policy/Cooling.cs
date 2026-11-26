@@ -27,7 +27,9 @@ public static class Cooling
             case "/api/cooling/set":
                 return !TryMinutes(body, out var mins) || mins < cfg.Cooling.Minutes;
             case "/api/catalog/set":
-                return B("kind") == "direct" ? on : !on;
+                return B("kind") is "direct" or "allow" ? on : !on;
+            case "/api/apps/allowRunning":
+                return true;
             case "/api/release":
                 return B("action") != "undo";
             case "/api/backup/restore":

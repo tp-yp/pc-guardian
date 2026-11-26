@@ -25,7 +25,7 @@ public static class UserScopes
         return new GuardianConfig
         {
             ServiceName = cfg.ServiceName, WatchdogServiceName = cfg.WatchdogServiceName,
-            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi, Browsers = cfg.Browsers,
+            UserLockouts = cfg.UserLockouts, UiIdleLockMinutes = cfg.UiIdleLockMinutes, ActivityHours = cfg.ActivityHours, Boot = cfg.Boot, IspFilter = cfg.IspFilter, Clock = cfg.Clock, Vpn = cfg.Vpn, Wifi = cfg.Wifi, Browsers = cfg.Browsers,
             Apps = Merge(cfg.Apps, p.Apps),
             Network = Merge(cfg.Network, p.Network),
         };
@@ -94,6 +94,9 @@ public static class UserScopes
     }
 
     /// <summary>True if program blocking is on for anyone (the general rules or any account).</summary>
+    /// <summary>"Program locking" is on for the whole computer or for at least one account.</summary>
+    public static bool AnyProgramLocking(GuardianConfig cfg) => cfg.Apps.Enabled || cfg.UserPolicies.Any(p => p.Apps.Enabled);
+
     public static bool AnyAppBlocking(GuardianConfig cfg) => cfg.Apps.Enabled || cfg.Apps.BlockAdminTools || cfg.Apps.BlockVideoFiles || cfg.Vpn.Block ||
         cfg.UserPolicies.Any(p => p.Apps.Enabled || p.Apps.BlockAdminTools || p.Apps.BlockVideoFiles);
 

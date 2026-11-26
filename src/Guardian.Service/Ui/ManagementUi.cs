@@ -156,8 +156,23 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     await SendJson(res, 200, new { ok = true });
                     break;
                 case ("/api/log", "GET"):
-                    await SendJson(res, 200, accessLog.Recent(300));
+                {
+                    double.TryParse(req.QueryString["hours"], System.Globalization.CultureInfo.InvariantCulture, out var hours);
+                    accessLog.KeepHours = store.Load().ActivityHours;
+                    await SendJson(res, 200, accessLog.Recent(3000, hours is > 0 and <= 24 ? hours : 1));
                     break;
+                }
+                case ("/api/settings/activity", "POST"):
+                {
+                    if (!int.TryParse(body.GetValueOrDefault("hours"), out var h) || !GuardianConfig.ActivityHourChoices.Contains(h))
+                    { await SendJson(res, 400, new { error = "Bad request." }); break; }
+                    var cfg = store.Load();
+                    cfg.ActivityHours = h;
+                    store.Save(cfg);
+                    accessLog.KeepHours = h;
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
                 case ("/api/network", "GET"):
                     await SendJson(res, 200, store.Load().Network);
                     break;
@@ -173,6 +188,21 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     var view = UserScopes.View(cfg, who);
                     var exe = body.GetValueOrDefault("path") ?? "";
                     var orig = body.GetValueOrDefault("kind") == "lock" && File.Exists(exe) ? AppBlocker.ReadOriginalName(exe) : null;
+                    if (body.GetValueOrDefault("kind") == "allow")
+                    {
+                        // Allow-list mode: allow or un-allow this one program.
+                        if (body.GetValueOrDefault("value") == "true")
+                        {
+                            view.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Block && r.When.Windows.Count == 0 && string.Equals(r.PathPrefix, exe, StringComparison.OrdinalIgnoreCase));
+                            if (!AllowOne(view, exe, out var e2)) { await SendJson(res, 400, new { error = e2 }); break; }
+                        }
+                        else if (view.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Allow && string.Equals(r.PathPrefix, exe, StringComparison.OrdinalIgnoreCase)) == 0)
+                        { await SendJson(res, 400, new { error = "התוכנה מותרת דרך תיקייה או שם קובץ ברשימה הידנית. אפשר להסיר אותה שם." }); break; }
+                        UserScopes.Commit(cfg, view);
+                        store.Save(cfg);
+                        await SendJson(res, 200, CatalogFor(await catalog.GetAsync(), cfg, who));
+                        break;
+                    }
                     if (!AppCatalog.TrySet(view, exe, body.GetValueOrDefault("kind") ?? "", body.GetValueOrDefault("value") == "true", out var err, orig))
                     { await SendJson(res, 400, new { error = err }); break; }
                     UserScopes.Commit(cfg, view);
@@ -240,17 +270,46 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 case ("/api/apps/allow", "POST"):
                 {
                     var exePath = body.GetValueOrDefault("path") ?? "";
-                    var value = body.GetValueOrDefault("scope") == "folder" ? ConfigEditing.AppFolderOf(exePath) : exePath;
+                    var folder = body.GetValueOrDefault("scope") == "folder";
+                    var value = folder ? ConfigEditing.AppFolderOf(exePath) : exePath;
                     var cfg = store.Load();
                     var view = UserScopes.View(cfg, who);
                     // Allowing also removes a matching lock, otherwise the lock would still win.
                     view.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Block && r.When.Windows.Count == 0 &&
                         (string.Equals(r.PathPrefix, exePath, StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(r.FileName, Path.GetFileName(exePath), StringComparison.OrdinalIgnoreCase)));
-                    if (!ConfigEditing.TryEditAppList(view, "allowApps", "add", value, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    if (folder && Directory.Exists(value)) ConfigEditing.AllowScanned(view, value, FolderScan.Scan(value));
+                    else if (!AllowOne(view, exePath, out var err)) { await SendJson(res, 400, new { error = err }); break; }
                     UserScopes.Commit(cfg, view);
                     store.Save(cfg);
                     await SendJson(res, 200, new { ok = true, allowed = value, user = UserScopes.Find(cfg, who)?.UserName });
+                    break;
+                }
+                case ("/api/apps/allowRunning", "POST"):
+                {
+                    // Allow-list mode helper: every program open right now (outside Windows) becomes allowed.
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    var n = 0;
+                    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var p in System.Diagnostics.Process.GetProcesses())
+                    {
+                        using (p)
+                        {
+                            if (p.SessionId == 0) continue;
+                            var exeRun = Guardian.Service.Native.ProcessPath.Get(p.Id);
+                            if (string.IsNullOrEmpty(exeRun) || !seen.Add(exeRun)) continue;
+                            var owner = Guardian.Service.Native.ProcessUser.Of(p.Id) ?? "";
+                            if (who != null && !string.Equals(owner, who, StringComparison.OrdinalIgnoreCase) && !owner.EndsWith("\\" + who, StringComparison.OrdinalIgnoreCase)) continue;
+                            if (ProtectedApps.IsProtected(exeRun) || SystemApps.IsPartOfWindows(exeRun) || exeRun.StartsWith(Environment.GetFolderPath(Environment.SpecialFolder.Windows) + "\\", StringComparison.OrdinalIgnoreCase)) continue;
+                            if (AppCatalog.IsAllowed(view, exeRun)) continue;
+                            if (AllowOne(view, exeRun, out _)) n++;
+                        }
+                    }
+                    UserScopes.Commit(cfg, view);
+                    store.Save(cfg);
+                    log.LogInformation("UI: {N} running programs allowed", n);
+                    await SendJson(res, 200, new { count = n });
                     break;
                 }
                 case ("/api/site", "POST"):
@@ -501,6 +560,22 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 {
                     var cfg = store.Load();
                     var view = UserScopes.View(cfg, who);
+                    var listValue = (body.GetValueOrDefault("value") ?? "").Trim().Trim('"');
+                    if (body.GetValueOrDefault("list") == "allowApps" && body.GetValueOrDefault("action") == "add" && listValue.Contains('\\'))
+                    {
+                        // A folder: its programs are scanned and allowed one by one. A single program: pinned by contents where needed.
+                        if (Directory.Exists(listValue))
+                        {
+                            var found = FolderScan.Scan(listValue);
+                            if (found.Count == 0) { await SendJson(res, 400, new { error = "לא נמצאו תוכנות בתיקייה הזו." }); break; }
+                            ConfigEditing.AllowScanned(view, listValue, found);
+                        }
+                        else if (!AllowOne(view, listValue, out var e1)) { await SendJson(res, 400, new { error = e1 }); break; }
+                        UserScopes.Commit(cfg, view);
+                        store.Save(cfg);
+                        await SendJson(res, 200, State(cfg, who));
+                        break;
+                    }
                     if (!ConfigEditing.TryEditAppList(view, body.GetValueOrDefault("list") ?? "", body.GetValueOrDefault("action") ?? "",
                             body.GetValueOrDefault("value") ?? "", out var err))
                     { await SendJson(res, 400, new { error = err }); break; }
@@ -556,7 +631,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         {
             required = cfg.IspFilter.Required,
             status = status.ToString(),
-            blocked = cfg.IspFilter.Required && status != IspFilterStatus.Filtered,
+            blocked = cfg.IspFilter.Required && status is not (IspFilterStatus.Filtered or IspFilterStatus.Offline),
             time = r.Status == IspFilterStatus.Unknown ? (DateTime?)null : r.Time,
             detail = r.Detail,
             signer = IspFilterCheck.Signer(r.Chain),
@@ -566,6 +641,21 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             thumbprints = cfg.IspFilter.Thumbprints,
             apps = cfg.IspFilter.ClientApps,
         };
+    }
+
+    /// <summary>Allows one program by its full path; outside Program Files it is also pinned by its contents.</summary>
+    private static bool AllowOne(GuardianConfig view, string exe, out string error)
+    {
+        error = "";
+        if (!exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(exe)) { error = "התוכנה או התיקייה לא נמצאו במחשב."; return false; }
+        if (ConfigEditing.IsAdminOnlyFolder(exe, FolderScan.AdminRoots)) return ConfigEditing.TryEditAppList(view, "allowApps", "add", exe, out error);
+        // Signed: allowed by publisher at this place, so it keeps working after updates. Unsigned: by its contents.
+        var signer = Guardian.Service.Native.Authenticode.SignerOf(exe);
+        var hash = signer is null ? FolderScan.Hash(exe) : null;
+        if (signer is null && hash is null) { error = "אי אפשר לקרוא את התוכנה."; return false; }
+        view.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Allow && string.Equals(r.PathPrefix, exe, StringComparison.OrdinalIgnoreCase));
+        view.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = exe, Sha256 = hash, Signer = signer });
+        return true;
     }
 
     private static object State(GuardianConfig cfg, string? who)
@@ -631,6 +721,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         },
         lockouts = c.UserLockouts.Count,
         idleMinutes = c.UiIdleLockMinutes > 0 ? c.UiIdleLockMinutes : 5,
+        activityHours = c.ActivityHours,
         idleChoices = GuardianConfig.IdleLockChoices,
     };
 

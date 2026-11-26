@@ -47,7 +47,7 @@ switch (cmd)
 
     case "blocked":
         Setup.HideOwnConsole();
-        return Gui.Blocked(args.ElementAtOrDefault(1) ?? "");
+        return Gui.Blocked(args.ElementAtOrDefault(1) ?? "", args.ElementAtOrDefault(2) ?? "");
 
     case "uninstall-gui":
     {

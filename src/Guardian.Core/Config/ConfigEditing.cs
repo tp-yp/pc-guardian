@@ -40,6 +40,7 @@ public static class ConfigEditing
         current.Wifi = incoming.Wifi;
         current.Browsers = incoming.Browsers;
         current.Cooling.Minutes = incoming.Cooling.Minutes;
+        if (GuardianConfig.ActivityHourChoices.Contains(incoming.ActivityHours)) current.ActivityHours = incoming.ActivityHours;
     }
 
     /// <summary>Switches that "release all restrictions" turns off for the whole computer.</summary>
@@ -156,6 +157,9 @@ public static class ConfigEditing
         { error = ProtectedError; return false; }
         bool Same(AppRule r) => r.Action == kind && r.When.Windows.Count == 0 &&
             string.Equals(isPath ? r.PathPrefix : r.FileName, value, StringComparison.OrdinalIgnoreCase);
+        // A scanned folder is one entry in the list: removing it removes all of its programs.
+        if (action == "remove" && cfg.Apps.Rules.RemoveAll(r => r.Action == kind && string.Equals(r.Source, value, StringComparison.OrdinalIgnoreCase)) > 0)
+            return true;
         var existing = cfg.Apps.Rules.FindIndex(Same);
         switch (action)
         {
@@ -194,8 +198,47 @@ public static class ConfigEditing
 
     /// <summary>Simple (unscheduled) app rules shown in the UI lists.</summary>
     public static List<string> SimpleAppList(GuardianConfig cfg, RuleAction kind) =>
-        cfg.Apps.Rules.Where(r => r.Action == kind && r.When.Windows.Count == 0 && r.Sha256 is null)
-            .Select(r => r.PathPrefix ?? r.FileName ?? "").Where(v => v.Length > 0).ToList();
+        cfg.Apps.Rules.Where(r => r.Action == kind && r.When.Windows.Count == 0 && (r.Sha256 is null || r.PathPrefix != null))
+            .Select(r => r.Source ?? r.PathPrefix ?? r.FileName ?? "").Where(v => v.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>
+    /// Allows the programs found in a folder, one by one, instead of the folder itself: a program copied into
+    /// it later is not allowed. <paramref name="files"/> are the programs with their contents' hash, or null
+    /// in folders only administrators can change (Program Files), where the place is enough.
+    /// Scanning the same folder again replaces its earlier list (new and updated programs come in).
+    /// </summary>
+    public static int AllowScanned(GuardianConfig cfg, string folder, IEnumerable<(string Path, string? Sha256)> files) =>
+        AllowScanned(cfg, folder, files.Select(f => (f.Path, f.Sha256, (string?)null)));
+
+    /// <summary>
+    /// As above, with the publisher of each signed program: signed programs are allowed by publisher in the folder
+    /// (one rule per publisher, so updates keep working), unsigned ones by their contents.
+    /// </summary>
+    public static int AllowScanned(GuardianConfig cfg, string folder, IEnumerable<(string Path, string? Sha256, string? Signer)> files)
+    {
+        folder = folder.Replace('/', '\\').TrimEnd('\\') + "\\";
+        cfg.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Allow && string.Equals(r.Source, folder, StringComparison.OrdinalIgnoreCase));
+        cfg.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Allow && r.Source is null && r.When.Windows.Count == 0 &&
+                                      string.Equals(r.PathPrefix?.TrimEnd('\\') + "\\", folder, StringComparison.OrdinalIgnoreCase));
+        var n = 0;
+        var signers = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (path, hash, signer) in files)
+        {
+            n++;
+            if (signer is { Length: > 0 })
+            {
+                if (signers.Add(signer)) cfg.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = folder, Signer = signer, Source = folder });
+                continue;
+            }
+            cfg.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = path, Sha256 = hash, Source = folder });
+        }
+        return n;
+    }
+
+    /// <summary>Folders only administrators can change: there the place of a program is enough to trust it.</summary>
+    public static bool IsAdminOnlyFolder(string path, IEnumerable<string> adminRoots) =>
+        adminRoots.Where(r => !string.IsNullOrEmpty(r)).Any(r => path.Replace('/', '\\').StartsWith(r.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// "Block this" / "Allow this" for a site or page, whatever the list mode is.

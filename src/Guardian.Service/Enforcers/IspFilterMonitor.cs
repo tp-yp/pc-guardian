@@ -38,10 +38,31 @@ public sealed class IspFilterMonitor : IDisposable
     /// <summary>True when the switch is on and the filter is not confirmed right now.</summary>
     public bool Isolated(GuardianConfig cfg) => cfg.IspFilter.Required && Last.ShouldBlock;
 
+    private DateTime _fastUntil = DateTime.MinValue;
+
     private void OnNetworkChanged(object? sender, EventArgs e)
     {
-        // Give DHCP a moment; the decision stays as it was until the new check finishes.
-        lock (_gate) _nextCheck = DateTime.UtcNow.AddSeconds(4);
+        lock (_gate)
+        {
+            // Check soon, and every few seconds for a while, so a filtered network opens quickly.
+            _nextCheck = DateTime.UtcNow.AddSeconds(2);
+            _fastUntil = DateTime.UtcNow.AddSeconds(90);
+            // A network appeared after being offline: blocked until a check confirms the filter.
+            if (_last.Status == IspFilterStatus.Offline && HasNetwork())
+                _last = new(IspFilterStatus.Unknown, DateTime.Now, "network came back, checking", []);
+        }
+    }
+
+    /// <summary>True when some network adapter is connected with a gateway (a way out to other networks).</summary>
+    private static bool HasNetwork()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces().Any(n => n.OperationalStatus == OperationalStatus.Up &&
+                n.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel) &&
+                n.GetIPProperties().GatewayAddresses.Any(g => !g.Address.Equals(System.Net.IPAddress.Any) && !g.Address.Equals(System.Net.IPAddress.IPv6Any)));
+        }
+        catch (Exception) { return true; } // unknown: stay strict
     }
 
     /// <summary>
@@ -55,10 +76,12 @@ public sealed class IspFilterMonitor : IDisposable
         bool due;
         lock (_gate)
         {
-            if (_probes.Count > 0) _last = IspFilterCheck.Decide(cfg.IspFilter, _probes, _last.Time);
+            if (!HasNetwork()) _last = new(IspFilterStatus.Offline, DateTime.Now, "no network", []);
+            else if (_last.Status == IspFilterStatus.Offline) _last = new(IspFilterStatus.Unknown, DateTime.Now, "network came back, checking", []);
+            else if (_probes.Count > 0 && _last.Status != IspFilterStatus.Unknown) _last = IspFilterCheck.Decide(cfg.IspFilter, _probes, _last.Time);
             due = DateTime.UtcNow >= _nextCheck;
         }
-        if (due) _ = CheckAsync(cfg.IspFilter);
+        if (due && Last.Status != IspFilterStatus.Offline) _ = CheckAsync(cfg.IspFilter);
         var blocked = Last.ShouldBlock;
         var changed = _lastBlocked != blocked;
         if (changed && _lastBlocked != null)
@@ -83,7 +106,7 @@ public sealed class IspFilterMonitor : IDisposable
                 _probes = probes;
                 _last = IspFilterCheck.Decide(policy, probes, DateTime.Now);
                 // While blocked, look again sooner so the internet comes back quickly once filtered.
-                _nextCheck = DateTime.UtcNow.AddSeconds(_last.ShouldBlock ? 20 : 60);
+                _nextCheck = DateTime.UtcNow.AddSeconds(!_last.ShouldBlock ? 60 : DateTime.UtcNow < _fastUntil ? 3 : 20);
                 return _last;
             }
         }
@@ -97,7 +120,7 @@ public sealed class IspFilterMonitor : IDisposable
 
     private static async Task<(string Host, List<ChainCert>? Chain, string? Error)> Probe(string host)
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         try
         {
             using var tcp = new TcpClient();

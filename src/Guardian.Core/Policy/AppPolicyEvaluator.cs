@@ -3,14 +3,26 @@ using Guardian.Core.Config;
 namespace Guardian.Core.Policy;
 
 /// <param name="OriginalName">The original file name written inside the program (version info), if any.</param>
-public sealed record ProcessInfo(string Path, string? Sha256, string? OriginalName = null);
+/// <param name="Signer">The publisher in the program's valid digital signature (Authenticode), if signed.</param>
+public sealed record ProcessInfo(string Path, string? Sha256, string? OriginalName = null, string? Signer = null);
 
 public sealed record AppDecision(RuleAction Action, string Reason);
 
+/// <summary>Why a program was closed, as shown on the block screen.</summary>
+public static class Reasons
+{
+    public const string BlockRule = "התוכנה נעולה (ברשימת התוכנות החסומות)";
+    public const string BlockedHours = "התוכנה חסומה בשעות האלה (שעות חסימה שנקבעו לה)";
+    public const string NotAllowed = "מצב \"רק תוכנות מותרות\" פועל, והתוכנה לא ברשימת התוכנות המותרות";
+    public const string AdminTool = "חסימת כלי מנהל";
+    public const string Video = "חסימת קבצי וידאו";
+    public const string OtherAccount = "התוכנה נמצאת בתיקייה של משתמש אחר במחשב";
+    public const string Vpn = "חסימת VPN ו-proxy";
+}
+
 /// <summary>
-/// Decides whether an executable may run now. Order: Block rules win over Allow rules;
-/// if nothing matches, DefaultDeny decides. Windows system folders are always allowed
-/// so the OS itself keeps working.
+/// Decides whether an executable may run now. Block rules win. In block-list mode everything else runs; in
+/// allow-list mode only the parts of Windows (found automatically), Geder and allowed programs run.
 /// </summary>
 public static class AppPolicyEvaluator
 {
@@ -26,25 +38,23 @@ public static class AppPolicyEvaluator
         var active = policy.Rules.Where(r => r.When.IsActive(local)).ToList();
 
         var block = active.FirstOrDefault(r => r.Action == RuleAction.Block && Matches(r, proc, forBlock: true));
-        if (block != null) return new(RuleAction.Block, "matched block rule");
+        if (block != null) return new(RuleAction.Block, block.When.Windows.Count > 0 ? Reasons.BlockedHours : Reasons.BlockRule);
 
-        if (AlwaysAllowedPrefixes.Concat(extraTrustedPrefixes ?? []).Any(p => StartsWith(proc.Path, p)))
+        // Block-list mode: everything else runs.
+        if (!policy.DefaultDeny) return new(RuleAction.Allow, "default allow");
+
+        // Allow-list mode: Windows itself (found automatically), Geder, and the allowed programs.
+        if (AlwaysAllowedPrefixes.Concat(extraTrustedPrefixes ?? []).Any(p => StartsWith(proc.Path, p)) || SystemApps.IsPartOfWindows(proc.Path))
             return new(RuleAction.Allow, "system path");
 
         var allow = active.FirstOrDefault(r => r.Action == RuleAction.Allow && Matches(r, proc));
         if (allow != null) return new(RuleAction.Allow, "matched allow rule");
 
-        return policy.DefaultDeny ? new(RuleAction.Block, "unknown executable (default deny)")
-                                  : new(RuleAction.Allow, "default allow");
+        return new(RuleAction.Block, Reasons.NotAllowed);
     }
 
-    /// <summary>Extra trusted folders for this machine (Program Files if enabled, plus Guardian itself).</summary>
-    public static List<string> TrustedPrefixes(AppPolicy policy, IEnumerable<string> programFilesDirs, string selfDir)
-    {
-        var list = new List<string> { WithSlash(selfDir) };
-        if (policy.TrustProgramFiles) list.AddRange(programFilesDirs.Where(d => !string.IsNullOrEmpty(d)).Select(WithSlash));
-        return list;
-    }
+    /// <summary>Geder's own folder, which is always allowed.</summary>
+    public static List<string> TrustedPrefixes(string selfDir) => [WithSlash(selfDir)];
 
     private static string WithSlash(string d) => Normalize(d).TrimEnd('\\') + "\\";
 
@@ -58,11 +68,23 @@ public static class AppPolicyEvaluator
             if (r.OriginalName is { Length: > 0 } ro && string.Equals(ExeName(ro), o, StringComparison.OrdinalIgnoreCase)) return true;
             if (r.FileName is { Length: > 0 } rf && string.Equals(ExeName(rf), o, StringComparison.OrdinalIgnoreCase)) return true;
         }
+        // A signed program allowed by place and publisher: any program of that publisher there, also after updates.
+        if (r.Signer is { Length: > 0 } sg)
+            return r.PathPrefix is { Length: > 0 } sp && PathMatches(p.Path, sp) && string.Equals(sg, p.Signer, StringComparison.Ordinal);
+        // A program allowed by place and contents (from a scanned folder) must match both.
+        if (r.PathPrefix is { Length: > 0 } pp && r.Sha256 is { Length: > 0 } hh)
+            return PathMatches(p.Path, pp) && p.Sha256 is { } ps && string.Equals(hh, ps, StringComparison.OrdinalIgnoreCase);
         if (r.Sha256 is { Length: > 0 } h && p.Sha256 is { } ph && string.Equals(h, ph, StringComparison.OrdinalIgnoreCase)) return true;
-        if (r.PathPrefix is { Length: > 0 } pre && StartsWith(p.Path, pre)) return true;
+        if (r.PathPrefix is { Length: > 0 } pre && PathMatches(p.Path, pre)) return true;
         if (r.FileName is { Length: > 0 } fn && string.Equals(fn, FileNameOf(p.Path), StringComparison.OrdinalIgnoreCase)) return true;
         return false;
     }
+
+    /// <summary>A rule for one program (ends with .exe) is that exact file; any other path is a folder.</summary>
+    public static bool PathMatches(string path, string rule) =>
+        rule.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            ? string.Equals(Normalize(path), Normalize(rule), StringComparison.OrdinalIgnoreCase)
+            : StartsWith(path, rule);
 
     /// <summary>"Discord" / "discord.exe.mui" / "Discord.exe" all become "Discord.exe".</summary>
     public static string ExeName(string name)

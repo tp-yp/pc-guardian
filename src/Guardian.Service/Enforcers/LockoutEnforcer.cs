@@ -34,6 +34,7 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
     public void Tick(GuardianConfig cfg)
     {
         ApplyLogonHours(cfg);
+        try { ApplyFullLock(cfg); } catch (Exception ex) { log.LogWarning(ex, "Full lock could not be applied"); }
         var now = clock.LocalNow; // not the Windows clock: changing the time must not open a locked account
         var sessions = Wts.UserSessions();
         // Addiction prevention: a sign-out after N minutes of continuous use; signing in again is allowed.
@@ -89,9 +90,50 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
         _managedUsers.UnionWith(current);
     }
 
-    /// <summary>On uninstall: give every managed account its hours back.</summary>
+    /// <summary>Accounts Geder turned off for their locked hours (so only those are turned on again).</summary>
+    private static string DisabledFile => Path.Combine(Paths.DataDir, "locked-accounts.txt");
+
+    private static HashSet<string> ReadDisabled()
+    {
+        try { return new HashSet<string>(File.ReadAllLines(DisabledFile).Where(l => l.Length > 0), StringComparer.OrdinalIgnoreCase); }
+        catch (Exception) { return new(StringComparer.OrdinalIgnoreCase); }
+    }
+
+    /// <summary>
+    /// Full lock: during locked hours the account is turned off, so it cannot sign in or unlock at all (logon hours
+    /// alone let a PIN sign-in through for a moment). Never done to an administrator account. Turned back on when the
+    /// locked hours end, on a temporary release, when the rule is removed and when Geder is removed.
+    /// </summary>
+    private void ApplyFullLock(GuardianConfig cfg)
+    {
+        var now = clock.LocalNow;
+        var disabled = ReadDisabled();
+        var want = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rule in cfg.UserLockouts)
+        {
+            var exempt = exemptions.Until.Any(e => LockoutPlanner.SameUser(e.Key, rule.UserName) && e.Value > now);
+            if (!exempt && rule.LockedDuring.Windows.Count > 0 && rule.LockedDuring.IsActive(now) && !NetUser.IsAdmin(rule.UserName)) want.Add(rule.UserName);
+        }
+        var changed = false;
+        foreach (var u in want.Where(u => !disabled.Contains(u)))
+        {
+            if (NetUser.IsDisabled(u)) continue; // already off by someone else: not ours to turn on later
+            if (NetUser.SetDisabled(u, true) == 0) { disabled.Add(u); changed = true; log.LogInformation("Account {User} turned off for its locked hours", u); }
+        }
+        foreach (var u in disabled.Where(u => !want.Contains(u)).ToList())
+        {
+            NetUser.SetDisabled(u, false);
+            disabled.Remove(u); changed = true;
+            log.LogInformation("Account {User} turned on again", u);
+        }
+        if (changed) File.WriteAllLines(DisabledFile, disabled);
+    }
+
+    /// <summary>On uninstall: give every managed account its hours back, and turn on accounts Geder turned off.</summary>
     public static void RestoreAll(GuardianConfig cfg)
     {
         foreach (var r in cfg.UserLockouts) NetUser.SetLogonHours(r.UserName, NetUser.AllHours);
+        foreach (var u in ReadDisabled()) NetUser.SetDisabled(u, false);
+        try { File.Delete(DisabledFile); } catch (Exception) { /* best effort */ }
     }
 }

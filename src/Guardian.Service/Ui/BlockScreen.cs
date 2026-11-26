@@ -16,16 +16,18 @@ body{background:#000;color:#fff;font-family:"Segoe UI",system-ui,Arial,sans-seri
 h1{font-size:26px;font-weight:600;margin:0 0 10px;letter-spacing:.2px}
 .what{font-size:17px;margin:0 0 6px;word-break:break-word;direction:ltr;unicode-bidi:plaintext}
 p{color:#bdbdbd;font-size:14px;line-height:1.6;margin:14px 0 0}
+.why{color:#fff;background:#1c1c1c;border-radius:8px;padding:8px 12px}
 button{margin-top:22px;background:#fff;color:#000;border:0;border-radius:6px;padding:9px 28px;font:inherit;font-size:14px;cursor:pointer}
 button:focus-visible{outline:2px solid #fff;outline-offset:3px}
 </style>
 """;
 
-    public static string ForProgram(string name) => $"""
+    public static string ForProgram(string name, string reason = "") => $"""
 <!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>חסום</title>{Style}</head><body><div class="box">
 <div class="mark" aria-hidden="true"></div>
 <h1>התוכנה הזו חסומה</h1>
 <div class="what">{WebUtility.HtmlEncode(name)}</div>
+{(reason.Length > 0 ? $"<p class=\"why\"><b>הסיבה:</b> {WebUtility.HtmlEncode(reason)}</p>" : "")}
 <p>Geder לא מאפשר להפעיל אותה במחשב הזה.<br>אם צריך אותה, אפשר להתיר אותה במסך הניהול עם סיסמת הניהול.</p>
 <button onclick="chrome.webview.postMessage('close')" autofocus>הבנתי</button>
 </div></body></html>
