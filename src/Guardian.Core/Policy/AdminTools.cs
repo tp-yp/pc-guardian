@@ -15,6 +15,8 @@ public static class AdminTools
         "net.exe", "net1.exe", "netsh.exe", "bcdedit.exe", "reagentc.exe", "msconfig.exe", "wmic.exe", "schtasks.exe",
         "taskkill.exe", "wsl.exe", "wslhost.exe", "bash.exe", "cscript.exe", "wscript.exe", "mshta.exe",
         "rstrui.exe", "systemreset.exe", "gpedit.exe", "secpol.exe", "runas.exe", "sdbinst.exe", "diskpart.exe",
+        // Windows Security (where Defender and the firewall are turned off), accounts and recovery tools.
+        "sechealthui.exe", "netplwiz.exe", "useraccountcontrolsettings.exe", "recoverydrive.exe", "dism.exe",
     };
 
     /// <summary>
@@ -28,6 +30,9 @@ public static class AdminTools
         "explorer.exe", "taskmgr.exe", "startmenuexperiencehost.exe", "searchhost.exe", "searchapp.exe", "sihost.exe",
         "openwith.exe", "rundll32.exe", "windowsterminal.exe", "openconsole.exe", "wt.exe", "conhost.exe",
         "svchost.exe", "taskhostw.exe", "runtimebroker.exe", "dllhost.exe", "consent.exe", "msedge.exe", "chrome.exe", "firefox.exe",
+        // Windows screens that open the tools with a button: System Restore from "System Protection",
+        // "Reset this PC" from Settings, and the Control Panel.
+        "systempropertiesprotection.exe", "systempropertiesadvanced.exe", "systemsettings.exe", "systemsettingsadminflows.exe", "control.exe",
     };
 
     /// <summary>Whether a tool started by <paramref name="parentPath"/> (null = unknown / gone) counts as started by hand.</summary>

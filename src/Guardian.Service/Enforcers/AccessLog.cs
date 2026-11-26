@@ -6,12 +6,18 @@ namespace Guardian.Service.Enforcers;
 /// <param name="App">The program behind the entry, when known (full path).</param>
 public sealed record AccessEntry(DateTime Time, string Source, string Target, bool Allowed, string? User = null, string? App = null);
 
-/// <summary>In-memory ring buffer of recent network decisions, for the management UI.</summary>
+/// <summary>
+/// Recent network and program decisions, for the management window, kept in memory for
+/// <see cref="KeepHours"/> hours (up to a day; set in the settings), at most <see cref="Capacity"/> entries.
+/// </summary>
 public sealed class AccessLog
 {
-    private const int Capacity = 2000;
+    private const int Capacity = 200_000;
     private readonly ConcurrentQueue<AccessEntry> _q = new();
     private string _lastKey = "";
+    private int _adds;
+
+    public int KeepHours { get; set; } = 24;
 
     public void Add(string source, string target, bool allowed, string? user = null, string? app = null)
     {
@@ -20,7 +26,20 @@ public sealed class AccessLog
         _lastKey = key;
         _q.Enqueue(new(DateTime.Now, source, target, allowed, string.IsNullOrEmpty(user) ? null : user, string.IsNullOrEmpty(app) ? null : app));
         while (_q.Count > Capacity) _q.TryDequeue(out _);
+        if (++_adds % 500 == 0) Trim();
     }
 
-    public IReadOnlyList<AccessEntry> Recent(int max = 200) => _q.Reverse().Take(max).ToList();
+    private void Trim()
+    {
+        var cut = DateTime.Now.AddHours(-Math.Clamp(KeepHours, 1, 24));
+        while (_q.TryPeek(out var e) && e.Time < cut) _q.TryDequeue(out _);
+    }
+
+    /// <summary>The newest entries first, from the last <paramref name="hours"/> hours.</summary>
+    public IReadOnlyList<AccessEntry> Recent(int max = 200, double hours = 24)
+    {
+        Trim();
+        var since = DateTime.Now.AddHours(-hours);
+        return _q.Reverse().TakeWhile(e => e.Time >= since).Take(max).ToList();
+    }
 }

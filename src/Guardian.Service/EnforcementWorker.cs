@@ -14,6 +14,9 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         var cfg = store.Load();
+        // Settings from 0.9.6 or older: allowed folders and "Program Files counts as allowed" become scanned lists.
+        try { if (FolderScan.MigrateOldRules(cfg)) { store.Save(cfg); log.LogInformation("Allowed folders turned into scanned program lists"); } }
+        catch (Exception ex) { log.LogWarning(ex, "Allowed folders could not be scanned"); }
         var stamp = store.LastWriteUtc;
         log.LogInformation("Policy host started as {Name}. Lockout rules: {L}, app rules: {A}, domains: {D}",
             cfg.ServiceName, cfg.UserLockouts.Count, cfg.Apps.Rules.Count, cfg.Network.Domains.Count);

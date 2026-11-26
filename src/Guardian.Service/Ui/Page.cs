@@ -19,10 +19,14 @@ internal static class Page
  --inv:#e2e2e9;--on-inv:#2e3036;--shadow:0 1px 2px #0000004d,0 1px 3px 1px #00000026}}
 *{box-sizing:border-box}body{margin:0;font-family:"Segoe UI Variable Text","Segoe UI",system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45}
 [hidden]{display:none !important}
-header{padding:10px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg);position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--line)}
+header{padding:10px 24px;min-height:60px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg);position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--line)}
 h1{font-size:22px;font-weight:500;margin:0;display:flex;align-items:center;gap:8px}
 h1:before{content:"";width:28px;height:28px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0.35' y2='1'%3E%3Cstop offset='0' stop-color='%233d64a8'/%3E%3Cstop offset='1' stop-color='%2314213d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M128 14 C 152 28 186 38 220 40 C 226 41 230 46 230 52 L 230 112 C 230 172 190 214 133 240 C 130 241.5 126 241.5 123 240 C 66 214 26 172 26 112 L 26 52 C 26 46 30 41 36 40 C 70 38 104 28 128 14 Z' fill='url(%23g)'/%3E%3Cpath d='M94 116 V 92 a34 34 0 0 1 68 0 V 116' fill='none' stroke='%23fff' stroke-width='22' stroke-linecap='round'/%3E%3Crect x='70' y='106' width='116' height='88' rx='18' fill='%23fff'/%3E%3Ccircle cx='128' cy='146' r='15' fill='%231d2f55'/%3E%3C/svg%3E") center/contain no-repeat}
-nav{display:flex;gap:4px;flex-wrap:wrap;background:var(--card2);padding:4px;border-radius:24px}
+.shell{display:flex;align-items:flex-start}.content{flex:1;min-width:0}
+nav.side{display:flex;flex-direction:column;gap:2px;width:200px;flex:none;position:sticky;top:64px;margin-block:20px;margin-inline:16px 0;padding:8px;background:var(--card);border-radius:16px}
+nav.side button{display:flex;align-items:center;gap:12px;width:100%;text-align:start;height:44px;border-radius:22px;padding:0 16px}
+nav.side svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media (max-width:820px){.shell{display:block}nav.side{position:static;flex-direction:row;width:auto;overflow-x:auto;margin:8px 12px 0}nav.side button{width:auto;white-space:nowrap;padding:0 14px}}
 nav button,.sub button{background:none;color:var(--muted);border:0;border-radius:20px;padding:8px 16px;font-weight:500;height:36px}
 nav button:hover,.sub button:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}
 nav button.on,.sub button.on{background:var(--soft);color:var(--on-soft)}
@@ -99,6 +103,14 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--inv);color:var(--on-inv);padding:12px 20px;border-radius:8px;font-size:14px;max-width:90vw;z-index:10;box-shadow:var(--shadow)}
 #toast.bad{background:var(--badbg);color:var(--bad)}
 #login{max-width:400px;margin:15vh auto;padding:0 16px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:2px 10px 2px 8px;border-radius:12px;vertical-align:middle;margin-inline-start:8px;white-space:nowrap}
+.chip svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chip.pc{background:var(--accent-c);color:var(--on-accent-c)}.chip.user{background:var(--okbg);color:var(--ok)}
+h2 .chip{font-size:12px}th .chip{margin:0;padding:1px 6px}th .chip span{display:none}
+.seg{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--outline);border-radius:20px;overflow:hidden;width:fit-content}
+.seg button{background:none;color:var(--text);border-radius:0;font-weight:500;padding:8px 18px;min-height:40px}
+.seg button+button{border-inline-start:1px solid var(--outline)}.seg button.on{background:var(--soft);color:var(--on-soft)}
+.seg button.on:before{content:"✓ "}
 </style>
 </head>
 <body>
@@ -109,12 +121,20 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 
 <div id="app" hidden>
 <header><h1>Geder</h1>
-<nav id="tabs">
-<button data-tab="home" class="on">לוח בקרה</button><button data-tab="features">יכולות</button><button data-tab="security">אבטחה</button><button data-tab="programs" class="peruser">תוכנות</button><button data-tab="net">רשת</button><button data-tab="users" id="usersTab">משתמשים</button><button data-tab="log">פעילות</button><button data-tab="settings" class="machine">הגדרות</button>
-</nav>
 <button class="ghost" id="logout">נעילה</button></header>
+<div class="shell">
+<nav id="tabs" class="side">
+<button data-tab="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>לוח בקרה</button>
+<button data-tab="features"><svg viewBox="0 0 24 24"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>יכולות</button>
+<button data-tab="security"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>אבטחה</button>
+<button data-tab="programs" class="peruser"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>תוכנות</button>
+<button data-tab="net"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>רשת</button>
+<button data-tab="users" id="usersTab"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7"/><path d="M18 14.8c1.8.8 3 2.5 3.5 5.2"/></svg><span>משתמשים</span></button>
+<button data-tab="log"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>פעילות</button>
+<button data-tab="settings" class="machine"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>הגדרות</button>
+</nav>
+<div class="content">
 <div id="scopebar" class="scopebar general" hidden><span id="scopeText"></span><button class="ghost" id="backHome" style="margin-inline-start:auto">חזרה ללוח הבקרה</button></div>
-
 <main>
 <!-- ===== לוח בקרה ===== -->
 <div class="page" data-page="home">
@@ -210,26 +230,39 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 
 <!-- ===== תוכנות ===== -->
 <div class="page" data-page="programs" hidden>
+<div class="wide sub" id="progsub"><button data-sub="all" class="on">כל התוכנות</button><button data-sub="manual">רשימות ידניות</button></div>
+<section class="wide peruser" id="appModeSec"><h2>מצב נעילת תוכנות</h2>
+<div class="seg" id="appMode"><button data-v="false">רשימה שחורה: הכול נפתח, חוץ ממה שנעול</button><button data-v="true">רשימה לבנה: רק מה שמותר נפתח</button></div>
+<p class="hint" id="appModeHint" style="margin-top:10px"></p>
+<div class="warn" id="appModeWarn" hidden><b>ברשימה לבנה כל תוכנה שלא הותרה נסגרת.</b> רכיבי ווינדוס מזוהים ומותרים לבד: כל מה שבתיקיית Windows, האפליקציות המובנות (מחשבון, תמונות, פנקס רשימות, כלי החיתוך, אבטחת Windows), רכיבים משותפים של Microsoft ו-Geder עצמו. <b>צריך להתיר בעצמכם:</b> תוכנות של דרייברים (קול, מסך, משטח מגע, מדפסת), תוכנות שרצות ברקע (OneDrive, Teams, אנטי-וירוס), דפדפנים ו-Office. הדרך הקלה: פותחים את כל מה שצריך, ולוחצים על "התרת כל התוכנות שפתוחות עכשיו".
+<div class="row" style="margin-top:8px"><button class="ghost" id="allowRunning">התרת כל התוכנות שפתוחות עכשיו</button></div></div>
+<div class="warn" id="appModeOff" hidden>"נעילת תוכנות" כבויה בלשונית "יכולות", ולכן המצב שנבחר עוד לא נאכף.</div>
+</section>
+<div class="page" data-sub-page="all">
 <section class="wide peruser"><h2>כל התוכנות במחשב</h2>
 <p class="hint">הרשימה נאספת מתפריט התחל, מ"אפליקציות מותקנות" בהגדרות ומהחנות של Microsoft. לכל תוכנה אפשר לבחור:<br>
-<b>נעולה</b> – התוכנה תיסגר מיד בכל פעם שמישהו ינסה לפתוח אותה, ויופיע מסך חסימה.<br>
+<b>נעולה</b> (ברשימה שחורה) – התוכנה תיסגר מיד בכל פעם שמישהו ינסה לפתוח אותה, ויופיע מסך חסימה.<br>
+<b>מותרת</b> (ברשימה לבנה) – התוכנה יכולה להיפתח. תוכנה שלא מסומנת נסגרת.<br>
 <b>בלי אינטרנט</b> – התוכנה תיפתח כרגיל, אבל לא תוכל להתחבר לאינטרנט.<br>
 <b>שעות</b> – התוכנה תיחסם רק בשעות שתקבעו (למשל משחק שמותר רק אחרי הצהריים). מחוץ לשעות האלה היא עובדת כרגיל, ואם היא פתוחה כשהשעה מגיעה, היא נסגרת.<br>
 <b>גישה ישירה</b> – רלוונטי רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תתחבר לאינטרנט בלי לעבור בסינון. מתאים למשחקים, Steam, Spotify ותוכנות שמפסיקות לעבוד כשהסינון דולק.<br>
 <b>אתרים</b> – רק כש"סינון לפי כתובת מלאה" דולק: התוכנה תוכל להגיע רק לאתרים שברשימה שלה, גם דרך חלון אינטרנט שמובנה בתוכנה (WebView2). מתאים לתוכנה שצריכה אתר אחד או שניים.<br>
-<b>תוכנות של משתמש אחר</b> – בניהול של משתמש מופיעות רק תוכנות שמותקנות לכולם ותוכנות שהותקנו למשתמש הזה. תוכנה שנמצאת בתיקייה של משתמש אחר (למשל בהורדות שלו או ב-AppData שלו) חסומה אוטומטית לכל השאר, כל עוד "נעילת תוכנות" דולקת אצלם.</p>
+<b>תוכנות של משתמש אחר</b> – תוכנה שנמצאת בתיקייה של משתמש (ההורדות, שולחן העבודה או ה-AppData שלו) נפתחת רק לו. לכל שאר המשתמשים היא חסומה תמיד, בלי קשר להגדרות שלו, כל עוד "נעילת תוכנות" דולקת למישהו במחשב. מנהל שמפעיל אותה עם סיסמת מנהל ("הפעל כמנהל") לא נחסם. בניהול של משתמש מופיעות רק תוכנות שמותקנות לכולם ותוכנות שלו.</p>
 <div class="row"><input id="q" placeholder="חיפוש תוכנה…" style="flex:1;min-width:180px"><select id="srcPick"><option value="">כל המקורות</option><option value="StartMenu">רק מתפריט התחל</option><option value="InstalledApps">רק אפליקציות מותקנות</option><option value="Store">רק מהחנות של Microsoft</option></select><button class="ghost" id="refresh">רענון הרשימה</button></div>
 <div class="row" style="margin-top:6px"><label><input type="checkbox" id="onlySet"> רק תוכנות עם הגבלה</label><label><input type="checkbox" id="hideWin" checked> להסתיר תוכנות של ווינדוס (System32 ותיקיית Windows)</label></div>
 <div id="catNote" class="hint" style="margin-top:8px"></div>
-<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th>נעולה</th><th>בלי אינטרנט</th><th>גישה ישירה</th><th>שעות חסימה</th><th>אתרים</th></tr></thead><tbody id="catalog"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>תוכנה</th><th>מקור</th><th id="thLock">נעולה</th><th>בלי אינטרנט</th><th data-chip="pc">גישה ישירה</th><th>שעות חסימה</th><th>אתרים</th></tr></thead><tbody id="catalog"></tbody></table></div>
 </section>
-<section class="wide peruser"><details><summary><b>הוספה ידנית (לתוכנות שלא מופיעות ברשימה, למשל קבצים ניידים)</b></summary>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px">
-<div><h3>תוכנות מותרות</h3><p class="hint">כשהיכולת "חסימת כל תוכנה לא מוכרת" דולקת, רק תוכנות מוכרות נפתחות. כאן מוסיפים תוכנה או תיקייה שמותר להפעיל. אפשר לכתוב שם קובץ (zoom.exe) או תיקייה שלמה (C:\Tools\).</p>
-<form class="row add" data-list="allowApps"><input required style="flex:1" placeholder="zoom.exe או C:\Tools\"><button>הוספה</button></form><ul id="allowApps"></ul></div>
+</div>
+<div class="page" data-sub-page="manual" hidden>
+<section class="wide peruser"><h2>רשימות ידניות</h2><p class="hint">לתוכנות שלא מופיעות ברשימה, למשל קבצים ניידים.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:10px">
+<div><h3>תוכנות מותרות</h3><p class="hint">ברשימה לבנה רק התוכנות כאן נפתחות. כותבים נתיב מלא של תוכנה (C:\Tools\app.exe) או של תיקייה (C:\Tools\). תיקייה נסרקת, וכל תוכנה שנמצאה בה מותרת בנפרד: תוכנה שתועתק אליה אחר כך לא תותר. מחוץ ל-Program Files כל תוכנה גם מזוהה לפי התוכן שלה, כך שהחלפת הקובץ בתוכנה אחרת לא עוזרת. אחרי עדכון של תוכנה כזו מוסיפים את התיקייה שוב, וכך היא נסרקת מחדש.</p>
+<form class="row add" data-list="allowApps"><input required style="flex:1" placeholder="C:\Tools\ או C:\Tools\app.exe"><button>הוספה</button></form><ul id="allowApps"></ul></div>
 <div><h3>תוכנות נעולות</h3><p class="hint">תוכנות שייסגרו תמיד, גם אם הותקנו כרגיל. שם קובץ (game.exe) או נתיב מלא.</p>
 <form class="row add" data-list="blockApps"><input required style="flex:1" placeholder="game.exe"><button>הוספה</button></form><ul id="blockApps"></ul></div>
-</div></details></section>
+</div></section>
+</div>
 </div>
 
 <!-- ===== רשת ===== -->
@@ -290,13 +323,14 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 <div class="page" data-page="users" hidden>
 <section class="wide"><h2>שעות כניסה למשתמשים</h2>
 <p class="hint">היום של כל משתמש מתחלק לשלושה מצבים: <b>נעילה</b>, <b>מניעת התמכרות</b> ו<b>שימוש רגיל</b> (כל שאר השעות).<br>
-<b>נעילה:</b> כמה דקות לפני, המשתמש מקבל התראה, ואז המסך ננעל. התוכנות הפתוחות נשארות פתוחות, אבל אי אפשר להיכנס עד סוף שעות הנעילה. גם אם מישהו מצליח לפתוח את המסך, הוא ננעל שוב תוך שניות.<br>
+<b>נעילה:</b> כמה דקות לפני, המשתמש מקבל התראה, ואז המסך ננעל. התוכנות הפתוחות נשארות פתוחות, אבל אי אפשר להיכנס עד סוף שעות הנעילה. גם אם מישהו מצליח לפתוח את המסך, הוא ננעל שוב תוך שניות. בשעות הנעילה Geder גם משבית את החשבון עצמו, כך שאי אפשר להיכנס אליו בכלל, גם לא לרגע עם קוד PIN. בסוף השעות, בשחרור זמני ובהסרת Geder החשבון חוזר לפעול. חשבון מנהל לא מושבת אף פעם, כדי שתמיד יהיה מי שיכול להיכנס.<br>
 <b>מניעת התמכרות:</b> בשעות שתבחרו (או כל היום, אם לא תבחרו שעות), אחרי זמן השימוש הרציף שקבעתם המשתמש מקבל התראה ויוצא מהחשבון. הוא יכול להיכנס שוב מיד, והספירה מתחילה מחדש.</p>
 <p class="hint">
 טווח שעות שעובר חצות (למשל 23:00 עד 07:00) נחשב ליום שבו הוא מתחיל. כדי לחסום יום שלם, בחרו אותה שעה בהתחלה ובסוף.</p>
 <div id="allLocked" class="warn" hidden>שימו לב: לכל המשתמשים במחשב יש שעות נעילה. אם יש שעה שבה כולם נעולים, אף אחד לא יוכל להיכנס למחשב בזמן הזה, גם לא כדי לשנות הגדרות. כדאי להשאיר לפחות משתמש מנהל אחד בלי נעילה.</div>
 <div class="tip machine" style="margin-bottom:10px"><b>ניהול נפרד לכל משתמש:</b> בלוח הבקרה לוחצים על משתמש כדי לנהל את התוכנות, האתרים, השעות והפעילות שלו בנפרד. בכניסה הראשונה הוא מקבל הגדרות משלו, שמתחילות כהעתק של ברירת המחדל. משתמש שלא נכנסו לניהול שלו פועל לפי ברירת המחדל, שנערכת ב"המחשב כולו".</div>
 <div id="scopeUrlWarn" class="warn" hidden>יש משתמשים עם הגדרות אתרים נפרדות, אבל "סינון לפי כתובת מלאה" כבוי. בלעדיו אפשר להבדיל בין משתמשים רק בתוכנות. אתר ייחסם רק אם הוא חסום לכל המשתמשים.</div>
+<div class="sub" id="usersub" style="margin:4px 0 8px"></div>
 <div id="users"></div>
 </section>
 </div>
@@ -306,12 +340,14 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 <section class="wide"><h2>פעילות בזמן אמת</h2>
 <p class="hint">כל אתר שנפתח וכל תוכנה שנחסמה מופיעים כאן. אפשר לחסום או להתיר כל שורה: רק את הכתובת המדויקת, או את כל האתר (הדומיין). לתוכנה שנחסמה אפשר להתיר רק את הקובץ, או את כל התיקייה שלה (מומלץ לתוכנות שמורכבות מכמה קבצים, כמו Discord או Zoom).</p>
 <p class="hint">בעמודה "תוכנה" מופיעה התוכנה שיצרה את החיבור. כשהבקשה עוברת דרך שירות השמות של ווינדוס, Geder מזהה את התוכנה לפי יומן השירות. אם הזיהוי לא מצליח, השדה נשאר ריק.</p>
-<div class="row"><label><input type="checkbox" id="onlyBlocked"> רק מה שנחסם</label><select id="logUser" class="machine"><option value="">כל המשתמשים</option></select><select id="logApp"><option value="">כל התוכנות</option></select><input id="filter" placeholder="סינון…" style="flex:1;min-width:160px"><label><input type="checkbox" id="pause"> עצירת עדכון</label></div>
+<div class="row"><select id="logHours" title="טווח זמן"><option value="0.25">רבע שעה אחרונה</option><option value="1" selected>שעה אחרונה</option><option value="3">3 שעות</option><option value="6">6 שעות</option><option value="12">12 שעות</option><option value="24">24 שעות</option></select><label><input type="checkbox" id="onlyBlocked"> רק מה שנחסם</label><select id="logUser" class="machine"><option value="">כל המשתמשים</option></select><select id="logApp"><option value="">כל התוכנות</option></select><input id="filter" placeholder="סינון…" style="flex:1;min-width:160px"><label><input type="checkbox" id="pause"> עצירת עדכון</label></div>
 <div class="scroll" style="margin-top:8px"><table><thead><tr><th>שעה</th><th>משתמש</th><th>תוכנה</th><th>סוג</th><th>מצב</th><th>מה</th><th>פעולות</th></tr></thead><tbody id="log"></tbody></table></div></section>
 </div>
 
 <!-- ===== הגדרות ===== -->
 <div class="page" data-page="settings" hidden>
+<div class="wide sub" id="setsub"><button data-sub="general" class="on">כללי</button><button data-sub="delay">השהיה ושחרור</button><button data-sub="backup">גיבוי ולוגים</button><button data-sub="remove">הסרה</button></div>
+<div class="page" data-sub-page="general">
 <section><h2>נעילת הממשק</h2>
 <p class="hint">אם לא נוגעים בחלון הזה במשך הזמן שנבחר, הוא ננעל ושוב צריך סיסמה. כך אף אחד לא יכול לשנות הגדרות אם שכחתם את החלון פתוח.</p>
 <div class="row"><label>לנעול אחרי <select id="idle"></select> דקות ללא פעילות</label></div></section>
@@ -326,6 +362,11 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 <section><h2>מצב החיבור</h2>
 <p class="hint">כאן רואים אם Geder מצליח לברר כתובות אתרים. אם יש "מחובר, אין אינטרנט", הסתכלו כאן קודם.</p>
 <div id="health" class="hint"></div><button class="ghost" id="healthBtn">בדיקה</button></section>
+<section class="machine"><h2>שמירת הפעילות</h2>
+<p class="hint">כמה זמן אחורה נשמרת רשימת הפעילות (האתרים והתוכנות שנחסמו או הותרו). הרשימה נשמרת בזיכרון ומתאפסת כשהמחשב מופעל מחדש.</p>
+<div class="row"><label>לשמור <select id="actHours"><option value="1">שעה</option><option value="3">3 שעות</option><option value="6">6 שעות</option><option value="12">12 שעות</option><option value="24">יממה</option></select> אחורה</label></div></section>
+</div>
+<div class="page" data-sub-page="delay" hidden>
 <section class="wide machine"><h2>השהיית כיבוי</h2>
 <p class="hint">כל שינוי שמחליש את ההגנה (כיבוי יכולת, שחרור תוכנה או אתר, הסרת שעות, שחרור זמני, הקטנת ההשהיה עצמה) לא מתבצע מיד, אלא אחרי מספר הדקות שתקבעו (60 = שעה, 1440 = יממה). בזמן הזה אפשר לבטל אותו כאן. שינויים שמחמירים את ההגנה מתבצעים מיד. גם הסרת Geder דורשת בקשה מראש, והיא מתאפשרת רק אחרי ההשהיה. הזמן נמדד לפי השעון המהימן של Geder, כך ששינוי השעון לא מקצר אותו. 0 = בלי השהיה.</p>
 <div class="row"><label>השהיה של <input type="number" id="coolMin" min="0" step="1" style="width:120px"> דקות</label><span class="hint" id="coolWords" style="margin:0"></span><button id="coolSave">שמירה</button></div>
@@ -336,18 +377,25 @@ button.small{min-height:32px;padding:4px 16px}.drow.pc button.ghost{color:inheri
 <section class="wide machine"><h2>שחרור כל ההגבלות</h2>
 <p class="hint">מכבה בבת אחת את כל החסימות, במחשב כולו ולכל המשתמשים: נעילת תוכנות, סינון האתרים, שעות הנעילה ושאר היכולות. הרשימות נשארות כמו שהן, וההגדרות שהיו לפני השחרור נשמרות. כפתור "החזרת ההגבלות" מחזיר אותן בלחיצה אחת. אם "השהיית כיבוי" פעילה, השחרור יתבצע רק אחרי זמן ההמתנה.</p>
 <div class="row"><button class="ghost" id="releaseAll" style="color:var(--bad);border-color:var(--bad)">שחרור כל ההגבלות</button><button class="ghost" id="releaseUndo" hidden>החזרת ההגבלות</button></div></section>
+</div>
+<div class="page" data-sub-page="backup" hidden>
 <section class="wide machine"><h2>גיבוי ושחזור הגדרות</h2>
 <p class="hint">הגיבוי הוא קובץ עם כל ההגדרות והרשימות, של המחשב כולו ושל כל משתמש. הסיסמאות לא נשמרות בו. שחזור מחליף את כל ההגדרות בהגדרות שבקובץ, ונשארות הסיסמאות הנוכחיות. אם "השהיית כיבוי" פעילה, השחזור יתבצע רק אחרי זמן ההמתנה.</p>
 <div class="row"><button class="ghost" id="backupSave">שמירת גיבוי</button><button class="ghost" id="backupLoad">שחזור מגיבוי…</button><input type="file" id="backupFile" accept=".json,application/json" hidden></div></section>
 <section class="wide"><h2>ייצוא לוגים</h2>
 <p class="hint">קובץ zip עם יומן הפעולות של Geder בשבועיים האחרונים, רשימת הפעילות האחרונה, ההגדרות (בלי סיסמאות) ופרטי ווינדוס. אם יש בעיה, שלחו את הקובץ למי שעוזר לכם בה.</p>
 <button class="ghost" id="logsExport">ייצוא לוגים</button></section>
+</div>
+<div class="page" data-sub-page="remove" hidden>
 <section class="wide"><h2>הסרת Geder</h2>
 <p class="hint">מסיר את Geder מהמחשב ומחזיר את כל מה שהוא שינה: חומת האש, הגדרות הרשת, תעודת האבטחה ושעות הכניסה של המשתמשים. ווינדוס יבקש אישור מנהל, ואחריו צריך להקליד את סיסמת הניהול או את הסיסמה המצילה.</p>
 <button class="ghost" id="uninstall" style="color:var(--bad);border-color:var(--bad)">הסרת Geder…</button>
 <div id="uninstallNote" class="hint" hidden style="margin-top:8px">אפשר גם להסיר דרך הגדרות ווינדוס: אפליקציות > אפליקציות מותקנות > Geder > הסרת התקנה.</div></section>
 </div>
+</div>
 </main>
+</div>
+</div>
 </div>
 <div id="toast" hidden></div>
 
@@ -385,14 +433,36 @@ function openTab(name){if(name==='settings'&&scope)name='features';
  if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings'){loadHealth();loadCooling()}if(name==='features'){loadIsp();if(!scope)loadWifi()}if(name==='security'&&!scope)loadBoot();
  if(name==='programs'&&!scope&&state&&state.allOwn)openTab('features')}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
-document.querySelectorAll('#netsub button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#netsub button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('[data-sub-page]').forEach(m=>m.hidden=m.dataset.subPage!==b.dataset.sub);if(b.dataset.sub==='netapps')loadDirect()});
+// Secondary navigation inside a page: shows one group of sections at a time.
+function subOpen(bar,key){bar.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.sub===key));
+ const page=bar.closest('[data-page]');page.querySelectorAll(':scope > [data-sub-page]').forEach(m=>m.hidden=m.dataset.subPage!==key);
+ if(key==='netapps')loadDirect()}
+document.querySelectorAll('#netsub,#progsub,#setsub').forEach(bar=>bar.querySelectorAll('button').forEach(b=>b.onclick=()=>subOpen(bar,b.dataset.sub)));
+
+// Who a setting applies to: the whole computer, or one account (or the default for accounts without their own).
+const SVG_PC='<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
+const SVG_USER='<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>';
+function chip(kind,who){const c=el('span',{class:'chip '+kind});const t=kind==='pc'?'כל המחשב':(who||(scope?scope:'ברירת מחדל למשתמשים'));
+ c.innerHTML=(kind==='pc'?SVG_PC:SVG_USER)+'<span></span>';c.lastChild.textContent=t;c.title=kind==='pc'?'חל על כל המחשב ועל כל המשתמשים':(scope?'חל רק על '+scope:'חל על כל משתמש שאין לו הגדרות נפרדות');return c}
+function chips(){document.querySelectorAll('main section > h2, main section > details > summary').forEach(h=>{h.querySelector(':scope > .chip')?.remove();
+ const sec=h.closest('section');const k=sec.dataset.chip||(sec.classList.contains('machine')?'pc':sec.classList.contains('peruser')?'user':'');if(k)h.append(chip(k))});
+ document.querySelectorAll('[data-page=programs] th').forEach(th=>{th.querySelector('.chip')?.remove();
+  if(th.id==='thLock'||['בלי אינטרנט','שעות חסימה','אתרים'].includes(th.firstChild.textContent))th.append(chip('user'));
+  if(th.dataset.chip==='pc')th.append(chip('pc'))})}
+// Program locking mode: block list or allow list.
+function renderAppMode(st){const deny=!!st.settings['apps.defaultDeny'];document.querySelectorAll('#appMode button').forEach(b=>b.classList.toggle('on',(b.dataset.v==='true')===deny));
+ $('appModeHint').textContent=deny?'רק תוכנות שסומנו "מותרת" (וחלקי ווינדוס) נפתחות. כל השאר נסגרות.':'כל התוכנות נפתחות, חוץ מתוכנות שסומנו "נעולה" ותוכנות בשעות החסימה שלהן.';
+ $('appModeWarn').hidden=!deny;$('appModeOff').hidden=!!st.settings['apps.enabled'];$('thLock').firstChild.textContent=deny?'מותרת':'נעולה'}
+document.querySelectorAll('#appMode button').forEach(b=>b.onclick=()=>{if(b.classList.contains('on'))return;
+ post('/api/settings',{key:'apps.defaultDeny',value:b.dataset.v}).then(st=>{render(st);if(catalog)renderCatalog();toast(b.dataset.v==='true'?'עברנו לרשימה לבנה'+(scope?' עבור '+scope:''):'עברנו לרשימה שחורה'+(scope?' עבור '+scope:''))}).catch(fail)});
+$('allowRunning').onclick=()=>post('/api/apps/allowRunning',{}).then(r=>{load();if(catalog)loadCatalog(false);toast(r.count?r.count+' תוכנות פתוחות הותרו'+(scope?' עבור '+scope:''):'לא נמצאו תוכנות פתוחות שצריך להתיר')}).catch(fail);
+$('actHours').onchange=e=>post('/api/settings/activity',{hours:e.target.value}).then(()=>toast('הפעילות תישמר '+e.target.selectedOptions[0].textContent+' אחורה')).catch(fail);
+$('logHours').onchange=()=>tick();
 
 // Features
 const TOGGLES=[
- ['apps.enabled','נעילת תוכנות','תוכנות שסימנתם כ"נעולות" בלשונית "תוכנות" ייסגרו מיד כשמישהו פותח אותן, ויופיע מסך חסימה. בלי היכולת הזו, הסימונים לא נאכפים.'],
- ['apps.defaultDeny','חסימת כל תוכנה לא מוכרת','כל תוכנה שלא הותקנה כרגיל תיחסם: קבצים שהורדו, תוכנות ניידות, דיסק און קי ותוכנות שמתקינות את עצמן בלי אישור מנהל. כדי לאפשר אחת מהן, התירו אותה מלשונית "פעילות" או הוסיפו אותה ב"תוכנות" > "הוספה ידנית".','לפני שמדליקים: כדאי להדליק קודם את "נעילת תוכנות", לעבוד יום רגיל, ולראות בלשונית "פעילות" מה היה נחסם.'],
- ['apps.trustProgramFiles','לסמוך על תוכנות שהותקנו כרגיל','תוכנות שהותקנו לתיקיית Program Files (התקנה רגילה שדורשת אישור מנהל) נחשבות מוכרות ולא נחסמות. מומלץ להשאיר דולק.'],
- ['apps.blockAdminTools','חסימת כלי מנהל','חוסם את שורת הפקודה, PowerShell, עורך הרישום, מסופי הניהול (שירותים, מתזמן משימות, מדיניות קבוצתית), פקודות הרשאות ושירותים, שחזור מערכת ואיפוס המחשב. כמעט כל הוראה לעקיפת Geder עוברת דרך הכלים האלה, ולכן זו אחת ההגנות החזקות. גם עותק או שינוי שם של הכלי ייחסמו. שורת הפקודה ועורך הרישום נחסמים מיד דרך מדיניות של ווינדוס (הסייר ותפריט התחל מתחילים לחסום אחרי כניסה מחדש לחשבון). כלים שנפתחים בדרך אחרת, כמו PowerShell בתוך הטרמינל, נסגרים תוך שניות. מנהל המשימות וההגדרות נשארים פתוחים. כשצריך את הכלים, משחררים אותם לזמן קצוב מתחת למתג הזה.','לפני שמדליקים לחשבון שלכם: ודאו שאתם זוכרים את סיסמת Geder, כי בלעדיה לא תוכלו לשחרר את הכלים.','sec'],
+ ['apps.enabled','נעילת תוכנות','מפעיל את הנעילה לפי המצב שנבחר בלשונית "תוכנות": ברשימה שחורה נסגרות התוכנות שסומנו "נעולה", וברשימה לבנה נסגרת כל תוכנה שלא סומנה "מותרת". בלי היכולת הזו הסימונים לא נאכפים.'],
+ ['apps.blockAdminTools','חסימת כלי מנהל','חוסם את הכלים שדרכם עוקפים או מבטלים את Geder: שורת הפקודה, PowerShell והטרמינל; עורך הרישום; מסופי הניהול (שירותים, מתזמן משימות, ניהול מחשב, מדיניות קבוצתית); פקודות שמשנות הרשאות, שירותים ומשתמשים (sc, net, takeown, icacls ודומות); אבטחת Windows (שם מכבים את Defender ואת חומת האש) וניהול חשבונות המשתמשים; <b>שחזור מערכת</b> (החזרת המחשב לנקודת שחזור מלפני ההתקנה, גם מתוך מסך "הגנת מערכת"); <b>איפוס המחשב</b> ("אפס מחשב זה", גם מתוך ההגדרות). יצירת נקודת שחזור חדשה לא מסוכנת ונשארת פתוחה. גם עותק או שינוי שם של כלי ייחסמו. שורת הפקודה ועורך הרישום נחסמים מיד דרך מדיניות של ווינדוס (הסייר ותפריט התחל מתחילים לחסום אחרי כניסה מחדש לחשבון). כלים שנפתחים בדרך אחרת נסגרים תוך שניות. מנהל המשימות וההגדרות נשארים פתוחים. כשצריך את הכלים, משחררים אותם לזמן קצוב מתחת למתג הזה.','לפני שמדליקים לחשבון שלכם: ודאו שאתם זוכרים את סיסמת Geder, כי בלעדיה לא תוכלו לשחרר את הכלים.','sec'],
  ['apps.blockVideo','חסימת קבצי וידאו','נגני וידאו נסגרים מיד כשהם נפתחים, כולל נגן המדיה של ווינדוס (גם כשמשתמשים בו למוזיקה), VLC ונגנים נפוצים אחרים, גם אם שינו להם את השם. גם כל תוכנה אחרת שנפתחת עם קובץ וידאו, למשל בלחיצה כפולה על הקובץ, ב"פתח באמצעות" או בקישור לקובץ, נסגרת.'],
  ['network.enabled','סינון אתרים וחומת אש','חוסם אתרים שלמים לפי הרשימות בלשונית "רשת", ומונע אינטרנט מתוכנות שסימנתם "בלי אינטרנט". עובד בכל הדפדפנים ובכל התוכנות.'],
  ['isp.required','אינטרנט רק דרך הסינון','חוסם את כל האינטרנט כשהמחשב לא מחובר דרך ספק סינון (נטפרי, אתרוג או נטספארק). הזיהוי לפי תעודת האבטחה, והסבר מלא בהמשך העמוד. ההפעלה דורשת אישור, וכיבוי מחזיר את האינטרנט מיד.'],
@@ -404,7 +474,7 @@ const TOGGLES=[
  ['network.urlFiltering','סינון לפי כתובת מלאה','מאפשר לחסום חלק מאתר (למשל רק youtube.com/shorts) ולא רק אתר שלם. כדי לעשות את זה Geder מתקין תעודת אבטחה מקומית ובודק את התקשורת המוצפנת במחשב עצמו. יש תוכנות שלא יודעות לעבוד כך, והן יאבדו אינטרנט עד שתאפשרו להן "גישה ישירה" (רשת > תוכנות ברשת יראה לכם בדיוק אילו).','אחרי ההדלקה צריך לסגור ולפתוח מחדש את הדפדפנים. בדקו את "רשת" > "תוכנות ברשת" בימים הראשונים.'],
 ];
 function sw(checked,onchange,label,disabled){const i=el('input',{type:'checkbox',checked,disabled:!!disabled});i.setAttribute('aria-label',label);i.onchange=()=>onchange(i);return el('label',{class:'switch',title:label},i,el('span',{class:'slider'}))}
-const PER_USER=['apps.enabled','apps.defaultDeny','apps.trustProgramFiles','apps.blockAdminTools','apps.blockVideo'];
+const PER_USER=['apps.enabled','apps.defaultDeny','apps.blockAdminTools','apps.blockVideo'];
 function askBoot(){$('bootConfirm').hidden=false;$('bootAgree').checked=false;$('bootGo').disabled=true;$('bootConfirm').scrollIntoView({behavior:'smooth',block:'center'})}
 $('bootAgree').onchange=()=>$('bootGo').disabled=!$('bootAgree').checked;
 $('bootCancel').onclick=()=>$('bootConfirm').hidden=true;
@@ -451,9 +521,9 @@ function toolsUnlock(){const m=el('select',{},...[15,30,60,120].map(x=>el('optio
   el('button',{class:'link',onclick:()=>post('/api/tools/unlock',{minutes:'0'}).then(()=>toast('כלי המנהל חסומים שוב')).catch(fail)},'לחסום שוב עכשיו'))}
 // Each switch goes to "יכולות" or to "אבטחה". On the whole-computer screen, when every account has settings of
 // its own, the per-account defaults are hidden: they would apply to nobody.
-function toggleRow([k,t,d,w]){const s=state.settings;const txt=el('div',{},el('b',{},t),el('small',{},d));
+function toggleRow([k,t,d,w]){const s=state.settings;const sm=el('small');sm.innerHTML=d;const txt=el('div',{},el('b',{},t),sm);
  if(k==='apps.blockAdminTools'&&s[k])txt.append(toolsUnlock());
- txt.append(el('small',{class:'badge',style:'display:inline-block;margin-top:4px'},PER_USER.includes(k)?(scope?'חל רק על '+scope:'ברירת מחדל: חל על משתמשים בלי הגדרות נפרדות'):'חל על כל המחשב'));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
+ txt.append(el('div',{style:'margin-top:6px'},chip(PER_USER.includes(k)?'user':'pc')));if(w&&!s[k])txt.append(el('div',{class:'warn'},w));
  return el('div',{class:'toggle'},txt,sw(s[k],i=>(ASK[k]&&i.checked)?(i.checked=false,ASK[k]()):post('/api/settings',{key:k,value:String(i.checked)}).then(st=>{render(st);if(k==='isp.required')loadIsp();if(k==='boot.lockdown')loadBoot();if(k==='wifi.knownOnly')loadWifi();toast(t+(i.checked?' – הודלק':' – כובה'))}).catch(x=>{fail(x);i.checked=!i.checked}),t))}
 function renderToggles(){const show=([k])=>scope?PER_USER.includes(k):!(state.allOwn&&PER_USER.includes(k));
  $('toggles').replaceChildren(...TOGGLES.filter(x=>x[4]!=='sec'&&show(x)).map(toggleRow));
@@ -481,7 +551,7 @@ function renderMode(st){const allow=st.mode==='Allowlist';$('mode').value=st.mod
  $('excHint').textContent=allow?'כתובות שייחסמו למרות שהאתר שלהן ברשימת המותרים. למשל: youtube.com מותר, אבל youtube.com/shorts חסום.':'כתובות שיהיו פתוחות למרות שהאתר שלהן חסום. למשל: youtube.com חסום, אבל סרטון מסוים מותר.';
  $('netOff').hidden=st.settings['network.enabled'];$('urlOff').hidden=!st.settings['network.enabled']||st.settings['network.urlFiltering']}
 function renderScope(st){const bar=$('scopebar');document.body.dataset.ctx=st.scope?'user':'computer';if(st.allOwn)document.body.dataset.allown='1';else delete document.body.dataset.allown;
- bar.className='scopebar'+(st.scope?'':' general');$('usersTab').textContent=st.scope?'שעות':'משתמשים';
+ bar.className='scopebar'+(st.scope?'':' general');$('usersTab').lastChild.textContent=st.scope?'שעות':'משתמשים';
  $('scopeText').replaceChildren(...(st.scope?['מנהלים עכשיו את ',el('b',{},st.scope),'. כל שינוי בתוכנות, באתרים ובשעות חל רק עליו.']:[el('b',{},'המחשב כולו'),st.allOwn?'. לכל המשתמשים יש הגדרות נפרדות, ולכן מוצגות כאן רק הגדרות שחלות על כל המחשב.':'. הגדרות שחלות על כל המחשב, וברירת המחדל למשתמשים בלי הגדרות נפרדות.']));
  $('scopeUrlWarn').hidden=!(st.scopes.length&&!st.settings['network.urlFiltering'])}
 $('backHome').onclick=()=>openTab('home');
@@ -526,7 +596,7 @@ function loadDash(){return api('/api/dashboard',{},false).then(d=>{renderDash(d)
 function enterUser(u){(u.own?Promise.resolve():post('/api/users/own',{name:u.name,own:'true'}).then(()=>toast(u.name+' קיבל הגדרות נפרדות, שמתחילות כהעתק של ברירת המחדל.')))
  .then(()=>setScope(u.name)).catch(fail)}
 setInterval(()=>{if(!$('app').hidden&&!document.querySelector('[data-page=home]').hidden)loadDash()},15000);
-function render(st){state=st;scope=st.scope||'';$('releasedNote').hidden=!st.released;$('releaseUndo').hidden=!st.released;$('releaseAll').hidden=!!st.released;renderScope(st);renderProviders(st);idleMin=st.idleMinutes||5;renderToggles();renderMode(st);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
+function render(st){state=st;scope=st.scope||'';renderAppMode(st);if(st.activityHours)$('actHours').value=st.activityHours;$('releasedNote').hidden=!st.released;$('releaseUndo').hidden=!st.released;$('releaseAll').hidden=!!st.released;renderScope(st);renderProviders(st);idleMin=st.idleMinutes||5;renderToggles();renderMode(st);setTimeout(chips);for(const[k,v]of Object.entries(st.lists))if($(k))renderList(k,v);
  $('idle').replaceChildren(...st.idleChoices.map(m=>el('option',{value:m,selected:m===idleMin},String(m))));if(catalog)renderCatalog()}
 function load(){api(q('/api/state')).then(render).catch(fail)}
 $('idle').onchange=e=>post('/api/settings/idle',{minutes:e.target.value}).then(st=>{render(st);toast('הממשק יינעל אחרי '+e.target.value+' דקות ללא פעילות')}).catch(fail);
@@ -537,13 +607,13 @@ function loadCatalog(refresh){$('catNote').textContent='טוען את רשימת
 $('refresh').onclick=()=>loadCatalog(true);$('q').oninput=()=>renderCatalog();$('onlySet').onchange=()=>renderCatalog();$('srcPick').onchange=()=>renderCatalog();$('hideWin').onchange=()=>renderCatalog();
 const isWin=p=>/^[a-z]:\\windows\\/i.test(p);
 function setApp(a,kind,i){post('/api/catalog/set',{path:a.exePath,kind,value:String(i.checked)}).then(c=>{catalog=c;load();
- const msg={lock:['ננעלה','שוחררה מנעילה'],internet:['לא תוכל להתחבר לאינטרנט','יכולה שוב להתחבר לאינטרנט'],direct:['קיבלה גישה ישירה לאינטרנט','תעבור שוב דרך הסינון']}[kind];toast(a.name+' '+(i.checked?msg[0]:msg[1])+(kind==='direct'?'':(scope?' (עבור '+scope+')':'')))}).catch(x=>{fail(x);i.checked=!i.checked})}
+ const msg={allow:['מותרת','לא מותרת יותר'],lock:['ננעלה','שוחררה מנעילה'],internet:['לא תוכל להתחבר לאינטרנט','יכולה שוב להתחבר לאינטרנט'],direct:['קיבלה גישה ישירה לאינטרנט','תעבור שוב דרך הסינון']}[kind];toast(a.name+' '+(i.checked?msg[0]:msg[1])+(kind==='direct'?'':(scope?' (עבור '+scope+')':'')))}).catch(x=>{fail(x);i.checked=!i.checked})}
 function renderCatalog(){if(!catalog)return;const q=$('q').value.trim().toLowerCase(),only=$('onlySet').checked,direct=state&&state.settings['network.urlFiltering'];
  const src=$('srcPick').value,hw=$('hideWin').checked;
- const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length||(a.sites||[]).length)&&(!src||a.source===src)&&(!hw||!isWin(a.exePath)||a.locked||(a.hours||[]).length));
+ const rows=catalog.filter(a=>(!q||a.name.toLowerCase().includes(q)||a.exePath.toLowerCase().includes(q))&&(!only||a.allowed||a.locked||a.internetBlocked||a.directInternet||(a.hours||[]).length||(a.sites||[]).length)&&(!src||a.source===src)&&(!hw||!isWin(a.exePath)||a.locked||(a.hours||[]).length));
  $('catNote').textContent=catalog.length+' תוכנות נמצאו'+(rows.length!==catalog.length?', מוצגות '+rows.length:'')+'.'+(state&&!state.settings['apps.enabled']&&catalog.some(a=>a.locked)?' שימו לב: "נעילת תוכנות" כבויה בלשונית "יכולות", ולכן הנעילות לא נאכפות.':'');
  $('catalog').replaceChildren(...rows.map(a=>el('tr',{},el('td',{},el('b',{},a.name),el('div',{class:'hint ltr',style:'margin:0;font-size:11px'},a.exePath)),el('td',{},el('span',{class:'badge'},SRCN[a.source]||a.source),a.owner?el('div',{class:'hint',style:'margin:2px 0 0;font-size:11px'},'של '+a.owner):''),
-  el('td',{},sw(a.locked,i=>setApp(a,'lock',i),'נעולה')),el('td',{},sw(a.internetBlocked,i=>setApp(a,'internet',i),'בלי אינטרנט')),el('td',{},sw(a.directInternet,i=>setApp(a,'direct',i),'גישה ישירה',!direct&&!a.directInternet)),
+  el('td',{},state&&state.settings['apps.defaultDeny']?sw(a.allowed||isWin(a.exePath),i=>setApp(a,'allow',i),'מותרת',isWin(a.exePath)):sw(a.locked,i=>setApp(a,'lock',i),'נעולה')),el('td',{},sw(a.internetBlocked,i=>setApp(a,'internet',i),'בלי אינטרנט')),el('td',{},sw(a.directInternet,i=>setApp(a,'direct',i),'גישה ישירה',!direct&&!a.directInternet)),
   el('td',{},el('button',{class:'link',onclick:e=>appHours(a,e.target.closest('tr'))},(a.hours||[]).length?'חסומה לפי שעות':'+ שעות')),
   el('td',{},el('button',{class:'link',onclick:e=>appSites(a,e.target.closest('tr'))},(a.sites||[]).length?(a.sites.length===1?'אתר אחד':a.sites.length+' אתרים'):'+ אתרים')))))}
 // Blocked hours for one program, edited in a row under it.
@@ -583,7 +653,13 @@ function ownRow(a){const r=el('div',{class:'row',style:'margin-top:8px'});
   r.append(...[el('span',{class:'badge'},'תוכנות ואתרים: הגדרות נפרדות'),scope?null:el('button',{class:'ghost',onclick:()=>setScope(a.name,'programs')},'לניהול של '+a.name),back].filter(Boolean))}
  else r.append(el('span',{class:'badge'},'תוכנות ואתרים: לפי ברירת המחדל'),el('button',{class:'ghost',onclick:()=>enterUser({name:a.name,own:false})},'לניהול של '+a.name));
  return r}
-function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyoneLocked;$('users').replaceChildren(...u.accounts.filter(a=>!scope||a.name.toLowerCase()===scope.toLowerCase()).map(a=>{
+let userPick='';
+function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyoneLocked;
+ const list=u.accounts.filter(a=>!scope||a.name.toLowerCase()===scope.toLowerCase());
+ if(!list.some(a=>a.name===userPick))userPick=list.length?list[0].name:'';
+ $('usersub').hidden=list.length<2;
+ $('usersub').replaceChildren(...list.map(a=>el('button',{class:a.name===userPick?'on':'',onclick:()=>{userPick=a.name;loadUsers()}},a.name)));
+ $('users').replaceChildren(...list.filter(a=>a.name===userPick).map(a=>{
  const wins=a.rule?a.rule.lockedDuring.windows:[];const box=el('div');wins.forEach(w=>box.append(winRow(w)));
  const warn=el('input',{type:'number',min:0,max:60,value:a.rule?a.rule.warningMinutes:5,style:'width:70px'});
  const bwins=a.rule&&a.rule.breakDuring?a.rule.breakDuring.windows:[];const bbox=el('div');bwins.forEach(w=>bbox.append(winRow(w)));
@@ -629,9 +705,9 @@ function fillPick(id,all,vals){const s=$(id),cur=s.value,set=[...new Set(vals.fi
  const sig=set.join('|');if(s.dataset.sig===sig)return;s.dataset.sig=sig;s.replaceChildren(el('option',{value:''},all),...set.map(v=>el('option',{value:v,selected:v===cur},v)))}
 $('logUser').onchange=()=>tick();$('logApp').onchange=()=>tick();
 let timer;function tick(){clearTimeout(timer);if($('app').hidden)return;if($('pause').checked||document.querySelector('[data-page=log]').hidden){timer=setTimeout(tick,3000);return}
- api('/api/log',{},false).then(rows=>{const ob=$('onlyBlocked').checked,q=$('filter').value.toLowerCase(),fu=scope?'':$('logUser').value,fa=$('logApp').value;
+ api('/api/log?hours='+$('logHours').value,{},false).then(rows=>{const ob=$('onlyBlocked').checked,q=$('filter').value.toLowerCase(),fu=scope?'':$('logUser').value,fa=$('logApp').value;
  fillPick('logUser','כל המשתמשים',rows.map(r=>short(r.user)));fillPick('logApp','כל התוכנות',rows.map(appOf));
- $('log').replaceChildren(...rows.filter(r=>(!scope||short(r.user).toLowerCase()===scope.toLowerCase())&&(!fu||short(r.user)===fu)&&(!fa||appOf(r)===fa)&&(!ob||!r.allowed)&&(!q||r.target.toLowerCase().includes(q)||(r.app||'').toLowerCase().includes(q))).slice(0,200).map(r=>el('tr',{},
+ $('log').replaceChildren(...rows.filter(r=>(!scope||short(r.user).toLowerCase()===scope.toLowerCase())&&(!fu||short(r.user)===fu)&&(!fa||appOf(r)===fa)&&(!ob||!r.allowed)&&(!q||r.target.toLowerCase().includes(q)||(r.app||'').toLowerCase().includes(q))).slice(0,1000).map(r=>el('tr',{},
   el('td',{},new Date(r.time).toLocaleTimeString('he-IL')),el('td',{},short(r.user)||(r.source==='dns'?'(לא ידוע)':'')),el('td',{title:r.app||''},appOf(r)),el('td',{},SRC[r.source]||r.source),el('td',{class:r.allowed?'ok':'bad'},r.allowed?'הותר':'נחסם'),
   el('td',{class:'l'},r.target),el('td',{},el('div',{class:'acts'},...actions(r))))))}).catch(()=>{}).finally(()=>timer=setTimeout(tick,3000))}
 $('pause').onchange=()=>tick();

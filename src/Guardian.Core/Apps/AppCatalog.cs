@@ -10,7 +10,7 @@ public sealed record CatalogApp(string Name, string ExePath, AppSource Source);
 /// <param name="Hours">Times when the program is blocked (empty = no time limits).</param>
 /// <param name="Owner">The account the program was installed for (inside its profile folder), or null if shared.</param>
 public sealed record CatalogEntry(string Name, string ExePath, AppSource Source, bool Locked, bool InternetBlocked, bool DirectInternet,
-    List<Scheduling.TimeWindow>? Hours = null, string? Owner = null, List<string>? Sites = null);
+    List<Scheduling.TimeWindow>? Hours = null, string? Owner = null, List<string>? Sites = null, bool Allowed = false);
 
 /// <summary>Merges apps found in the Start menu, "Installed apps" and the Store into one list.</summary>
 public static class AppCatalog
@@ -39,7 +39,13 @@ public static class AppCatalog
             Locked: IsLocked(cfg, a.ExePath),
             InternetBlocked: cfg.Network.BlockedAppPaths.Contains(a.ExePath, StringComparer.OrdinalIgnoreCase),
             DirectInternet: cfg.Network.AllowDirectApps.Contains(a.ExePath, StringComparer.OrdinalIgnoreCase),
-            Hours: HoursOf(cfg, a.ExePath), Sites: SitesOf(cfg, a.ExePath))).ToList();
+            Hours: HoursOf(cfg, a.ExePath), Sites: SitesOf(cfg, a.ExePath), Allowed: IsAllowed(cfg, a.ExePath))).ToList();
+
+    /// <summary>An allow rule covers the program (by its place or name; a pinned one also needs its contents, checked when it runs).</summary>
+    public static bool IsAllowed(GuardianConfig cfg, string exe) =>
+        cfg.Apps.Rules.Any(r => r.Action == RuleAction.Allow && r.When.Windows.Count == 0 &&
+            (r.PathPrefix is { Length: > 0 } p ? Policy.AppPolicyEvaluator.PathMatches(exe, p) :
+             r.FileName is { Length: > 0 } f && string.Equals(f, Path.GetFileName(exe), StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>The only sites a program may reach, or empty when it has no list of its own.</summary>
     public static List<string> SitesOf(GuardianConfig cfg, string exe) =>

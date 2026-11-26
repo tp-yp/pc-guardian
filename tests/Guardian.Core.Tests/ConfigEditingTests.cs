@@ -53,7 +53,7 @@ public class ConfigEditingTests
         Assert.False(c.Network.Enabled);
         Assert.False(c.Network.UrlFiltering);
         Assert.Empty(c.UserLockouts);
-        Assert.True(c.Apps.DefaultDeny); // ready for when the owner turns app blocking on
+        Assert.False(c.Apps.DefaultDeny); // block-list mode: turning program locking on blocks only what is locked
     }
 
     [Fact]

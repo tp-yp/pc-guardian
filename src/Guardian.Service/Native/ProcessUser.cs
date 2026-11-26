@@ -46,6 +46,23 @@ internal static class ProcessUser
         return user;
     }
 
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool GetTokenInformation(IntPtr token, int cls, out int value, int length, out int returned);
+
+    /// <summary>True when the process runs with full administrator rights (started with "Run as administrator" / UAC).</summary>
+    public static bool IsElevated(int pid)
+    {
+        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (h == IntPtr.Zero) return false;
+        try
+        {
+            if (!OpenProcessToken(h, TOKEN_QUERY, out var tok)) return false;
+            try { return GetTokenInformation(tok, 20 /* TokenElevation */, out var elevated, 4, out _) && elevated != 0; }
+            finally { CloseHandle(tok); }
+        }
+        finally { CloseHandle(h); }
+    }
+
     // ---- TCP owner lookup (IPv4 and IPv6 tables) ----
     private const int AF_INET = 2, AF_INET6 = 23, TCP_TABLE_OWNER_PID_CONNECTIONS = 4;
 

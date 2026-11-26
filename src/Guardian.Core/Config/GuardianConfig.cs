@@ -16,6 +16,9 @@ public sealed class GuardianConfig
     /// <summary>The management window locks itself after this many minutes without activity.</summary>
     public int UiIdleLockMinutes { get; set; } = 5;
     public static readonly int[] IdleLockChoices = [1, 3, 5, 10, 15, 30];
+    /// <summary>How many hours back the activity list keeps (in memory).</summary>
+    public int ActivityHours { get; set; } = 24;
+    public static readonly int[] ActivityHourChoices = [1, 3, 6, 12, 24];
     /// <summary>General rules: apply to every Windows account that has no settings of its own.</summary>
     public AppPolicy Apps { get; set; } = new();
     public NetworkPolicy Network { get; set; } = new();
@@ -46,7 +49,7 @@ public sealed class GuardianConfig
         WatchdogServiceName = watchdogName,
         AdminPasswordHash = adminHash,
         RecoveryPasswordHash = recoveryHash,
-        Apps = new AppPolicy { Enabled = false },
+        Apps = new AppPolicy { Enabled = false, DefaultDeny = false, TrustProgramFiles = false },
         Network = new NetworkPolicy { Enabled = false, UrlFiltering = false },
     };
 }
@@ -195,15 +198,20 @@ public sealed class AppRule
     public string? OriginalName { get; set; }
     /// <summary>When the rule applies. Empty = always.</summary>
     public WeeklySchedule When { get; set; } = new();
+    /// <summary>The folder this rule came from when a whole folder was allowed: its programs are scanned one by one
+    /// (and, in folders anyone can write to, pinned by their contents), so a program copied there later is not allowed.</summary>
+    public string? Source { get; set; }
 }
 
 public sealed class AppPolicy
 {
     public bool Enabled { get; set; } = true;
-    /// <summary>Unknown executables are blocked unless an Allow rule matches.</summary>
+    /// <summary>
+    /// The mode of program locking. False = block list: everything runs except locked programs.
+    /// True = allow list: only allowed programs (and the parts of Windows, found automatically) run.
+    /// </summary>
     public bool DefaultDeny { get; set; } = true;
-    /// <summary>Treat everything under Program Files as known (only admins can install there).
-    /// Portable apps in Downloads, Desktop, USB drives etc. stay blocked by default.</summary>
+    /// <summary>Old setting (until 0.9.6): Program Files counted as allowed. Turned into scanned allow rules once, then false.</summary>
     public bool TrustProgramFiles { get; set; } = true;
     /// <summary>Block command line, PowerShell, registry editor and similar tools (see AdminTools).</summary>
     public bool BlockAdminTools { get; set; }
