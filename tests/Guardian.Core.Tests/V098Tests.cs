@@ -91,6 +91,24 @@ public class NewAccountsTests
 public class V098Tests
 {
     [Fact]
+    public void Disable_account_is_kept_released_with_everything_and_turning_on_waits()
+    {
+        var cfg = new GuardianConfig { Cooling = { Minutes = 60 } };
+        Assert.True(ConfigEditing.TrySetAccountDisabled(cfg, "kid", true, out _));
+        Assert.True(ConfigEditing.TrySetAccountDisabled(cfg, "KID", true, out _));
+        Assert.Equal(["KID"], cfg.Accounts.Disabled);
+        Assert.False(ConfigEditing.TrySetAccountDisabled(cfg, "a/b", true, out _));
+        Assert.True(Cooling.IsWeakening(cfg, null, "/api/users/disable", new Dictionary<string, string> { ["user"] = "kid", ["value"] = "false" }));
+        Assert.False(Cooling.IsWeakening(cfg, null, "/api/users/disable", new Dictionary<string, string> { ["user"] = "kid", ["value"] = "true" }));
+        ConfigEditing.ReleaseAll(cfg);
+        Assert.Empty(cfg.Accounts.Disabled);
+        Assert.True(ConfigEditing.TryUndoRelease(cfg));
+        Assert.Single(cfg.Accounts.Disabled);
+        Assert.True(ConfigEditing.TrySetAccountDisabled(cfg, "kid", false, out _));
+        Assert.Empty(cfg.Accounts.Disabled);
+    }
+
+    [Fact]
     public void Reset_this_PC_inside_Settings_is_an_admin_tool()
     {
         Assert.True(AdminTools.Is(@"C:\Windows\ImmersiveControlPanel\SystemSettingsAdminFlows.exe", null));

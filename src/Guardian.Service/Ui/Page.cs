@@ -723,7 +723,10 @@ function loadUsers(){api('/api/users').then(u=>{$('allLocked').hidden=!u.everyon
   a.unlockedUntil?el('button',{class:'link',onclick:()=>post('/api/users/unlock',{user:a.name,minutes:'0'}).then(()=>{toast('השחרור הזמני בוטל');loadUsers()}).catch(fail)},'ביטול השחרור'):null);
  const I_LOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',I_BREAK='<svg viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3c0 5 8 6 8 9s-8 4-8 9M16 3c0 5-8 6-8 9s8 4 8 9"/></svg>';
  const head=(icon,text)=>{const h=el('h3');h.innerHTML=icon;h.append(text);return h};
- return el('div',{class:'user'},el('div',{class:'uhead'},el('b',{class:'n'},a.name),status),
+ const dis=el('button',{class:'link',style:a.disabled?'':'color:var(--bad)'},a.disabled?'להפעיל את החשבון מחדש':'השבתת החשבון');let sure=false;
+ dis.onclick=()=>{if(!a.disabled&&!sure){sure=true;dis.textContent='בטוח? '+a.name+' לא יוכל להיכנס למחשב עד שתפעילו אותו כאן. לחצו שוב לאישור';return}
+  post('/api/users/disable',{user:a.name,value:String(!a.disabled)}).then(()=>{toast(a.disabled?'החשבון '+a.name+' יחזור לפעול תוך כמה שניות':'החשבון '+a.name+' יושבת תוך כמה שניות. אם הוא מחובר עכשיו, התוכנות הפתוחות שלו נשארות פתוחות עד שהוא יוצא.');loadUsers()}).catch(fail)};
+ return el('div',{class:'user'},el('div',{class:'uhead'},el('b',{class:'n'},a.name),a.disabled?el('span',{class:'badge bad'},'מושבת'):status,dis),
   ownRow(a),
   el('div',{class:'opts'},
    el('div',{class:'opt'},head(I_LOCK,'שעות נעילה'),el('p',{class:'hint'},'בשעות האלה המסך ננעל, ואי אפשר להיכנס לחשבון.'),box,
@@ -777,7 +780,7 @@ $('pause').onchange=()=>tick();
 // Delay before turning off
 const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/catalog/sites':'רשימת אתרים לתוכנה','/api/release':'שחרור כל ההגבלות','/api/backup/restore':'שחזור הגדרות מגיבוי','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
  '/api/site':'היתר לאתר','/api/network/list':'רשימת רשת','/api/network/mode':'מצב סינון האתרים','/api/users/set':'שעות ומניעת התמכרות','/api/users/unlock':'שחרור זמני של משתמש',
- '/api/tools/unlock':'שחרור זמני של כלי מנהל','/api/users/own':'חזרה לברירת המחדל','/api/wifi/list':'הוספת רשת Wi-Fi','/api/network/msupdates':'החרגת עדכוני מיקרוסופט','/api/isp/trust':'תעודת סינון','/api/cooling/set':'הקטנת ההשהיה'};
+ '/api/tools/unlock':'שחרור זמני של כלי מנהל','/api/users/own':'חזרה לברירת המחדל','/api/users/disable':'הפעלה מחדש של חשבון','/api/wifi/list':'הוספת רשת Wi-Fi','/api/network/msupdates':'החרגת עדכוני מיקרוסופט','/api/isp/trust':'תעודת סינון','/api/cooling/set':'הקטנת ההשהיה'};
 function describePending(p){const b=p.body||{};const t=(TOGGLES.find(x=>x[0]===b.key)||[])[1];
  const what=p.path==='/api/settings'?(t||b.key)+' – '+(b.value==='true'?'הדלקה':'כיבוי'):p.path==='/api/cooling/set'?'הקטנת ההשהיה ל-'+(b.minutes!=null?fmtMin(b.minutes):b.hours+' שעות'):
   (PLAB[p.path]||p.path)+(b.path?': '+b.path.split('\\').pop():b.value?': '+b.value:b.target?': '+b.target:b.minutes?': '+b.minutes+' דקות':'');

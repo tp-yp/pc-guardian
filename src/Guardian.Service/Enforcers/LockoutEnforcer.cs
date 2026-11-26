@@ -125,6 +125,8 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
         }
         foreach (var u in disabled.Where(u => !want.Contains(u)).ToList())
         {
+            // Turned off by the owner meanwhile: stays off, and is turned on here once the owner turns it on again.
+            if (cfg.Accounts.Disabled.Any(d => LockoutPlanner.SameUser(d, u))) continue;
             NetUser.SetDisabled(u, false);
             disabled.Remove(u); changed = true;
             log.LogInformation("Account {User} turned on again", u);

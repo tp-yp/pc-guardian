@@ -64,6 +64,8 @@ public sealed class GuardianConfig
 public sealed class AccountsPolicy
 {
     public bool BlockNew { get; set; }
+    /// <summary>Accounts the owner turned off in Geder ("disable account"). They stay off until turned on in Geder.</summary>
+    public List<string> Disabled { get; set; } = new();
 }
 
 /// <summary>

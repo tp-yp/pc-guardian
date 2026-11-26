@@ -60,6 +60,19 @@ public static class ConfigEditing
         foreach (var u in cfg.UserPolicies)
         { u.Apps.Enabled = false; u.Apps.BlockAdminTools = false; u.Apps.BlockVideoFiles = false; }
         cfg.UserLockouts = [];
+        cfg.Accounts.Disabled = [];
+    }
+
+    /// <summary>"Disable account": the account is turned off until it is turned on again here.</summary>
+    public static bool TrySetAccountDisabled(GuardianConfig cfg, string user, bool disabled, out string error)
+    {
+        error = "";
+        user = (user ?? "").Trim();
+        if (user.Length == 0 || user.Length > 104 || user.IndexOfAny(['\\', '/', '"', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '[', ']']) >= 0)
+        { error = "Invalid user name."; return false; }
+        cfg.Accounts.Disabled.RemoveAll(u => Lockout.LockoutPlanner.SameUser(u, user));
+        if (disabled) cfg.Accounts.Disabled.Add(user);
+        return true;
     }
 
     /// <summary>Brings back the settings from before "release all restrictions".</summary>

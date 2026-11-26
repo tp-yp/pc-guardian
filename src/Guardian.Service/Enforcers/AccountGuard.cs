@@ -13,6 +13,7 @@ public sealed class AccountGuard(ILogger<AccountGuard> log, AccessLog access)
 {
     private static string KnownPath => Path.Combine(Paths.DataDir, "known-accounts.txt");
     private static string OursPath => Path.Combine(Paths.DataDir, "new-accounts.txt");
+    private static string OwnerOffPath => Path.Combine(Paths.DataDir, "disabled-accounts.txt");
     private static readonly object Gate = new();
     private DateTime _next = DateTime.MinValue;
 
@@ -22,6 +23,7 @@ public sealed class AccountGuard(ILogger<AccountGuard> log, AccessLog access)
         _next = DateTime.UtcNow.AddSeconds(2);
         lock (Gate)
         {
+            DisableByOwner(cfg);
             var on = cfg.Accounts.BlockNew;
             var ours = Read(OursPath);
             if (!on && ours.Count == 0)
@@ -63,6 +65,42 @@ public sealed class AccountGuard(ILogger<AccountGuard> log, AccessLog access)
         }
     }
 
+    /// <summary>
+    /// "Disable account" in the Users screen: the account is turned off, and turned off again if someone turns it on.
+    /// Turned on again when the owner turns it on in Geder, and on uninstall. The last administrator stays on.
+    /// </summary>
+    private void DisableByOwner(GuardianConfig cfg)
+    {
+        var mine = ReadNames(OwnerOffPath);
+        var want = cfg.Accounts.Disabled;
+        if (want.Count == 0 && mine.Count == 0) return;
+        var accounts = NetUser.List();
+        if (accounts.Count == 0) return;
+        var changed = false;
+        foreach (var name in mine.Where(m => !want.Any(w => LockoutPlanner.SameUser(w, m))).ToList())
+        {
+            NetUser.SetDisabled(name, false);
+            mine.Remove(name); changed = true;
+            log.LogInformation("Account {User} turned on again by the owner", name);
+        }
+        foreach (var name in want)
+        {
+            var a = accounts.FirstOrDefault(x => LockoutPlanner.SameUser(name, x.Name));
+            if (a is null || !a.Enabled) continue; // gone, or already off (for example during its locked hours)
+            if (a.Admin && accounts.Count(x => x.Enabled && x.Admin) <= 1) continue; // the last administrator stays on
+            if (NetUser.SetDisabled(a.Name, true) != 0) continue;
+            changed |= mine.Add(a.Name);
+            log.LogInformation("Account {User} turned off by the owner", a.Name);
+        }
+        if (changed) Try(() => File.WriteAllLines(OwnerOffPath, mine));
+    }
+
+    private static HashSet<string> ReadNames(string path)
+    {
+        try { return File.Exists(path) ? new HashSet<string>(File.ReadAllLines(path).Where(l => l.Length > 0), StringComparer.OrdinalIgnoreCase) : new(StringComparer.OrdinalIgnoreCase); }
+        catch (Exception) { return new(StringComparer.OrdinalIgnoreCase); }
+    }
+
     /// <summary>Accounts waiting for approval (turned off by Geder).</summary>
     public static List<LocalAccount> Pending()
     {
@@ -89,6 +127,8 @@ public sealed class AccountGuard(ILogger<AccountGuard> log, AccessLog access)
         var ours = Read(OursPath);
         foreach (var a in NetUser.List().Where(a => ours.Contains(a.Rid))) NetUser.SetDisabled(a.Name, false);
         Try(() => File.Delete(OursPath));
+        foreach (var name in ReadNames(OwnerOffPath)) NetUser.SetDisabled(name, false);
+        Try(() => File.Delete(OwnerOffPath));
         Try(() => File.Delete(KnownPath));
     }
 
