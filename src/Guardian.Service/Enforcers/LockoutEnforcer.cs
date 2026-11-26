@@ -93,6 +93,9 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
     /// <summary>Accounts Geder turned off for their locked hours (so only those are turned on again).</summary>
     private static string DisabledFile => Path.Combine(Paths.DataDir, "locked-accounts.txt");
 
+    /// <summary>Accounts that are off right now only because of their locked hours.</summary>
+    public static HashSet<string> LockedByGeder() => ReadDisabled();
+
     private static HashSet<string> ReadDisabled()
     {
         try { return new HashSet<string>(File.ReadAllLines(DisabledFile).Where(l => l.Length > 0), StringComparer.OrdinalIgnoreCase); }
@@ -122,6 +125,8 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
         }
         foreach (var u in disabled.Where(u => !want.Contains(u)).ToList())
         {
+            // Turned off by the owner meanwhile: stays off, and is turned on here once the owner turns it on again.
+            if (cfg.Accounts.Disabled.Any(d => LockoutPlanner.SameUser(d, u))) continue;
             NetUser.SetDisabled(u, false);
             disabled.Remove(u); changed = true;
             log.LogInformation("Account {User} turned on again", u);

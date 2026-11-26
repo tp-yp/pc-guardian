@@ -25,6 +25,8 @@ public sealed class AppBlocker : IDisposable
     private readonly ConcurrentDictionary<string, DateTime> _lastNotified = new(StringComparer.OrdinalIgnoreCase);
     private readonly ManagementEventWatcher? _watcher;
     private volatile GuardianConfig? _cfg;
+    private readonly ConcurrentDictionary<int, long> _passed = new(); // pid -> start time, of programs that were allowed
+    private DateTime _passedSince = DateTime.UtcNow;
     private List<string> _trustedSelf = [];  // Guardian's own folder only
 
     private readonly AccessLog _access;
@@ -62,16 +64,24 @@ public sealed class AppBlocker : IDisposable
         {
             _trustedSelf = AppPolicyEvaluator.TrustedPrefixes(AppContext.BaseDirectory);
             _cfg = cfg;
+            _passed.Clear(); // new rules: every running program is checked again
         }
+        // Rules with hours, admin-tool releases and accounts change over time: a full check again every 20 seconds.
+        if (DateTime.UtcNow - _passedSince > TimeSpan.FromSeconds(20)) { _passed.Clear(); _passedSince = DateTime.UtcNow; }
         if (!UserScopes.AnyAppBlocking(cfg)) return;
+        var seen = new HashSet<int>();
         foreach (var p in Process.GetProcesses())
         {
             using (p)
             {
                 if (p.SessionId == 0) continue; // services / system processes
+                seen.Add(p.Id);
+                // A program that passed the check a moment ago is not checked again on every scan (the scan runs every second).
+                if (_passed.TryGetValue(p.Id, out var at) && at == StartOf(p)) continue;
                 Check(p.Id);
             }
         }
+        foreach (var pid in _passed.Keys.Where(k => !seen.Contains(k)).ToList()) _passed.TryRemove(pid, out _);
     }
 
     private void Check(int pid)
@@ -88,7 +98,7 @@ public sealed class AppBlocker : IDisposable
         if ((Path.GetFileName(path).StartsWith("guardian", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(path).StartsWith("geder", StringComparison.OrdinalIgnoreCase)) &&
             _selfHash.Value is { } self && Hash(path) == self) return;
         // Nor any other Geder build, such as an update that is being installed from a Downloads folder.
-        if (IsGederFile(path)) return;
+        if (IsGederFile(path)) { _passed[pid] = StartOf(proc); return; }
         // Each Windows account may have its own rules; unknown accounts follow the general ones.
         var user = cfg.UserPolicies.Count > 0 ? ProcessUser.Of(pid) : null;
         var rules = UserScopes.Effective(cfg, user).Apps;
@@ -104,9 +114,9 @@ public sealed class AppBlocker : IDisposable
         }
 
         // Essential parts of Windows (and Guardian's folder) are never closed, whatever the rules say.
-        if (ProtectedApps.IsProtected(path, WindowsDir, Paths.InstallDir)) return;
-        // "Block video files": video players, and any program opened with a video file.
-        if (rules.BlockVideoFiles && (VideoFiles.IsPlayer(path, OriginalName(path)) || VideoFiles.InCommandLine(ProcessCommandLine.Get(pid))))
+        if (ProtectedApps.IsProtected(path, WindowsDir, Paths.InstallDir)) { _passed[pid] = StartOf(proc); return; }
+        // "Block video files": any program opened with a video file.
+        if (rules.BlockVideoFiles && VideoFiles.InCommandLine(ProcessCommandLine.Get(pid)))
         {
             Kill(proc, pid, path, Reasons.Video, user, scopeName);
             return;
@@ -131,7 +141,7 @@ public sealed class AppBlocker : IDisposable
             decision = new AppDecision(RuleAction.Block, Reasons.Vpn);
             scopeName = null;
         }
-        if (decision.Action == RuleAction.Allow) return;
+        if (decision.Action == RuleAction.Allow) { _passed[pid] = StartOf(proc); return; }
         Kill(proc, pid, path, decision.Reason, user, scopeName);
     }
 
@@ -248,6 +258,11 @@ public sealed class AppBlocker : IDisposable
     {
         try { using var fs = File.OpenRead(path); return Convert.ToHexString(SHA256.HashData(fs)); }
         catch (Exception) { return null; }
+    }
+
+    private static long StartOf(Process p)
+    {
+        try { return p.StartTime.Ticks; } catch (Exception) { return -1; }
     }
 
     private static Process? TryGet(int pid)

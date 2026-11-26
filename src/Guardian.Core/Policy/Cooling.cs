@@ -29,6 +29,7 @@ public static class Cooling
             case "/api/catalog/set":
                 return B("kind") is "direct" or "allow" ? on : !on;
             case "/api/apps/allowRunning":
+            case "/api/accounts/approve":
                 return true;
             case "/api/release":
                 return B("action") != "undo";
@@ -82,6 +83,8 @@ public static class Cooling
             case "/api/users/unlock":
             case "/api/tools/unlock":
                 return int.TryParse(B("minutes"), out var m) && m > 0;
+            case "/api/users/disable":
+                return B("value") != "true";
             case "/api/users/own":
                 return B("own") != "true";
             case "/api/wifi/list":

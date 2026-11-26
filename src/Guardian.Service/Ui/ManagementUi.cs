@@ -8,6 +8,7 @@ using Guardian.Core.Config;
 using Guardian.Core.Network;
 using Guardian.Core.Policy;
 using Guardian.Core.Security;
+using Guardian.Service.Native;
 using Guardian.Core.Storage;
 using Guardian.Service.Enforcers;
 
@@ -86,7 +87,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.") || (body.GetValueOrDefault("key") ?? "").StartsWith("browser.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.") || (body.GetValueOrDefault("key") ?? "").StartsWith("browser.") || (body.GetValueOrDefault("key") ?? "").StartsWith("accounts.")) who = null;
 
             // "Delay before turning off": a change that weakens protection is kept and carried out later.
             if (req.HttpMethod == "POST" && !IsReplay(req))
@@ -251,6 +252,21 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     await SendJson(res, 200, new { ok = true, until = mins == 0 ? (DateTime?)null : toolsExempt.Until[key] });
                     break;
                 }
+                case ("/api/accounts", "GET"):
+                {
+                    var cfg = store.Load();
+                    var pending = AccountGuard.Pending().Select(a => new { rid = a.Rid, name = a.Name, admin = a.Admin });
+                    await SendJson(res, 200, new { on = cfg.Accounts.BlockNew, pending });
+                    break;
+                }
+                case ("/api/accounts/approve", "POST"):
+                {
+                    if (!int.TryParse(body.GetValueOrDefault("rid"), out var rid) || !AccountGuard.Approve(rid))
+                    { await SendJson(res, 400, new { error = "החשבון הזה לא ממתין לאישור." }); break; }
+                    log.LogInformation("UI: account {Rid} approved", rid);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
                 case ("/api/wifi", "GET"):
                 {
                     var cfg = store.Load();
@@ -339,6 +355,9 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                 {
                     var cfg = store.Load();
                     var accounts = AppCatalogScanner.LocalAccounts();
+                    // Accounts the owner turned off are listed too, so they can be turned on again.
+                    foreach (var d in cfg.Accounts.Disabled)
+                        if (!accounts.Any(a => Guardian.Core.Lockout.LockoutPlanner.SameUser(d, a))) accounts.Add(d);
                     await SendJson(res, 200, new
                     {
                         accounts = accounts.Select(a => new
@@ -346,6 +365,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                             name = a,
                             rule = cfg.UserLockouts.FirstOrDefault(r => Guardian.Core.Lockout.LockoutPlanner.SameUser(r.UserName, a)),
                             ownRules = UserScopes.Find(cfg, a) != null,
+                            disabled = cfg.Accounts.Disabled.Any(d => Guardian.Core.Lockout.LockoutPlanner.SameUser(d, a)),
                             unlockedUntil = exemptions.Until.TryGetValue(a, out var u) && u > clock.LocalNow ? u : (DateTime?)null,
                         }),
                         everyoneLocked = ConfigEditing.EveryAccountHasLockout(cfg, accounts),
@@ -365,6 +385,19 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
                     if (!ConfigEditing.TrySetLockout(cfg, body.GetValueOrDefault("user") ?? "", windows, warn, out var err, breakEvery, breakWindows)) { await SendJson(res, 400, new { error = err }); break; }
                     store.Save(cfg);
+                    await SendJson(res, 200, new { ok = true });
+                    break;
+                }
+                case ("/api/users/disable", "POST"):
+                {
+                    var cfg = store.Load();
+                    var user = body.GetValueOrDefault("user") ?? "";
+                    var off = body.GetValueOrDefault("value") == "true";
+                    if (off && NetUser.IsAdmin(user) && !NetUser.List().Any(a => a.Enabled && a.Admin && !Guardian.Core.Lockout.LockoutPlanner.SameUser(user, a.Name)))
+                    { await SendJson(res, 400, new { error = "זה חשבון המנהל היחיד שפועל במחשב, ולכן אי אפשר להשבית אותו. בלעדיו לא יהיה מי שיכול להיכנס." }); break; }
+                    if (!ConfigEditing.TrySetAccountDisabled(cfg, user, off, out var err)) { await SendJson(res, 400, new { error = err }); break; }
+                    store.Save(cfg);
+                    log.LogInformation("UI: account {User} {State}", user, off ? "disabled" : "enabled");
                     await SendJson(res, 200, new { ok = true });
                     break;
                 }
@@ -702,6 +735,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["clock.locked"] = c.Clock.Locked,
             ["vpn.block"] = c.Vpn.Block,
             ["wifi.knownOnly"] = c.Wifi.KnownOnly,
+            ["accounts.blockNew"] = c.Accounts.BlockNew,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>

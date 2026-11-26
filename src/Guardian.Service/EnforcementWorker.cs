@@ -4,12 +4,13 @@ using Guardian.Service.Enforcers;
 namespace Guardian.Service;
 
 /// <summary>
-/// Main loop: reloads the policy when it changes and runs each enforcer every few seconds.
+/// Main loop: every second the policy is reloaded if it changed, programs are checked, locked screens are locked
+/// again and new accounts are checked; the other enforcers run every five seconds.
 /// One failing enforcer never stops the others.
 /// </summary>
 public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
     NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy,
-    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp, TrustedClock clock, WifiGuard wifi, AdminToolsPolicy toolsPolicy, DnsOrigins dnsOrigins) : BackgroundService
+    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp, TrustedClock clock, WifiGuard wifi, AdminToolsPolicy toolsPolicy, DnsOrigins dnsOrigins, AccountGuard accounts) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -26,10 +27,12 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
         dns.Update(cfg);
         proxy.Update(cfg);
         Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
+        var slowAt = DateTime.MinValue;
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            await Task.Delay(TimeSpan.FromSeconds(1), ct);
             if (!store.Exists) break; // uninstalled: stop enforcing, the host is shutting down
+            var reloaded = false;
             if (store.LastWriteUtc != stamp)
             {
                 stamp = store.LastWriteUtc;
@@ -38,16 +41,22 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
                 proxy.Update(cfg);
                 Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
                 log.LogInformation("Policy reloaded.");
+                reloaded = true;
             }
-            Run("clock", () => clock.Tick(cfg));
-            Run("lockout", () => lockout.Tick(cfg));
+            // Fast part: a new setting is in force within a second, and so is a re-lock or a new account.
             Run("apps", () => apps.Tick(cfg));
+            Run("lockout", () => lockout.Tick(cfg));
+            Run("accounts", () => accounts.Tick(cfg));
+            Run("tools", () => toolsPolicy.Tick(cfg, reloaded));
             var ispChanged = false;
             Run("isp", () => ispChanged = isp.Tick(cfg));
-            Run("network", () => network.Tick(cfg, force: ispChanged, isolated: isp.Isolated(cfg)));
+            if (ispChanged) Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
+            if (DateTime.UtcNow < slowAt && !reloaded) continue;
+            slowAt = DateTime.UtcNow.AddSeconds(5);
+            Run("clock", () => clock.Tick(cfg));
+            Run("network", () => network.Tick(cfg, force: false, isolated: isp.Isolated(cfg)));
             Run("boot", () => boot.Tick(cfg));
             Run("wifi", () => wifi.Tick(cfg));
-            Run("tools", () => toolsPolicy.Tick(cfg));
             Run("direct", () => direct.SetActive(cfg.Network.Enabled && cfg.Network.UrlFiltering));
             Run("dns origins", () => dnsOrigins.SetActive(cfg.Network.Enabled));
             Run("private browsing", () => BrowserPrivacy.Apply(cfg.Browsers.NoPrivate));

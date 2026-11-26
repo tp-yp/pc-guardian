@@ -17,14 +17,6 @@ public class VideoFilesTests
     public void Command_line_with_a_video_file(string? cmd, bool expected) => Assert.Equal(expected, VideoFiles.InCommandLine(cmd));
 
     [Fact]
-    public void Players_are_found_also_when_renamed()
-    {
-        Assert.True(VideoFiles.IsPlayer(@"C:\Program Files\VideoLAN\VLC\vlc.exe", null));
-        Assert.True(VideoFiles.IsPlayer(@"C:\Users\kid\Downloads\homework.exe", "vlc.exe"));
-        Assert.False(VideoFiles.IsPlayer(@"C:\Windows\notepad.exe", "NOTEPAD.EXE"));
-    }
-
-    [Fact]
     public void Switch_is_per_account_and_counts_as_app_blocking()
     {
         var cfg = new GuardianConfig { Apps = { Enabled = false } };

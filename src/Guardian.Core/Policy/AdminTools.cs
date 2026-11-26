@@ -17,6 +17,9 @@ public static class AdminTools
         "rstrui.exe", "systemreset.exe", "gpedit.exe", "secpol.exe", "runas.exe", "sdbinst.exe", "diskpart.exe",
         // Windows Security (where Defender and the firewall are turned off), accounts and recovery tools.
         "sechealthui.exe", "netplwiz.exe", "useraccountcontrolsettings.exe", "recoverydrive.exe", "dism.exe",
+        // The part of Settings that runs its administrator actions: "Reset this PC" runs inside it, and so do
+        // adding an account and changing an account to administrator.
+        "systemsettingsadminflows.exe",
     };
 
     /// <summary>
