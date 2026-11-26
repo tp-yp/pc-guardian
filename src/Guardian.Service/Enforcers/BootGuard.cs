@@ -77,10 +77,10 @@ public sealed class BootGuard(ILogger<BootGuard> log, AccessLog access, IHostApp
     {
         var error = "";
         var current = CurrentLoader();
-        bool On() => BootState.WinReEnabled(ReadReAgent()) == true || (current != null && HasElement(current, BootState.RecoverySequence));
+        bool On() => WinReOn() == true || (current != null && HasElement(current, BootState.RecoverySequence));
         if (On())
         {
-            if (BootState.WinReEnabled(ReadReAgent()) == true)
+            if (WinReOn() == true)
             {
                 var (code, output) = Run("reagentc.exe", "/disable");
                 if (code != 0) error = "reagentc: " + output;
@@ -107,7 +107,7 @@ public sealed class BootGuard(ILogger<BootGuard> log, AccessLog access, IHostApp
     {
         var current = CurrentLoader();
         var o = new Original(
-            WinReEnabled: BootState.WinReEnabled(ReadReAgent()) == true || (current != null && HasElement(current, BootState.RecoverySequence)),
+            WinReEnabled: WinReOn() == true || (current != null && HasElement(current, BootState.RecoverySequence)),
             RecoveryEnabled: current is null || ReadBool(current, BootState.AutoRecoveryEnabled) != false,
             LegacyMenu: current != null && ReadInt(current, BootState.BootMenuPolicy) == 0);
         File.WriteAllText(StatePath, JsonSerializer.Serialize(o));
@@ -172,17 +172,29 @@ public sealed class BootGuard(ILogger<BootGuard> log, AccessLog access, IHostApp
         return k?.GetValue("Element") is byte[] { Length: >= 8 } b ? BitConverter.ToInt64(b, 0) : null;
     }
 
+    /// <summary>What "reagentc /info" says (Windows' own answer), or ReAgent.xml if that gives no answer.</summary>
+    private static bool? WinReOn()
+    {
+        try
+        {
+            var (code, output) = Run("reagentc.exe", "/info", 2000);
+            if (code == 0 && BootState.WinReEnabledFromInfo(output) is { } on) return on;
+        }
+        catch (Exception) { /* fall back to the file */ }
+        return BootState.WinReEnabled(ReadReAgent());
+    }
+
     private static string? ReadReAgent()
     {
         try { return File.ReadAllText(ReAgentXml); } catch { return null; }
     }
 
-    private static (int Code, string Output) Run(string exe, string args)
+    private static (int Code, string Output) Run(string exe, string args, int maxOutput = 300)
     {
         using var p = Process.Start(new ProcessStartInfo(exe, args)
             { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true })!;
         var output = (p.StandardOutput.ReadToEnd() + " " + p.StandardError.ReadToEnd()).Trim();
         p.WaitForExit(30_000);
-        return (p.HasExited ? p.ExitCode : -1, output.Length > 300 ? output[..300] : output);
+        return (p.HasExited ? p.ExitCode : -1, output.Length > maxOutput ? output[..maxOutput] : output);
     }
 }

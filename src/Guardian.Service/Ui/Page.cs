@@ -535,7 +535,7 @@ function loadBoot(){return api('/api/boot',{},false).then(b=>{const d=$('bootSta
  d.replaceChildren(el('b',{},'מצב נעילת סביבת השחזור: '),
   b.winReOff===true?el('span',{class:'ok'},'סביבת השחזור כבויה ✓'):b.winReOff===false?el('span',{class:'bad'},'ווינדוס לא איפשר לכבות את סביבת השחזור. '+(b.error||'')):el('span',{class:'muted'},'בודק…'),
   b.safeModePending?el('div',{class:'bad'},'יש בקשה להפעלה מחדש במצב בטוח, והיא תבוטל.'):'',
-  el('div',{class:'muted',style:'font-size:12px'},'בדיקה לאחרונה: '+(b.checked?new Date(b.checked).toLocaleTimeString('he-IL'):'עדיין לא')+'. כדי לוודא: הגדרות > מערכת > שחזור > "הפעל מחדש עכשיו" אמור להציג הודעה שסביבת השחזור לא נמצאה.'))}).catch(()=>{})}
+  el('div',{class:'muted',style:'font-size:12px'},'בדיקה לאחרונה: '+(b.checked?new Date(b.checked).toLocaleTimeString('he-IL'):'עדיין לא')+'. כדי לוודא: Shift + הפעלה מחדש אמור להציג רק "הגדרות אתחול" ו"הגדרות קושחת UEFI".'))}).catch(()=>{})}
 function loadIsp(){loadBoot();return api('/api/isp',{},false).then(renderIsp).catch(()=>{})}
 function checkIsp(){$('ispStatus').replaceChildren(el('span',{class:'muted'},'בודק…'));return post('/api/isp/check',{}).then(renderIsp).catch(fail)}
 $('ispCheck').onclick=checkIsp;
