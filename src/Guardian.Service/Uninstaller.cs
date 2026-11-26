@@ -30,6 +30,7 @@ public static class Uninstaller
             Try(() => ServiceHardening.DisableRecovery(svc));
         }
         Try(() => LockoutEnforcer.RestoreAll(cfg));
+        Try(AccountGuard.RestoreAll); // new accounts Geder turned off are turned on again
         Try(() => (network ?? new NetworkEnforcer(NullLogger<NetworkEnforcer>.Instance)).Restore());
         Try(ProxyHost.RemoveCa);
         Try(BootGuard.Restore); // recovery environment, Safe Mode, F8 menu back as they were

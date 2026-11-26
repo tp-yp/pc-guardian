@@ -62,6 +62,35 @@ internal static class NetUser
         return NetUserSetInfo(null, StripDomain(userName), 1008, ref info, out _);
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct USER_INFO_20 { public string name; public string full_name; public string comment; public int flags; public int user_id; }
+    [DllImport("netapi32.dll", CharSet = CharSet.Unicode)]
+    private static extern int NetUserEnum(string? server, int level, int filter, out IntPtr buf, int prefMaxLen, out int read, out int total, ref int resume);
+
+    /// <summary>Every ordinary local account, with its number, whether it is on and whether it is an administrator. Empty if listing fails.</summary>
+    public static List<Guardian.Core.Lockout.LocalAccount> List()
+    {
+        var list = new List<Guardian.Core.Lockout.LocalAccount>();
+        var resume = 0;
+        int rc;
+        do
+        {
+            rc = NetUserEnum(null, 20, 2 /* FILTER_NORMAL_ACCOUNT */, out var buf, -1, out var read, out _, ref resume);
+            if (rc != 0 && rc != 234 /* ERROR_MORE_DATA */) return [];
+            try
+            {
+                var size = Marshal.SizeOf<USER_INFO_20>();
+                for (var i = 0; i < read; i++)
+                {
+                    var u = Marshal.PtrToStructure<USER_INFO_20>(buf + i * size);
+                    list.Add(new(u.user_id, u.name, (u.flags & UF_ACCOUNTDISABLE) == 0, IsAdmin(u.name)));
+                }
+            }
+            finally { if (buf != IntPtr.Zero) NetApiBufferFree(buf); }
+        } while (rc == 234);
+        return list;
+    }
+
     public static byte[] AllHours => Enumerable.Repeat((byte)0xFF, 21).ToArray();
 
     private static string StripDomain(string u) => u.Contains('\\') ? u[(u.LastIndexOf('\\') + 1)..] : u;

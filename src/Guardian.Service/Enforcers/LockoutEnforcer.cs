@@ -93,6 +93,9 @@ public sealed class LockoutEnforcer(ILogger<LockoutEnforcer> log, LockoutExempti
     /// <summary>Accounts Geder turned off for their locked hours (so only those are turned on again).</summary>
     private static string DisabledFile => Path.Combine(Paths.DataDir, "locked-accounts.txt");
 
+    /// <summary>Accounts that are off right now only because of their locked hours.</summary>
+    public static HashSet<string> LockedByGeder() => ReadDisabled();
+
     private static HashSet<string> ReadDisabled()
     {
         try { return new HashSet<string>(File.ReadAllLines(DisabledFile).Where(l => l.Length > 0), StringComparer.OrdinalIgnoreCase); }

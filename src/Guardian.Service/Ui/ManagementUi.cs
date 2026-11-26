@@ -86,7 +86,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             if (string.IsNullOrWhiteSpace(who)) who = null;
             var shownWho = who;
             // The filtered-line settings are for the whole computer, never one account.
-            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.") || (body.GetValueOrDefault("key") ?? "").StartsWith("browser.")) who = null;
+            if ((body.GetValueOrDefault("key") ?? body.GetValueOrDefault("list") ?? "").StartsWith("isp") || (body.GetValueOrDefault("key") ?? "").StartsWith("clock.") || (body.GetValueOrDefault("key") ?? "").StartsWith("vpn.") || (body.GetValueOrDefault("key") ?? "").StartsWith("wifi.") || (body.GetValueOrDefault("key") ?? "").StartsWith("browser.") || (body.GetValueOrDefault("key") ?? "").StartsWith("accounts.")) who = null;
 
             // "Delay before turning off": a change that weakens protection is kept and carried out later.
             if (req.HttpMethod == "POST" && !IsReplay(req))
@@ -249,6 +249,21 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     if (mins == 0) toolsExempt.Until.TryRemove(key, out _); else toolsExempt.Until[key] = clock.LocalNow.AddMinutes(mins);
                     log.LogInformation("UI: admin tools released for {Who} for {Min} min", key, mins);
                     await SendJson(res, 200, new { ok = true, until = mins == 0 ? (DateTime?)null : toolsExempt.Until[key] });
+                    break;
+                }
+                case ("/api/accounts", "GET"):
+                {
+                    var cfg = store.Load();
+                    var pending = AccountGuard.Pending().Select(a => new { rid = a.Rid, name = a.Name, admin = a.Admin });
+                    await SendJson(res, 200, new { on = cfg.Accounts.BlockNew, pending });
+                    break;
+                }
+                case ("/api/accounts/approve", "POST"):
+                {
+                    if (!int.TryParse(body.GetValueOrDefault("rid"), out var rid) || !AccountGuard.Approve(rid))
+                    { await SendJson(res, 400, new { error = "החשבון הזה לא ממתין לאישור." }); break; }
+                    log.LogInformation("UI: account {Rid} approved", rid);
+                    await SendJson(res, 200, new { ok = true });
                     break;
                 }
                 case ("/api/wifi", "GET"):
@@ -702,6 +717,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
             ["clock.locked"] = c.Clock.Locked,
             ["vpn.block"] = c.Vpn.Block,
             ["wifi.knownOnly"] = c.Wifi.KnownOnly,
+            ["accounts.blockNew"] = c.Accounts.BlockNew,
         },
         mode = c.Network.Mode.ToString(),
         lists = new Dictionary<string, List<string>>

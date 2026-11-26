@@ -85,6 +85,7 @@ switch (cmd)
         builder.Services.AddSingleton<BootGuard>();
         builder.Services.AddSingleton<WifiGuard>();
         builder.Services.AddSingleton<AdminToolsPolicy>();
+        builder.Services.AddSingleton<AccountGuard>();
         builder.Services.AddSingleton<IspFilterMonitor>();
         builder.Services.AddSingleton<TrustedClock>();
         builder.Services.AddSingleton<AppCatalogScanner>();

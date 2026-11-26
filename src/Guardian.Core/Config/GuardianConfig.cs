@@ -33,6 +33,8 @@ public sealed class GuardianConfig
     public WifiPolicy Wifi { get; set; } = new();
     public BrowserPolicy Browsers { get; set; } = new();
     public CoolingPolicy Cooling { get; set; } = new();
+    /// <summary>"New accounts stay off until approved" (whole computer). Off by default.</summary>
+    public AccountsPolicy Accounts { get; set; } = new();
     /// <summary>
     /// The settings as they were before "release all restrictions" (exported form, no passwords),
     /// so they can be brought back with one click. Null when nothing was released.
@@ -52,6 +54,16 @@ public sealed class GuardianConfig
         Apps = new AppPolicy { Enabled = false, DefaultDeny = false, TrustProgramFiles = false },
         Network = new NetworkPolicy { Enabled = false, UrlFiltering = false },
     };
+}
+
+/// <summary>
+/// A Windows account that Geder did not know when the switch was turned on (for example a new administrator
+/// account made to get around Geder) is turned off until it is approved in Geder. Which accounts are known is kept
+/// on this computer only (GuardianData), not in the settings, so a backup from another computer cannot change it.
+/// </summary>
+public sealed class AccountsPolicy
+{
+    public bool BlockNew { get; set; }
 }
 
 /// <summary>

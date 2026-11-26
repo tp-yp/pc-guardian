@@ -29,6 +29,7 @@ public static class Cooling
             case "/api/catalog/set":
                 return B("kind") is "direct" or "allow" ? on : !on;
             case "/api/apps/allowRunning":
+            case "/api/accounts/approve":
                 return true;
             case "/api/release":
                 return B("action") != "undo";

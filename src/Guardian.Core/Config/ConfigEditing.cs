@@ -39,6 +39,7 @@ public static class ConfigEditing
         current.Vpn = incoming.Vpn;
         current.Wifi = incoming.Wifi;
         current.Browsers = incoming.Browsers;
+        current.Accounts = incoming.Accounts ?? new();
         current.Cooling.Minutes = incoming.Cooling.Minutes;
         if (GuardianConfig.ActivityHourChoices.Contains(incoming.ActivityHours)) current.ActivityHours = incoming.ActivityHours;
     }
@@ -46,7 +47,7 @@ public static class ConfigEditing
     /// <summary>Switches that "release all restrictions" turns off for the whole computer.</summary>
     private static readonly string[] ReleaseKeys =
         ["apps.enabled", "apps.blockAdminTools", "apps.blockVideo", "browser.noPrivate", "network.enabled", "boot.lockdown",
-         "isp.required", "vpn.block", "wifi.knownOnly", "clock.locked"];
+         "isp.required", "vpn.block", "wifi.knownOnly", "clock.locked", "accounts.blockNew"];
 
     /// <summary>
     /// "Release all restrictions": every blocking switch off, for the whole computer and every account, and no
@@ -93,7 +94,7 @@ public static class ConfigEditing
     }
 
     public static readonly string[] Toggles =
-        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked", "vpn.block", "wifi.knownOnly", "apps.blockAdminTools", "apps.blockVideo", "browser.noPrivate"];
+        ["apps.enabled", "apps.defaultDeny", "apps.trustProgramFiles", "network.enabled", "network.urlFiltering", "boot.lockdown", "isp.required", "isp.netfree", "isp.etrog", "clock.locked", "vpn.block", "wifi.knownOnly", "apps.blockAdminTools", "apps.blockVideo", "browser.noPrivate", "accounts.blockNew"];
 
     /// <summary>Turns one feature on or off.</summary>
     public static bool TrySetToggle(GuardianConfig cfg, string key, bool value, out string error)
@@ -133,6 +134,7 @@ public static class ConfigEditing
                 if (value) cfg.Network.Enabled = true; // VPN sites are refused by the DNS filter, ports by the firewall
                 return true;
             case "wifi.knownOnly": cfg.Wifi.KnownOnly = value; return true;
+            case "accounts.blockNew": cfg.Accounts.BlockNew = value; return true;
             case "clock.locked":
                 cfg.Clock.Locked = value;
                 // The time zone in effect now is the one kept (changing it is another way to move the clock).

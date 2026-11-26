@@ -16,16 +16,18 @@ namespace Guardian.Service.Enforcers;
 public sealed class AdminToolsPolicy(ILogger<AdminToolsPolicy> log, AdminToolsExemptions exempt, TrustedClock clock)
 {
     private const string Prefix = "Guardian-";
+    private const string SettingsPages = "hide:recovery;otherusers;family-group;windowsdefender";
     private const string SystemPolicy = @"Software\Policies\Microsoft\Windows\System";
     private const string CvSystem = @"Software\Microsoft\Windows\CurrentVersion\Policies\System";
     private const string CvExplorer = @"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer";
     private static string StatePath => Path.Combine(Paths.DataDir, "tools-policy.txt");
     private DateTime _next = DateTime.MinValue;
 
-    public void Tick(GuardianConfig cfg)
+    /// <param name="changed">The settings just changed: apply now instead of at the next round (every 5 seconds).</param>
+    public void Tick(GuardianConfig cfg, bool changed = false)
     {
-        if (DateTime.UtcNow < _next) return;
-        _next = DateTime.UtcNow.AddSeconds(15);
+        if (DateTime.UtcNow < _next && !changed) return;
+        _next = DateTime.UtcNow.AddSeconds(5);
         var applied = ReadState();
         foreach (var sid in LoadedUserSids())
         {
@@ -53,7 +55,14 @@ public sealed class AdminToolsPolicy(ILogger<AdminToolsPolicy> log, AdminToolsEx
     {
         using (var k = root.CreateSubKey($@"{sid}\{SystemPolicy}")) k.SetValue("DisableCMD", 2, RegistryValueKind.DWord);
         using (var k = root.CreateSubKey($@"{sid}\{CvSystem}")) k.SetValue("DisableRegistryTools", 1, RegistryValueKind.DWord);
-        using (var k = root.CreateSubKey($@"{sid}\{CvExplorer}")) k.SetValue("DisallowRun", 1, RegistryValueKind.DWord);
+        using (var k = root.CreateSubKey($@"{sid}\{CvExplorer}"))
+        {
+            k.SetValue("DisallowRun", 1, RegistryValueKind.DWord);
+            // Settings pages hidden for this account: Recovery ("Reset this PC"), other accounts and Windows Security.
+            // A value someone else set is left alone.
+            if (k.GetValue("SettingsPageVisibility") is not string v || v.Length == 0 || v == SettingsPages)
+                k.SetValue("SettingsPageVisibility", SettingsPages, RegistryValueKind.String);
+        }
         using (var k = root.CreateSubKey($@"{sid}\{CvExplorer}\DisallowRun"))
             foreach (var n in AdminTools.Names) k.SetValue(Prefix + n, n);
         return true;
@@ -71,6 +80,7 @@ public sealed class AdminToolsPolicy(ILogger<AdminToolsPolicy> log, AdminToolsEx
             list?.Dispose();
             using var ex = root.OpenSubKey($@"{sid}\{CvExplorer}", true);
             if (empty) { ex?.DeleteSubKey("DisallowRun", false); ex?.DeleteValue("DisallowRun", false); }
+            if (ex?.GetValue("SettingsPageVisibility") as string == SettingsPages) ex.DeleteValue("SettingsPageVisibility", false);
         });
     }
 
