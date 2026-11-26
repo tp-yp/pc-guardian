@@ -113,16 +113,17 @@ public sealed class AppBlocker : IDisposable
         }
         // Programs inside one account's profile folder (its Downloads, Desktop, AppData) are that account's only.
         // This holds whenever program locking is on for anyone, whatever the owner's own settings are.
-        // A program an administrator started with elevation (the admin password was typed) is left alone.
+        // Also for administrators and "Run as administrator"; Geder's own files were let through above.
         if (UserScopes.AnyProgramLocking(cfg) && UserPrograms.OwnerOf(path, UserProfiles.Current()) != null &&
-            UserPrograms.IsOtherUsers(path, user ?? ProcessUser.Of(pid), UserProfiles.Current()) && !ProcessUser.IsElevated(pid))
+            UserPrograms.IsOtherUsers(path, user ?? ProcessUser.Of(pid), UserProfiles.Current()))
         {
             Kill(proc, pid, path, Reasons.OtherAccount, user, scopeName);
             return;
         }
         var hashNeeded = rules.Rules.Any(r => !string.IsNullOrEmpty(r.Sha256));
         var nameNeeded = rules.Rules.Any(r => r.Action == RuleAction.Block && (!string.IsNullOrEmpty(r.FileName) || !string.IsNullOrEmpty(r.OriginalName)));
-        var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null, nameNeeded ? OriginalName(path) : null);
+        var signerNeeded = rules.Rules.Any(r => !string.IsNullOrEmpty(r.Signer));
+        var info = new ProcessInfo(path, hashNeeded ? Hash(path) : null, nameNeeded ? OriginalName(path) : null, signerNeeded ? Signer(path) : null);
         var decision = AppPolicyEvaluator.Evaluate(rules, info, _clock.LocalNow, _trustedSelf);
         // "Block VPN and proxies" (whole computer): known VPN / proxy programs, also when renamed.
         if (decision.Action == RuleAction.Allow && cfg.Vpn.Block && Guardian.Core.Network.VpnLists.IsVpnProgram(path, info.OriginalName ?? OriginalName(path)))
@@ -190,6 +191,21 @@ public sealed class AppBlocker : IDisposable
     }
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Size, DateTime Mtime, bool Geder)> _selfCache = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly ConcurrentDictionary<string, (long Size, DateTime Mtime, string? Signer)> _signerCache = new(StringComparer.OrdinalIgnoreCase);
+
+    private string? Signer(string path)
+    {
+        try
+        {
+            var fi = new FileInfo(path);
+            if (_signerCache.TryGetValue(path, out var c) && c.Size == fi.Length && c.Mtime == fi.LastWriteTimeUtc) return c.Signer;
+            var s = Authenticode.SignerOf(path);
+            _signerCache[path] = (fi.Length, fi.LastWriteTimeUtc, s);
+            return s;
+        }
+        catch (Exception) { return null; }
+    }
 
     private bool IsGederFile(string path)
     {

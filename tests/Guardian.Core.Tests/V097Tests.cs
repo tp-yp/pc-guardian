@@ -98,3 +98,26 @@ public class V097Tests
         Assert.Equal(24, c.ActivityHours);
     }
 }
+
+public class SignerRuleTests
+{
+    private static readonly DateTime Now = new(2026, 11, 26, 12, 0, 0);
+
+    [Fact]
+    public void Signed_programs_are_allowed_by_publisher_also_after_updates()
+    {
+        var cfg = new GuardianConfig { Apps = { Enabled = true, DefaultDeny = true } };
+        ConfigEditing.AllowScanned(cfg, @"C:\Users\kid\AppData\Local\Discord",
+            [(@"C:\Users\kid\AppData\Local\Discord\app-1.0.9\Discord.exe", null, "CN=Discord Inc."),
+             (@"C:\Users\kid\AppData\Local\Discord\Update.exe", null, "CN=Discord Inc."),
+             (@"C:\Users\kid\AppData\Local\Discord\tool.exe", "AA", null)]);
+        Assert.Equal(2, cfg.Apps.Rules.Count); // one rule for the publisher, one for the unsigned file
+        AppDecision Run(string path, string? signer, string? hash = null) => AppPolicyEvaluator.Evaluate(cfg.Apps, new(path, hash, null, signer), Now);
+        Assert.Equal(RuleAction.Allow, Run(@"C:\Users\kid\AppData\Local\Discord\app-1.0.10\Discord.exe", "CN=Discord Inc.").Action);
+        Assert.Equal(RuleAction.Block, Run(@"C:\Users\kid\AppData\Local\Discord\game.exe", null, "BB").Action);
+        Assert.Equal(RuleAction.Block, Run(@"C:\Users\kid\AppData\Local\Discord\game.exe", "CN=Game Studio").Action);
+        Assert.Equal(RuleAction.Block, Run(@"C:\Users\kid\Downloads\Discord.exe", "CN=Discord Inc.").Action);
+        Assert.Equal(RuleAction.Allow, Run(@"C:\Users\kid\AppData\Local\Discord\tool.exe", null, "aa").Action);
+        Assert.True(AppCatalog.IsAllowed(cfg, @"C:\Users\kid\AppData\Local\Discord\app-1.0.10\Discord.exe"));
+    }
+}

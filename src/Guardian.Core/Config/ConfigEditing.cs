@@ -208,17 +208,30 @@ public static class ConfigEditing
     /// in folders only administrators can change (Program Files), where the place is enough.
     /// Scanning the same folder again replaces its earlier list (new and updated programs come in).
     /// </summary>
-    public static int AllowScanned(GuardianConfig cfg, string folder, IEnumerable<(string Path, string? Sha256)> files)
+    public static int AllowScanned(GuardianConfig cfg, string folder, IEnumerable<(string Path, string? Sha256)> files) =>
+        AllowScanned(cfg, folder, files.Select(f => (f.Path, f.Sha256, (string?)null)));
+
+    /// <summary>
+    /// As above, with the publisher of each signed program: signed programs are allowed by publisher in the folder
+    /// (one rule per publisher, so updates keep working), unsigned ones by their contents.
+    /// </summary>
+    public static int AllowScanned(GuardianConfig cfg, string folder, IEnumerable<(string Path, string? Sha256, string? Signer)> files)
     {
         folder = folder.Replace('/', '\\').TrimEnd('\\') + "\\";
         cfg.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Allow && string.Equals(r.Source, folder, StringComparison.OrdinalIgnoreCase));
         cfg.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Allow && r.Source is null && r.When.Windows.Count == 0 &&
                                       string.Equals(r.PathPrefix?.TrimEnd('\\') + "\\", folder, StringComparison.OrdinalIgnoreCase));
         var n = 0;
-        foreach (var (path, hash) in files)
+        var signers = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (path, hash, signer) in files)
         {
-            cfg.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = path, Sha256 = hash, Source = folder });
             n++;
+            if (signer is { Length: > 0 })
+            {
+                if (signers.Add(signer)) cfg.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = folder, Signer = signer, Source = folder });
+                continue;
+            }
+            cfg.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = path, Sha256 = hash, Source = folder });
         }
         return n;
     }

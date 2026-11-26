@@ -201,6 +201,9 @@ public sealed class AppRule
     /// <summary>The folder this rule came from when a whole folder was allowed: its programs are scanned one by one
     /// (and, in folders anyone can write to, pinned by their contents), so a program copied there later is not allowed.</summary>
     public string? Source { get; set; }
+    /// <summary>The publisher of a digitally signed program (the subject of its valid signing certificate). With
+    /// <see cref="PathPrefix"/>, programs there signed by this publisher are allowed, also new versions after an update.</summary>
+    public string? Signer { get; set; }
 }
 
 public sealed class AppPolicy

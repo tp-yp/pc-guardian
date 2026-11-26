@@ -3,7 +3,8 @@ using Guardian.Core.Config;
 namespace Guardian.Core.Policy;
 
 /// <param name="OriginalName">The original file name written inside the program (version info), if any.</param>
-public sealed record ProcessInfo(string Path, string? Sha256, string? OriginalName = null);
+/// <param name="Signer">The publisher in the program's valid digital signature (Authenticode), if signed.</param>
+public sealed record ProcessInfo(string Path, string? Sha256, string? OriginalName = null, string? Signer = null);
 
 public sealed record AppDecision(RuleAction Action, string Reason);
 
@@ -67,6 +68,9 @@ public static class AppPolicyEvaluator
             if (r.OriginalName is { Length: > 0 } ro && string.Equals(ExeName(ro), o, StringComparison.OrdinalIgnoreCase)) return true;
             if (r.FileName is { Length: > 0 } rf && string.Equals(ExeName(rf), o, StringComparison.OrdinalIgnoreCase)) return true;
         }
+        // A signed program allowed by place and publisher: any program of that publisher there, also after updates.
+        if (r.Signer is { Length: > 0 } sg)
+            return r.PathPrefix is { Length: > 0 } sp && PathMatches(p.Path, sp) && string.Equals(sg, p.Signer, StringComparison.Ordinal);
         // A program allowed by place and contents (from a scanned folder) must match both.
         if (r.PathPrefix is { Length: > 0 } pp && r.Sha256 is { Length: > 0 } hh)
             return PathMatches(p.Path, pp) && p.Sha256 is { } ps && string.Equals(hh, ps, StringComparison.OrdinalIgnoreCase);

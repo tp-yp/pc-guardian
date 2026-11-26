@@ -20,18 +20,21 @@ public static class FolderScan
         Environment.GetFolderPath(Environment.SpecialFolder.Windows),
     ];
 
-    public static List<(string Path, string? Sha256)> Scan(string folder)
+    /// <summary>The programs in a folder. Outside Program Files each one carries its publisher (if validly signed) or its hash.</summary>
+    public static List<(string Path, string? Sha256, string? Signer)> Scan(string folder)
     {
         var pinned = !ConfigEditing.IsAdminOnlyFolder(folder, AdminRoots);
-        var result = new List<(string, string?)>();
+        var result = new List<(string, string?, string?)>();
         var opts = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
         foreach (var f in Directory.EnumerateFiles(folder, "*.exe", opts))
         {
             if (result.Count >= MaxFiles) break;
             if (f.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase)) continue;
-            result.Add((f, pinned ? Hash(f) : null));
+            if (!pinned) { result.Add((f, null, null)); continue; }
+            var signer = Guardian.Service.Native.Authenticode.SignerOf(f);
+            result.Add((f, signer is null ? Hash(f) : null, signer));
         }
-        return result.Where(r => !pinned || r.Item2 != null).ToList();
+        return result.Where(r => !pinned || r.Item2 != null || r.Item3 != null).ToList();
     }
 
     public static string? Hash(string path)

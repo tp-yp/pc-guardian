@@ -649,10 +649,12 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         error = "";
         if (!exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(exe)) { error = "התוכנה או התיקייה לא נמצאו במחשב."; return false; }
         if (ConfigEditing.IsAdminOnlyFolder(exe, FolderScan.AdminRoots)) return ConfigEditing.TryEditAppList(view, "allowApps", "add", exe, out error);
-        var hash = FolderScan.Hash(exe);
-        if (hash is null) { error = "אי אפשר לקרוא את התוכנה."; return false; }
+        // Signed: allowed by publisher at this place, so it keeps working after updates. Unsigned: by its contents.
+        var signer = Guardian.Service.Native.Authenticode.SignerOf(exe);
+        var hash = signer is null ? FolderScan.Hash(exe) : null;
+        if (signer is null && hash is null) { error = "אי אפשר לקרוא את התוכנה."; return false; }
         view.Apps.Rules.RemoveAll(r => r.Action == RuleAction.Allow && string.Equals(r.PathPrefix, exe, StringComparison.OrdinalIgnoreCase));
-        view.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = exe, Sha256 = hash });
+        view.Apps.Rules.Add(new AppRule { Action = RuleAction.Allow, PathPrefix = exe, Sha256 = hash, Signer = signer });
         return true;
     }
 
