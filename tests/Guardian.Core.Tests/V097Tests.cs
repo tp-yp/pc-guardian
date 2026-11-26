@@ -121,3 +121,14 @@ public class SignerRuleTests
         Assert.True(AppCatalog.IsAllowed(cfg, @"C:\Users\kid\AppData\Local\Discord\app-1.0.10\Discord.exe"));
     }
 }
+
+public class OfflineTests
+{
+    [Fact]
+    public void No_network_at_all_is_not_blocked_but_failed_checks_are()
+    {
+        Assert.False(new Guardian.Core.Network.IspFilterResult(Guardian.Core.Network.IspFilterStatus.Offline, DateTime.Now, "", []).ShouldBlock);
+        Assert.True(new Guardian.Core.Network.IspFilterResult(Guardian.Core.Network.IspFilterStatus.NoNetwork, DateTime.Now, "", []).ShouldBlock);
+        Assert.True(new Guardian.Core.Network.IspFilterResult(Guardian.Core.Network.IspFilterStatus.Unknown, DateTime.Now, "", []).ShouldBlock);
+    }
+}

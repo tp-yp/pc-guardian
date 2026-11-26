@@ -154,7 +154,7 @@ h2 .chip{font-size:12px}th .chip{margin:0;padding:1px 6px}th .chip span{display:
 <div id="ispNow" style="margin:6px 0">בודק את החיבור…</div>
 <ul style="margin:6px 0;padding-inline-start:20px;max-height:none">
 <li style="display:list-item;border:0;padding:0">אם Geder לא מזהה את הסינון, <b>כל האינטרנט במחשב ייחסם</b> מיד, וייפתח מעצמו רק כשהחיבור יעבור שוב דרך הסינון.</li>
-<li style="display:list-item;border:0;padding:0">גם כשאין רשת בכלל, או כשהבדיקה נכשלת, האינטרנט נשאר חסום עד שהסינון מזוהה.</li>
+<li style="display:list-item;border:0;padding:0">כשהמחשב לא מחובר לשום רשת, אין מה לחסום. כשרשת מופיעה, האינטרנט נחסם עד שהבדיקה מזהה את הסינון, בדרך כלל תוך כמה שניות. גם כשיש רשת אבל הבדיקה נכשלת, האינטרנט נשאר חסום עד שהסינון מזוהה.</li>
 <li style="display:list-item;border:0;padding:0">כיבוי המתג או הסרת Geder (שניהם דורשים סיסמה) מחזירים את האינטרנט מיד.</li>
 </ul>
 <label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="ispAgree"> הבנתי, ואני רוצה להפעיל</label>
@@ -480,7 +480,7 @@ $('bootAgree').onchange=()=>$('bootGo').disabled=!$('bootAgree').checked;
 $('bootCancel').onclick=()=>$('bootConfirm').hidden=true;
 $('bootGo').onclick=()=>post('/api/settings',{key:'boot.lockdown',value:'true'}).then(st=>{$('bootConfirm').hidden=true;render(st);setTimeout(loadBoot,8000);toast('נעילת סביבת השחזור הופעלה. מומלץ לנעול גם את ה-BIOS.')}).catch(fail);
 // Filtered line (ISP filter)
-const ISPST={Filtered:['ok','החיבור עובר דרך הסינון'],NotFiltered:['bad','החיבור לא עובר דרך הסינון'],NoNetwork:['bad','אין חיבור לאינטרנט'],Unknown:['muted','עוד לא נבדק']};
+const ISPST={Filtered:['ok','החיבור עובר דרך הסינון'],NotFiltered:['bad','החיבור לא עובר דרך הסינון'],NoNetwork:['bad','אין חיבור לאינטרנט'],Offline:['muted','המחשב לא מחובר לשום רשת (לא נחסם, כי אין מה לחסום)'],Unknown:['muted','עוד לא נבדק']};
 let isp=null;
 function ispLine(i){const[c,t]=ISPST[i.status]||ISPST.Unknown;return el('div',{},el('b',{class:c},t),i.signer?el('span',{},' · התעודה נחתמה על ידי: ',el('b',{style:'direction:ltr;unicode-bidi:isolate'},i.signer)):null,
  i.time?el('small',{class:'muted'},' (נבדק ב-'+new Date(i.time).toLocaleTimeString('he-IL')+')'):null,

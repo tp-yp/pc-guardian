@@ -631,7 +631,7 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
         {
             required = cfg.IspFilter.Required,
             status = status.ToString(),
-            blocked = cfg.IspFilter.Required && status != IspFilterStatus.Filtered,
+            blocked = cfg.IspFilter.Required && status is not (IspFilterStatus.Filtered or IspFilterStatus.Offline),
             time = r.Status == IspFilterStatus.Unknown ? (DateTime?)null : r.Time,
             detail = r.Detail,
             signer = IspFilterCheck.Signer(r.Chain),

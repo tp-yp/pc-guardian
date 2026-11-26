@@ -5,13 +5,15 @@ namespace Guardian.Core.Network;
 /// <summary>One certificate of a TLS chain, from the site's certificate up to the root.</summary>
 public sealed record ChainCert(string Subject, string Issuer, string Thumbprint);
 
-public enum IspFilterStatus { Unknown, Filtered, NotFiltered, NoNetwork }
+/// <summary>Offline = Windows has no network connection at all (no adapter with a gateway): there is nothing to block.</summary>
+public enum IspFilterStatus { Unknown, Filtered, NotFiltered, NoNetwork, Offline }
 
 /// <summary>Result of one round of checks, shown in the UI and used to block or unblock.</summary>
 public sealed record IspFilterResult(IspFilterStatus Status, DateTime Time, string Detail, List<ChainCert> Chain)
 {
-    /// <summary>Fail closed: anything but a confirmed filter keeps the internet blocked.</summary>
-    public bool ShouldBlock => Status != IspFilterStatus.Filtered;
+    /// <summary>Fail closed: anything but a confirmed filter keeps the internet blocked. With no network at all there is
+    /// nothing to block, so the block is lifted, and it comes back (until a check passes) as soon as a network appears.</summary>
+    public bool ShouldBlock => Status is not (IspFilterStatus.Filtered or IspFilterStatus.Offline);
 }
 
 public static class IspFilterCheck
