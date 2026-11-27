@@ -122,3 +122,16 @@ public class V098Tests
         Assert.False(VideoFiles.InCommandLine("\"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\""));
     }
 }
+
+public class WinReInfoTests
+{
+    [Fact]
+    public void Reagentc_info_decides_in_any_language()
+    {
+        const string on = "Windows Recovery Environment (Windows RE) and system reset configuration\n    Windows RE status:         Enabled\n    Windows RE location:       \\\\?\\GLOBALROOT\\device\\harddisk0\\partition4\\Recovery\\WindowsRE\n    Boot Configuration Data (BCD) identifier: 4a3b2c1d-1111-2222-3333-444455556666\n";
+        const string off = "    מצב Windows RE:         מושבת\n    מיקום Windows RE:\n    מזהה BCD: 00000000-0000-0000-0000-000000000000\n";
+        Assert.True(Guardian.Core.Boot.BootState.WinReEnabledFromInfo(on));
+        Assert.False(Guardian.Core.Boot.BootState.WinReEnabledFromInfo(off));
+        Assert.Null(Guardian.Core.Boot.BootState.WinReEnabledFromInfo("something else"));
+    }
+}

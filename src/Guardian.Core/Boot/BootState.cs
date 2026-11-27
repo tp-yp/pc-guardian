@@ -20,6 +20,20 @@ public static class BootState
         catch (System.Xml.XmlException) { return null; }
     }
 
+    /// <summary>
+    /// Whether the recovery environment is on, from the output of "reagentc /info" (in any language): when it is on,
+    /// the output names its location (\\?\GLOBALROOT\...) and a boot entry with a real id; when it is off, the id is
+    /// all zeros. Null if the output says neither. This is what Windows itself goes by; ReAgent.xml can lag behind.
+    /// </summary>
+    public static bool? WinReEnabledFromInfo(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output)) return null;
+        if (output.Contains("GLOBALROOT", StringComparison.OrdinalIgnoreCase)) return true;
+        var ids = System.Text.RegularExpressions.Regex.Matches(output, "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+        if (ids.Count == 0) return null;
+        return ids.Any(m => m.Value.Trim('0', '-').Length > 0);
+    }
+
     // BCD element types (stored under HKLM\BCD00000000\Objects\{id}\Elements\{type}).
     public const string SafeBoot = "25000080";               // safeboot Minimal/Network/DsRepair
     public const string SafeBootAlternateShell = "26000081";  // safebootalternateshell

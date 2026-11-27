@@ -21,7 +21,7 @@ namespace Guardian.Service.Ui;
 /// request header on every API call (blocks cross-site form posts).
 /// </summary>
 public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore store, AdminGate gate, AccessLog accessLog,
-    AppCatalogScanner catalog, LockoutExemptions exemptions, AdminToolsExemptions toolsExempt, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot)
+    AppCatalogScanner catalog, LockoutExemptions exemptions, AdminToolsExemptions toolsExempt, DirectConnectionWatcher direct, DnsFilterServer dns, IspFilterMonitor isp, TrustedClock clock, BootGuard boot, TimedSiteRunner timed)
     : BackgroundService
 {
     public const int Port = 8898;
@@ -628,6 +628,31 @@ public sealed class ManagementUi(ILogger<ManagementUi> log, EncryptedConfigStore
                     store.Save(cfg);
                     log.LogInformation("UI: {Action} {Value} in {List}", body["action"], body["value"], body["list"]);
                     await SendJson(res, 200, State(cfg, who));
+                    break;
+                }
+                case ("/api/network/timed", "GET"):
+                {
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    await SendJson(res, 200, new { rules = view.Network.TimedSites, status = timed.Status(cfg, who), urlFiltering = cfg.Network.UrlFiltering, enabled = cfg.Network.Enabled });
+                    break;
+                }
+                case ("/api/network/timed", "POST"):
+                {
+                    var cfg = store.Load();
+                    var view = UserScopes.View(cfg, who);
+                    List<Guardian.Core.Scheduling.TimeWindow> windows;
+                    try { windows = JsonSerializer.Deserialize<List<Guardian.Core.Scheduling.TimeWindow>>(body.GetValueOrDefault("windows") ?? "[]", Json) ?? []; }
+                    catch (JsonException) { await SendJson(res, 400, new { error = "שעות לא תקינות." }); break; }
+                    int.TryParse(body.GetValueOrDefault("use"), out var use);
+                    int.TryParse(body.GetValueOrDefault("block"), out var rest);
+                    var site = new TimedSite { Site = body.GetValueOrDefault("site") ?? "", UseMinutes = use, BlockMinutes = rest, BlockedDuring = new() { Windows = windows } };
+                    if (!ConfigEditing.TryEditTimedSite(view, body.GetValueOrDefault("action") ?? "set", site, out var err))
+                    { await SendJson(res, 400, new { error = err }); break; }
+                    UserScopes.Commit(cfg, view);
+                    store.Save(cfg);
+                    log.LogInformation("UI: timed site {Action} {Site}", body.GetValueOrDefault("action"), site.Site);
+                    await SendJson(res, 200, new { ok = true });
                     break;
                 }
                 case ("/api/network/mode", "POST"):
