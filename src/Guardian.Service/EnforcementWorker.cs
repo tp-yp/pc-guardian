@@ -10,7 +10,7 @@ namespace Guardian.Service;
 /// </summary>
 public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedConfigStore store, LockoutEnforcer lockout, AppBlocker apps,
     NetworkEnforcer network, DnsFilterServer dns, ProxyHost proxy,
-    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp, TrustedClock clock, WifiGuard wifi, AdminToolsPolicy toolsPolicy, DnsOrigins dnsOrigins, AccountGuard accounts) : BackgroundService
+    DirectConnectionWatcher direct, BootGuard boot, IspFilterMonitor isp, TrustedClock clock, WifiGuard wifi, AdminToolsPolicy toolsPolicy, DnsOrigins dnsOrigins, AccountGuard accounts, TimedSiteRunner timed) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -24,8 +24,9 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
 
         // Older versions locked the program folder against normal users; fix that on every start.
         Run("acl", () => DataDirSecurity.Lock(Paths.InstallDir, usersCanRun: true));
-        dns.Update(cfg);
-        proxy.Update(cfg);
+        var first = timed.Tick(cfg) ?? cfg;
+        dns.Update(first);
+        proxy.Update(first);
         Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
         var slowAt = DateTime.MinValue;
         while (!ct.IsCancellationRequested)
@@ -37,12 +38,12 @@ public sealed class EnforcementWorker(ILogger<EnforcementWorker> log, EncryptedC
             {
                 stamp = store.LastWriteUtc;
                 cfg = store.Load();
-                dns.Update(cfg);
-                proxy.Update(cfg);
                 Run("network", () => network.Tick(cfg, force: true, isolated: isp.Isolated(cfg)));
                 log.LogInformation("Policy reloaded.");
                 reloaded = true;
             }
+            // Sites with time rules: the filter gets new rules when one opens or closes (and after a reload).
+            Run("timed sites", () => { if (timed.Tick(cfg) is { } eff) { dns.Update(eff); proxy.Update(eff); } });
             // Fast part: a new setting is in force within a second, and so is a re-lock or a new account.
             Run("apps", () => apps.Tick(cfg));
             Run("lockout", () => lockout.Tick(cfg));

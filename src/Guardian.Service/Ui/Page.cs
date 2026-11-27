@@ -235,7 +235,7 @@ th.sort{cursor:pointer;user-select:none;white-space:nowrap}th.sort:hover{color:v
 <!-- ===== רשת ===== -->
 <div class="page" data-page="net" hidden>
 <div class="wide warn pcnote">בעמוד הזה יש גם הגדרות שחלות על כל המחשב: הפעלת סינון האתרים, סינון לפי כתובת מלאה, אינטרנט רק דרך הסינון, רשתות Wi-Fi, גישה ישירה, אתרים שלא נבדקים לעומק ומכשירים ברשת המקומית. הן מוצגות רק בניהול של המחשב כולו.<button class="ghost small topc">לניהול המחשב כולו</button></div>
-<div class="wide sub" id="netsub"><button data-sub="netgen" class="machine on">כללי</button><button data-sub="urls">חסימת כתובות</button><button data-sub="netapps">תוכנות ברשת</button><button data-sub="isp" class="machine">אינטרנט מסונן</button><button data-sub="wifi" class="machine">Wi-Fi</button></div>
+<div class="wide sub" id="netsub"><button data-sub="netgen" class="machine on">כללי</button><button data-sub="urls">חסימת כתובות</button><button data-sub="timed">אתרים לפי זמן</button><button data-sub="netapps">תוכנות ברשת</button><button data-sub="isp" class="machine">אינטרנט מסונן</button><button data-sub="wifi" class="machine">Wi-Fi</button></div>
 <div class="page" data-sub-page="netgen">
 <section class="wide machine"><h2>סינון אתרים</h2>
 <div id="tg-net"></div></section>
@@ -318,6 +318,14 @@ th.sort{cursor:pointer;user-select:none;white-space:nowrap}th.sort:hover{color:v
 <ul id="localAddresses"></ul></section>
 </div>
 
+<div class="page" data-sub-page="timed" hidden>
+<section class="wide peruser"><h2>אתרים לפי זמן</h2>
+<p class="hint">לכל אתר אפשר לקבוע שני דברים, אחד מהם או את שניהם: <b>שעות חסימה</b>, שבהן האתר חסום, ו<b>מגבלת זמן</b>: מהכניסה הראשונה האתר פתוח מספר דקות, ואחר כך חסום לזמן שתקבעו. אחרי זמן החסימה, הכניסה הבאה מתחילה סבב חדש. למשל, כדי לאפשר אתר רבע שעה ביום: פתוח 15 דקות, חסום 23 שעות ו-45 דקות.<br>
+הזמן נספר מהכניסה הראשונה, גם אם סוגרים את האתר באמצע. הספירה נשמרת גם אחרי הפעלה מחדש של המחשב, ונמדדת לפי השעון המהימן של Geder.</p>
+<div id="timedWarn" class="warn" hidden></div>
+<form class="row" id="timedAdd" style="margin-top:8px"><input required style="flex:1;direction:ltr" placeholder="youtube.com"><button>הוספת אתר</button></form>
+<div id="timedList"></div></section>
+</div>
 <div class="page" data-sub-page="netapps" hidden>
 <section class="peruser"><h2>תוכנות בלי אינטרנט</h2>
 <p class="hint">התוכנות האלה נפתחות כרגיל אבל לא יכולות להתחבר לאינטרנט. הדרך הנוחה להוסיף היא בלשונית "תוכנות". כאן אפשר גם להדביק נתיב מלא לקובץ.</p>
@@ -440,7 +448,7 @@ function api(p,o={},active=true){const h={'X-Guardian':'1','Content-Type':'appli
   if(!r.ok)throw new Error(HE[j.error]||j.error||('שגיאה '+r.status));return j})}
 const fmtMin=m=>{m=+m||0;return m===1?'דקה':m<60?m+' דקות':m===60?'שעה':m===120?'שעתיים':m%60===0?(m/60)+' שעות':m+' דקות'};
 const fmtDue=d=>new Date(d).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow','/api/tools/unlock','/api/catalog/hours','/api/catalog/sites'];
+let scope='';const SCOPED=['/api/settings','/api/network/msupdates','/api/apps/list','/api/network/list','/api/network/mode','/api/catalog/set','/api/site','/api/apps/allow','/api/tools/unlock','/api/catalog/hours','/api/catalog/sites','/api/network/timed'];
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(SCOPED.includes(p)&&!('user' in b)?{...b,user:scope}:b)});
 const q=(p,extra)=>p+'?user='+encodeURIComponent(scope)+(extra||'');
 const short=u=>u?String(u).split('\\').pop():'';
@@ -460,14 +468,14 @@ function openTab(name){if((name==='settings'||name==='more')&&scope)name='progra
  if(name==='programs'&&!scope&&state&&state.allOwn)name='net';
  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));document.querySelectorAll('[data-page]').forEach(m=>m.hidden=m.dataset.page!==name);
  $('scopebar').hidden=name==='home';if(name==='home')loadDash();
- if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings'){loadHealth();loadCooling()}if(name==='net'){loadIsp();if(!scope)loadWifi();const nb=$('netsub'),cur=nb.querySelector('.on');if(scope&&cur&&cur.classList.contains('machine'))subOpen(nb,'urls')}
+ if(name==='programs'&&!catalog)loadCatalog(false);if(name==='users')loadUsers();if(name==='net')loadDirect();if(name==='settings'){loadHealth();loadCooling()}if(name==='net'){loadIsp();if(!document.querySelector('[data-sub-page=timed]').hidden)loadTimed();if(!scope)loadWifi();const nb=$('netsub'),cur=nb.querySelector('.on');if(scope&&cur&&cur.classList.contains('machine'))subOpen(nb,'urls')}
  if(name==='security'){if(!scope)loadBoot();loadAccounts()}
  buildTree()}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
 // Secondary navigation inside a page: shows one group of sections at a time.
 function subOpen(bar,key){bar.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.sub===key));
  const page=bar.closest('[data-page]');page.querySelectorAll(':scope > [data-sub-page]').forEach(m=>m.hidden=m.dataset.subPage!==key);
- if(key==='netapps')loadDirect();if(key==='isp')loadIsp();if(key==='wifi'&&!scope)loadWifi();buildTree()}
+ if(key==='netapps')loadDirect();if(key==='timed')loadTimed();if(key==='isp')loadIsp();if(key==='wifi'&&!scope)loadWifi();buildTree()}
 // The same secondary navigation, as a tree under the open page in the side bar (on wide screens).
 function buildTree(){const nav=$('tabs');nav.querySelectorAll('.navsub,.caret').forEach(x=>x.remove());
  const top=nav.querySelector('button.on');if(!top)return;const page=document.querySelector('[data-page='+top.dataset.tab+']');
@@ -691,6 +699,37 @@ function loadDirect(){api('/api/direct',{},false).then(rows=>{$('direct').replac
   el('td',{},d.allowed?el('span',{class:'ok'},'מאושרת'):el('button',{class:'link',onclick:()=>edit('directApps','add',d.appPath).then(()=>{toast('התוכנה קיבלה גישה ישירה. אם היא עדיין לא מתחברת, סגרו ופתחו אותה מחדש.');loadDirect()}).catch(()=>{})},'לאפשר גישה ישירה')))));
  $('directEmpty').textContent=rows.length?'':(state&&state.settings['network.urlFiltering']?'עדיין לא נחסמו תוכנות. מצוין.':'"סינון לפי כתובת מלאה" כבוי, ולכן אין מה להציג.')}).catch(()=>{})}
 
+// Sites by time: blocked hours, and/or a time limit from the first visit.
+const TPH={Open:['','פתוח'],Using:['ok','פתוח עכשיו'],Resting:['bad','חסום'],Hours:['bad','חסום עכשיו לפי השעות']};
+const hm=d=>new Date(d).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+function loadTimed(){api(q('/api/network/timed'),{},false).then(t=>{
+ const w=$('timedWarn');w.hidden=t.enabled&&t.urlFiltering;
+ w.textContent=!t.enabled?'"סינון אתרים וחומת אש" כבוי (ב"רשת" > "כללי"), ולכן הכללים כאן לא נאכפים.':'"סינון לפי כתובת מלאה" כבוי. החסימה עדיין עובדת, אבל דף שכבר פתוח כשהאתר נחסם יכול להמשיך לעבוד עד שסוגרים אותו או טוענים אותו מחדש.';
+ const st=Object.fromEntries((t.status||[]).map(x=>[x.site,x]));
+ $('timedList').replaceChildren(...(t.rules.length?t.rules.map(r=>timedCard(r,st[r.site])):[el('p',{class:'hint',style:'margin-top:10px'},'עוד לא הוספו אתרים.')]))}).catch(fail)}
+function timedCard(r,s){const box=el('div');(r.blockedDuring.windows||[]).forEach(w=>box.append(winRow(w)));
+ const use=el('input',{type:'number',min:0,max:10080,value:r.useMinutes||0,style:'width:80px'});
+ const bh=el('input',{type:'number',min:0,max:168,value:Math.floor((r.blockMinutes||0)/60),style:'width:70px'}),bm=el('input',{type:'number',min:0,max:59,value:(r.blockMinutes||0)%60,style:'width:70px'});
+ const ph=s?TPH[s.phase]||TPH.Open:TPH.Open;
+ const badge=el('span',{class:'badge '+ph[0]},ph[1]+(s&&s.until?(s.phase==='Using'?', נחסם ב-':' עד ')+hm(s.until):'')+(s&&s.phase==='Open'&&r.useMinutes?' (הזמן יתחיל בכניסה הבאה)':''));
+ const save=()=>post('/api/network/timed',{action:'set',site:r.site,windows:JSON.stringify(readWins(box)),use:use.value,block:String((+bh.value||0)*60+(+bm.value||0))}).then(()=>{toast('הכללים של '+r.site+' נשמרו'+(scope?' (עבור '+scope+')':''));loadTimed()}).catch(fail);
+ const del=el('button',{class:'link',style:'color:var(--bad)'},'הסרה');let sure=false;
+ del.onclick=()=>{if(!sure){sure=true;del.textContent='בטוח? לחצו שוב';return}post('/api/network/timed',{action:'remove',site:r.site}).then(()=>{toast(r.site+' הוסר');loadTimed()}).catch(fail)};
+ const I_CLOCK='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',I_LOCK='<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
+ const head=(icon,text)=>{const h=el('h3');h.innerHTML=icon;h.append(text);return h};
+ return el('div',{class:'user'},el('div',{class:'uhead'},el('b',{class:'n ltr'},r.site),badge,del),
+  el('div',{class:'opts'},
+   el('div',{class:'opt'},head(I_LOCK,'שעות חסימה'),el('p',{class:'hint'},'בשעות האלה האתר חסום.'),box,
+    el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'ghost',onclick:()=>box.append(winRow({days:DAYS.map(d=>d[0]),start:'08:00',end:'13:00'}))},'+ טווח שעות'))),
+   el('div',{class:'opt'},head(I_CLOCK,'מגבלת זמן'),el('p',{class:'hint'},'0 דקות = בלי מגבלת זמן.'),
+    el('div',{class:'row'},el('span',{},'פתוח'),use,el('span',{},'דקות מהכניסה הראשונה')),
+    el('div',{class:'row',style:'margin-top:8px'},el('span',{},'ואז חסום'),bh,el('span',{},'שעות ו-'),bm,el('span',{},'דקות')))),
+  el('div',{class:'usave'},el('button',{onclick:save},'שמירה')))}
+$('timedAdd').onsubmit=e=>{e.preventDefault();const i=e.target.querySelector('input');const v=i.value.trim();if(!v)return;
+ api(q('/api/network/timed'),{},false).then(t=>{if(t.rules.some(r=>r.site===v.toLowerCase())){toast('האתר כבר ברשימה');return}
+  const r={site:v,useMinutes:15,blockMinutes:1425,blockedDuring:{windows:[]}};
+  $('timedList').querySelector('p.hint')?.remove();$('timedList').prepend(timedCard(r,null));i.value='';toast('קבעו את הכללים ולחצו "שמירה"')}).catch(fail)};
+
 // Users
 const DAYS=[['Sunday','א'],['Monday','ב'],['Tuesday','ג'],['Wednesday','ד'],['Thursday','ה'],['Friday','ו'],['Saturday','ש']];
 function winRow(w){const d=el('span',{class:'days'},...DAYS.map(([v,l])=>el('label',{},el('input',{type:'checkbox',value:v,checked:w.days.includes(v)}),l)));
@@ -780,7 +819,7 @@ $('pause').onchange=()=>tick();
 // Delay before turning off
 const PLAB={'/api/settings':'הגדרה','/api/catalog/set':'תוכנה','/api/catalog/hours':'שעות חסימה לתוכנה','/api/catalog/sites':'רשימת אתרים לתוכנה','/api/release':'שחרור כל ההגבלות','/api/backup/restore':'שחזור הגדרות מגיבוי','/api/apps/list':'רשימת תוכנות','/api/apps/allow':'היתר לתוכנה',
  '/api/site':'היתר לאתר','/api/network/list':'רשימת רשת','/api/network/mode':'מצב סינון האתרים','/api/users/set':'שעות ומניעת התמכרות','/api/users/unlock':'שחרור זמני של משתמש',
- '/api/tools/unlock':'שחרור זמני של כלי מנהל','/api/users/own':'חזרה לברירת המחדל','/api/users/disable':'הפעלה מחדש של חשבון','/api/wifi/list':'הוספת רשת Wi-Fi','/api/network/msupdates':'החרגת עדכוני מיקרוסופט','/api/isp/trust':'תעודת סינון','/api/cooling/set':'הקטנת ההשהיה'};
+ '/api/tools/unlock':'שחרור זמני של כלי מנהל','/api/users/own':'חזרה לברירת המחדל','/api/users/disable':'הפעלה מחדש של חשבון','/api/network/timed':'אתר לפי זמן','/api/wifi/list':'הוספת רשת Wi-Fi','/api/network/msupdates':'החרגת עדכוני מיקרוסופט','/api/isp/trust':'תעודת סינון','/api/cooling/set':'הקטנת ההשהיה'};
 function describePending(p){const b=p.body||{};const t=(TOGGLES.find(x=>x[0]===b.key)||[])[1];
  const what=p.path==='/api/settings'?(t||b.key)+' – '+(b.value==='true'?'הדלקה':'כיבוי'):p.path==='/api/cooling/set'?'הקטנת ההשהיה ל-'+(b.minutes!=null?fmtMin(b.minutes):b.hours+' שעות'):
   (PLAB[p.path]||p.path)+(b.path?': '+b.path.split('\\').pop():b.value?': '+b.value:b.target?': '+b.target:b.minutes?': '+b.minutes+' דקות':'');

@@ -83,6 +83,19 @@ public static class Cooling
             case "/api/users/unlock":
             case "/api/tools/unlock":
                 return int.TryParse(B("minutes"), out var m) && m > 0;
+            case "/api/network/timed":
+            {
+                var site = UrlPolicy.NormalizeHost(B("site"));
+                var old = view.Network.TimedSites.FirstOrDefault(t => UrlPolicy.NormalizeHost(t.Site) == site);
+                var allow = view.Network.Mode == UrlMode.Allowlist;
+                if (B("action") == "remove") return old != null && !allow; // in an allow list a timed site is an allowed one
+                if (old is null) return allow;
+                int.TryParse(B("use"), out var use);
+                int.TryParse(B("block"), out var rest);
+                var stricter = Covers(Windows(B("windows")), old.BlockedDuring.Windows) &&
+                    (old.UseMinutes == 0 || (use > 0 && use <= old.UseMinutes && rest >= old.BlockMinutes));
+                return !stricter;
+            }
             case "/api/users/disable":
                 return B("value") != "true";
             case "/api/users/own":

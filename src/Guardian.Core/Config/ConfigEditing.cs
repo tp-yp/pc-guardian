@@ -291,6 +291,24 @@ public static class ConfigEditing
         return e.Host + path;
     }
 
+    /// <summary>Adds or replaces a site with time rules, or removes it ("remove").</summary>
+    public static bool TryEditTimedSite(GuardianConfig cfg, string action, Policy.TimedSite site, out string error)
+    {
+        error = "";
+        var list = cfg.Network.TimedSites;
+        var host = Policy.UrlPolicy.NormalizeHost(site.Site ?? "");
+        var i = list.FindIndex(t => Policy.UrlPolicy.NormalizeHost(t.Site) == host);
+        if (action == "remove")
+        {
+            if (i < 0) { error = "Not in list."; return false; }
+            list.RemoveAt(i);
+            return true;
+        }
+        if (!Policy.TimedSites.TryValidate(site, out error)) return false;
+        if (i >= 0) list[i] = site; else list.Add(site);
+        return true;
+    }
+
     /// <summary>Sets (or with no windows, removes) the lock-out schedule of one Windows account.</summary>
     public static bool TrySetLockout(GuardianConfig cfg, string user, IEnumerable<Scheduling.TimeWindow> windows, int warningMinutes, out string error, int breakEveryMinutes = 0,
         IEnumerable<Scheduling.TimeWindow>? breakWindows = null)

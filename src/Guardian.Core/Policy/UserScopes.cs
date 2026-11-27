@@ -36,7 +36,7 @@ public static class UserScopes
     private static NetworkPolicy Merge(NetworkPolicy g, NetworkPolicy u) => new()
     {
         Enabled = g.Enabled, UrlFiltering = g.UrlFiltering, NoDecryptDomains = g.NoDecryptDomains, AllowDirectApps = g.AllowDirectApps, LocalAddresses = g.LocalAddresses,
-        Mode = u.Mode, Domains = u.Domains, Exceptions = u.Exceptions, BlockedAppPaths = u.BlockedAppPaths, AppSites = u.AppSites,
+        Mode = u.Mode, Domains = u.Domains, Exceptions = u.Exceptions, BlockedAppPaths = u.BlockedAppPaths, AppSites = u.AppSites, TimedSites = u.TimedSites,
     };
 
     /// <summary>
@@ -88,10 +88,17 @@ public static class UserScopes
                 OtherDomains = [.. cfg.Network.OtherDomains], OtherExceptions = [.. cfg.Network.OtherExceptions],
                 AppSites = cfg.Network.AppSites.Select(a => new AppSites { ExePath = a.ExePath, Sites = [.. a.Sites] }).ToList(),
                 BlockedAppPaths = [.. cfg.Network.BlockedAppPaths], NoDecryptDomains = [], AllowDirectApps = [],
+                TimedSites = cfg.Network.TimedSites.Select(CopyTimed).ToList(),
             },
         });
         return true;
     }
+
+    private static TimedSite CopyTimed(TimedSite t) => new()
+    {
+        Site = t.Site, UseMinutes = t.UseMinutes, BlockMinutes = t.BlockMinutes,
+        BlockedDuring = new() { Windows = [.. t.BlockedDuring.Windows] },
+    };
 
     /// <summary>True if program blocking is on for anyone (the general rules or any account).</summary>
     /// <summary>"Program locking" is on for the whole computer or for at least one account.</summary>

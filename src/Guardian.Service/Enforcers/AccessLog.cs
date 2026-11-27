@@ -19,12 +19,17 @@ public sealed class AccessLog
 
     public int KeepHours { get; set; } = 24;
 
+    /// <summary>Raised for every new entry (used to start the clock of sites with a time limit).</summary>
+    public event Action<AccessEntry>? Added;
+
     public void Add(string source, string target, bool allowed, string? user = null, string? app = null)
     {
         var key = source + target + allowed + user + app;
         if (key == _lastKey) return; // collapse bursts of identical lookups
         _lastKey = key;
-        _q.Enqueue(new(DateTime.Now, source, target, allowed, string.IsNullOrEmpty(user) ? null : user, string.IsNullOrEmpty(app) ? null : app));
+        var entry = new AccessEntry(DateTime.Now, source, target, allowed, string.IsNullOrEmpty(user) ? null : user, string.IsNullOrEmpty(app) ? null : app);
+        _q.Enqueue(entry);
+        try { Added?.Invoke(entry); } catch (Exception) { /* a listener never breaks logging */ }
         while (_q.Count > Capacity) _q.TryDequeue(out _);
         if (++_adds % 500 == 0) Trim();
     }

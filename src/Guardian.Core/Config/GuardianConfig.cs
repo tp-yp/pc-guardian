@@ -265,6 +265,8 @@ public sealed class NetworkPolicy
     public List<string> AllowDirectApps { get; set; } = new();
     /// <summary>Programs that may reach only some sites (also through WebView2). Enforced by the full-URL filter.</summary>
     public List<AppSites> AppSites { get; set; } = new();
+    /// <summary>Sites blocked by the clock: in set hours, and/or after some minutes of use (see <see cref="Policy.TimedSites"/>).</summary>
+    public List<Policy.TimedSite> TimedSites { get; set; } = new();
     /// <summary>
     /// Home-network addresses left out of the filter (a NAS, a printer, a local server): one address or a
     /// CIDR range, private ranges only. For the whole computer. DNS stays filtered.
